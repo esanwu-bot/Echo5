@@ -1,0 +1,211 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ═══════════ THEME: :root=light, .dark=dark ═══════════ */
+:root {
+  --bg0: #F5F6F8;
+  --bg1: #FFFFFF;
+  --bg2: #F2F3F5;
+  --bg3: #E8EAED;
+  --line: #E5E6EB;
+  --line2: #C9CDD4;
+  --text: #1D2129;
+  --dim: #4E5969;
+  --faint: #86909C;
+  --amber: #F77234;
+  --amber2: #E85D04;
+  --teal: #0DA5AA;
+  --green: #009A29;
+  --red: #E63E3E;
+  --violet: #6A3FC5;
+  --blue: #2478CC;
+  --shadow: rgba(0, 0, 0, 0.10);
+  --grid-c: rgba(29, 33, 41, 0.035);
+  --glow1: rgba(247, 114, 52, 0.05);
+  --glow2: rgba(13, 165, 170, 0.04);
+  --glow3: rgba(106, 63, 197, 0.03);
+  --serp-bg: #FFFFFF;
+  --serp-text: #1D2129;
+  --serp-link: #2478CC;
+  --serp-sub: #4E5969;
+  --serp-pill: #F2F3F5;
+  --term-bg: #1D2129;
+  --term-text: #A9BCD8;
+  --scroll-thumb: #C9CDD4;
+  --bubble-user-bg: rgba(13, 165, 170, 0.05);
+  --bubble-user-bd: rgba(13, 165, 170, 0.25);
+  /* Marketing brand colors (fixed, theme-independent) */
+  --indigo: #4F46E5;
+  --indigo-light: #6366F1;
+  --mkt-bg: #0F0F14;
+  --mkt-surface: #1A1A24;
+  --mkt-text: #F0F0F5;
+  --mkt-dim: #9CA3AF;
+}
+
+.dark {
+  --bg0: #0A0F17;
+  --bg1: #0E1622;
+  --bg2: #121C2C;
+  --bg3: #17233A;
+  --line: #1D2A3F;
+  --line2: #2A3C5A;
+  --text: #E9EFF8;
+  --dim: #93A7C4;
+  --faint: #5C7192;
+  --amber: #FFB454;
+  --amber2: #FF8A3D;
+  --teal: #4FD8C4;
+  --green: #6BDB81;
+  --red: #FF6B70;
+  --violet: #B49BFC;
+  --blue: #74C0FC;
+  --shadow: rgba(0, 0, 0, 0.5);
+  --grid-c: rgba(120, 150, 200, 0.045);
+  --glow1: rgba(255, 150, 60, 0.10);
+  --glow2: rgba(64, 210, 190, 0.09);
+  --glow3: rgba(150, 120, 255, 0.055);
+  --serp-bg: #F4F6F9;
+  --serp-text: #1F2733;
+  --serp-link: #1A4FC0;
+  --serp-sub: #5F6B7A;
+  --serp-pill: #E7ECF2;
+  --term-bg: #070B12;
+  --term-text: #7E93B4;
+  --scroll-thumb: #22314B;
+  --bubble-user-bg: rgba(79, 216, 196, 0.05);
+  --bubble-user-bd: rgba(79, 216, 196, 0.22);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  background: var(--bg0);
+  color: var(--text);
+  font-size: 14px;
+  transition: background 0.35s, color 0.35s;
+}
+
+::selection {
+  background: rgba(255, 180, 84, 0.28);
+}
+
+.dark ::selection {
+  background: rgba(255, 180, 84, 0.28);
+}
+
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border-radius: 8px;
+  border: 2px solid var(--bg0);
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ═══════════ ANIMATIONS ═══════════ */
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(107, 219, 129, 0.5); }
+  55% { box-shadow: 0 0 0 6px rgba(107, 219, 129, 0); }
+}
+
+@keyframes pulse-amber {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 180, 84, 0.5); }
+  55% { box-shadow: 0 0 0 5px rgba(255, 180, 84, 0); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes thinking-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-5px); opacity: 1; }
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes blink-cursor {
+  50% { opacity: 0; }
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(24px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scroll-reveal {
+  from { opacity: 0; transform: translateY(32px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes typewriter {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+@keyframes count-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.animate-pop-in {
+  animation: pop-in 0.18s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.animate-toast-in {
+  animation: toast-in 0.3s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+/* Workbench grid + glow background */
+.workbench-bg::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--grid-c) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-c) 1px, transparent 1px);
+  background-size: 38px 38px;
+}
+
+.workbench-bg::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(720px 420px at 10% -6%, var(--glow1), transparent 62%),
+    radial-gradient(860px 520px at 96% 112%, var(--glow2), transparent 62%),
+    radial-gradient(520px 320px at 58% -4%, var(--glow3), transparent 60%);
+}

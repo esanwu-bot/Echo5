@@ -1,0 +1,2 @@
+{ "mcpServers": { "hutian-seo": { "command": "hutian-seo-mcp",
+  "env": { "PAGESPEED_API_KEY": "${PAGESPEED_API_KEY}", "HUTIAN_CITATION_API": "${HUTIAN_CITATION_API}" } } } }

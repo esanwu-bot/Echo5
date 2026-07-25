@@ -1,0 +1,4 @@
+{ "name": "hutian-seo", "version": "0.1.0",
+  "description": "壶天 SEO/GEO 智能优化：四步诊断、AI 引用追踪、结构化数据映射、站点地图提交、品牌实体更名",
+  "author": { "name": "Hutian" }, "category": "monitoring",
+  "keywords": ["seo","geo","schema.org","lighthouse","indexnow","json-ld"], "domains": ["hutian.com"] }

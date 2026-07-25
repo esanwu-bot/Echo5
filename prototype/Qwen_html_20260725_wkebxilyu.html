@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>壶天 · AI Agent Workbench</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+/* ═══════════ THEME VARIABLES ═══════════ */
+:root{
+  --bg0:#0A0F17; --bg1:#0E1622; --bg2:#121C2C; --bg3:#17233A;
+  --line:#1D2A3F; --line2:#2A3C5A;
+  --text:#E9EFF8; --dim:#93A7C4; --faint:#5C7192;
+  --amber:#FFB454; --amber2:#FF8A3D;
+  --teal:#4FD8C4; --green:#6BDB81; --red:#FF6B70; --violet:#B49BFC; --blue:#74C0FC;
+  --shadow:rgba(0,0,0,.5);
+  --grid-c:rgba(120,150,200,.045);
+  --glow1:rgba(255,150,60,.10); --glow2:rgba(64,210,190,.09); --glow3:rgba(150,120,255,.055);
+  --serp-bg:#F4F6F9; --serp-text:#1F2733; --serp-link:#1A4FC0; --serp-sub:#5F6B7A; --serp-pill:#E7ECF2;
+  --term-bg:#070B12; --term-text:#7E93B4;
+  --scroll-thumb:#22314B;
+  --bubble-user-bg:rgba(79,216,196,.05); --bubble-user-bd:rgba(79,216,196,.22);
+}
+[data-theme="light"]{
+  --bg0:#F5F6F8; --bg1:#FFFFFF; --bg2:#F2F3F5; --bg3:#E8EAED;
+  --line:#E5E6EB; --line2:#C9CDD4;
+  --text:#1D2129; --dim:#4E5969; --faint:#86909C;
+  --amber:#F77234; --amber2:#E85D04;
+  --teal:#0DA5AA; --green:#009A29; --red:#E63E3E; --violet:#6A3FC5; --blue:#2478CC;
+  --shadow:rgba(0,0,0,.10);
+  --grid-c:rgba(29,33,41,.035);
+  --glow1:rgba(247,114,52,.05); --glow2:rgba(13,165,170,.04); --glow3:rgba(106,63,197,.03);
+  --serp-bg:#FFFFFF; --serp-text:#1D2129; --serp-link:#2478CC; --serp-sub:#4E5969; --serp-pill:#F2F3F5;
+  --term-bg:#1D2129; --term-text:#A9BCD8;
+  --scroll-thumb:#C9CDD4;
+  --bubble-user-bg:rgba(13,165,170,.05); --bubble-user-bd:rgba(13,165,170,.25);
+}
+
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:'Noto Sans SC',sans-serif; background:var(--bg0); color:var(--text);
+  font-size:14px; overflow:hidden;
+  transition:background .35s,color .35s;
+}
+body::before{
+  content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background-image:
+    linear-gradient(var(--grid-c) 1px,transparent 1px),
+    linear-gradient(90deg,var(--grid-c) 1px,transparent 1px);
+  background-size:38px 38px;
+}
+body::after{
+  content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background:
+    radial-gradient(720px 420px at 10% -6%, var(--glow1), transparent 62%),
+    radial-gradient(860px 520px at 96% 112%, var(--glow2), transparent 62%),
+    radial-gradient(520px 320px at 58% -4%, var(--glow3), transparent 60%);
+}
+::selection{background:rgba(255,180,84,.28)}
+[data-theme="light"] ::selection{background:rgba(247,114,52,.18)}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:var(--scroll-thumb);border-radius:8px;border:2px solid var(--bg0)}
+::-webkit-scrollbar-track{background:transparent}
+
+.app{position:relative;z-index:1;display:flex;flex-direction:column;height:100vh}
+
+/* ═══════════ TOPBAR ═══════════ */
+.topbar{
+  height:52px;flex:0 0 52px;display:flex;align-items:center;gap:14px;
+  padding:0 16px;border-bottom:1px solid var(--line);
+  background:var(--bg1);transition:background .35s,border-color .35s;
+}
+.logo{display:flex;align-items:center;gap:10px;cursor:pointer}
+.logo-mark{
+  width:28px;height:28px;border-radius:7px;display:grid;place-items:center;
+  background:linear-gradient(135deg,var(--amber),var(--amber2));
+  color:#fff;font-weight:900;font-size:15px;
+  box-shadow:0 2px 10px rgba(247,114,52,.3);
+  transition:transform .25s cubic-bezier(.34,1.56,.64,1);
+}
+[data-theme="dark"] .logo-mark{color:#191006}
+.logo:hover .logo-mark{transform:rotate(-8deg) scale(1.06)}
+.logo-word{line-height:1.05}
+.logo-word b{font-family:'Space Grotesk','Noto Sans SC',sans-serif;font-size:16px;font-weight:700;letter-spacing:.02em;display:block}
+.logo-word span{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.28em;color:var(--faint)}
+.tb-div{width:1px;height:22px;background:var(--line)}
+.ws-pick{
+  display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;
+  border:1px solid transparent;color:var(--dim);cursor:pointer;font-size:13px;transition:.2s;
+}
+.ws-pick:hover{border-color:var(--line2);background:var(--bg2);color:var(--text)}
+.ws-pick code{font-family:'JetBrains Mono',monospace;font-size:12px}
+.ws-dot{width:7px;height:7px;border-radius:50%;background:var(--teal);box-shadow:0 0 8px var(--teal)}
+.tb-spacer{flex:1}
+.model-pill{position:relative}
+.model-btn{
+  display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:8px;cursor:pointer;
+  border:1px solid var(--line2);background:var(--bg2);color:var(--text);
+  font-family:'JetBrains Mono',monospace;font-size:12px;transition:.2s;
+}
+.model-btn:hover{border-color:var(--amber);box-shadow:0 0 0 3px rgba(247,114,52,.12)}
+.model-btn .mdot{width:8px;height:8px;border-radius:50%;background:linear-gradient(135deg,var(--teal),var(--blue))}
+.model-menu{
+  position:absolute;top:calc(100% + 8px);right:0;min-width:210px;z-index:60;
+  background:var(--bg1);border:1px solid var(--line2);border-radius:10px;padding:6px;
+  box-shadow:0 16px 40px var(--shadow);display:none;
+}
+.model-menu.open{display:block;animation:pop .18s cubic-bezier(.34,1.4,.64,1)}
+@keyframes pop{from{opacity:0;transform:translateY(-6px) scale(.97)}}
+.mm-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:7px;cursor:pointer;font-size:12.5px;color:var(--dim);transition:.15s}
+.mm-item:hover{background:var(--bg2);color:var(--text)}
+.mm-item.on{color:var(--text)}
+.mm-item .mk{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber)}
+.mm-item i{width:7px;height:7px;border-radius:50%;flex:0 0 7px}
+.icon-btn{
+  width:32px;height:32px;border-radius:8px;display:grid;place-items:center;cursor:pointer;
+  border:1px solid transparent;color:var(--dim);background:transparent;transition:.2s;position:relative;
+}
+.icon-btn:hover{color:var(--text);border-color:var(--line2);background:var(--bg2);transform:translateY(-1px)}
+.icon-btn svg{width:16px;height:16px}
+.icon-btn .ndot{position:absolute;top:6px;right:7px;width:6px;height:6px;border-radius:50%;background:var(--amber);box-shadow:0 0 6px var(--amber)}
+.icon-btn.spin svg{animation:rot .7s ease}
+@keyframes rot{to{transform:rotate(360deg)}}
+.sys-chip{
+  display:flex;align-items:center;gap:7px;font-size:12px;color:var(--dim);
+  padding:6px 11px;border-radius:999px;border:1px solid rgba(0,154,41,.25);background:rgba(0,154,41,.06);
+}
+[data-theme="dark"] .sys-chip{border-color:rgba(107,219,129,.25);background:rgba(107,219,129,.07)}
+.sys-chip i{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(0,154,41,.5)}55%{box-shadow:0 0 0 6px rgba(0,154,41,0)}}
+.avatar{
+  width:28px;height:28px;border-radius:50%;display:grid;place-items:center;cursor:pointer;
+  background:linear-gradient(135deg,var(--violet),var(--blue));color:#fff;font-weight:700;font-size:12px;
+  transition:transform .2s;
+}
+.avatar:hover{transform:scale(1.1)}
+.nav-toggle{display:none}
+
+/* ═══════════ WORKSPACE ═══════════ */
+.workspace{flex:1;display:flex;min-height:0}
+
+/* ---- SIDEBAR ---- */
+.sidebar{
+  width:266px;flex:0 0 266px;background:var(--bg1);border-right:1px solid var(--line);
+  display:flex;flex-direction:column;min-height:0;transition:background .35s,border-color .35s;
+}
+.sb-top{padding:14px 14px 10px}
+.btn-new{
+  width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:9px 0;border-radius:9px;border:none;cursor:pointer;
+  background:linear-gradient(135deg,var(--amber),var(--amber2));color:#fff;
+  font-weight:700;font-size:13.5px;
+  box-shadow:0 4px 16px rgba(247,114,52,.25);transition:.2s;
+}
+[data-theme="dark"] .btn-new{color:#1C1207}
+.btn-new:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(247,114,52,.35)}
+.btn-new:active{transform:translateY(0)}
+.sb-search{
+  margin-top:10px;display:flex;align-items:center;gap:8px;padding:7px 11px;
+  border:1px solid var(--line);border-radius:8px;background:var(--bg0);color:var(--faint);transition:.2s;
+}
+.sb-search:focus-within{border-color:var(--line2);color:var(--dim)}
+.sb-search input{flex:1;background:none;border:none;outline:none;color:var(--text);font-size:12.5px}
+.sb-search svg{width:13px;height:13px;flex:0 0 13px}
+.sb-scroll{flex:1;overflow-y:auto;padding:4px 10px 12px}
+.sb-label{
+  font-size:10.5px;letter-spacing:.18em;color:var(--faint);font-weight:700;
+  padding:12px 6px 7px;display:flex;align-items:center;justify-content:space-between;
+}
+.sb-label em{font-style:normal;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--faint)}
+.s-item{
+  display:flex;gap:10px;align-items:flex-start;padding:9px 10px;border-radius:9px;cursor:pointer;
+  border:1px solid transparent;position:relative;transition:.18s;
+}
+.s-item:hover{background:var(--bg2)}
+.s-item.on{background:var(--bg2);border-color:var(--line2)}
+.s-item.on::before{
+  content:"";position:absolute;left:-1px;top:9px;bottom:9px;width:3px;border-radius:3px;
+  background:linear-gradient(180deg,var(--amber),var(--amber2));
+}
+.s-ico{width:26px;height:26px;border-radius:7px;flex:0 0 26px;display:grid;place-items:center;background:var(--bg3);margin-top:1px}
+.s-ico svg{width:13px;height:13px}
+.s-body{flex:1;min-width:0}
+.s-title{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.s-meta{font-size:11px;color:var(--faint);margin-top:2px;display:flex;align-items:center;gap:6px}
+.s-st{width:7px;height:7px;border-radius:50%;flex:0 0 7px;margin-top:5px}
+.s-st.run{background:var(--amber);animation:pulse2 1.6s infinite}
+@keyframes pulse2{0%,100%{box-shadow:0 0 0 0 rgba(247,114,52,.5)}55%{box-shadow:0 0 0 5px rgba(247,114,52,0)}}
+.s-st.done{background:var(--green)}
+.s-st.queue{background:var(--faint)}
+.rt-card{margin:6px 14px 14px;border:1px solid var(--line);border-radius:11px;background:var(--bg2);padding:12px 13px;transition:background .35s,border-color .35s}
+.rt-row{display:flex;justify-content:space-between;font-size:11.5px;color:var(--dim);margin-bottom:6px}
+.rt-row b{font-family:'JetBrains Mono',monospace;font-weight:500;color:var(--text)}
+.ctx-bar{height:5px;border-radius:4px;background:var(--bg0);overflow:hidden;margin-bottom:12px}
+.ctx-bar i{display:block;height:100%;width:0;border-radius:4px;background:linear-gradient(90deg,var(--teal),var(--blue));transition:width 1.4s cubic-bezier(.22,1,.36,1)}
+.rt-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.rt-mini{background:var(--bg0);border:1px solid var(--line);border-radius:8px;padding:8px 9px;transition:background .35s}
+.rt-mini span{font-size:10px;color:var(--faint);display:flex;align-items:center;gap:5px}
+.rt-mini b{font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:500;display:block;margin-top:3px}
+.gdot{width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;box-shadow:0 0 6px var(--green)}
+/* sidebar bottom + theme */
+.sb-bottom{border-top:1px solid var(--line);padding:10px 14px;transition:border-color .35s}
+.sb-user{display:flex;align-items:center;gap:10px}
+.sb-user .avatar{width:26px;height:26px;font-size:11px}
+.sb-user b{font-size:12.5px;display:block}
+.sb-user span{font-size:10.5px;color:var(--faint);font-family:'JetBrains Mono',monospace}
+.sb-actions{margin-left:auto;display:flex;gap:4px}
+.sb-actions .icon-btn{width:28px;height:28px}
+.sb-actions .icon-btn svg{width:14px;height:14px}
+.theme-wrap{position:relative}
+.theme-menu{
+  position:absolute;bottom:calc(100% + 10px);right:0;min-width:150px;z-index:70;
+  background:var(--bg1);border:1px solid var(--line2);border-radius:10px;padding:5px;
+  box-shadow:0 12px 36px var(--shadow);display:none;
+}
+.theme-menu.open{display:block;animation:pop .18s cubic-bezier(.34,1.4,.64,1)}
+.tm-item{
+  display:flex;align-items:center;gap:9px;padding:8px 11px;border-radius:7px;cursor:pointer;
+  font-size:12.5px;color:var(--dim);transition:.15s;
+}
+.tm-item:hover{background:var(--bg2);color:var(--text)}
+.tm-item.on{color:var(--text)}
+.tm-item svg{width:14px;height:14px;flex:0 0 14px}
+.tm-item .mk{margin-left:auto;font-size:11px;color:var(--amber);opacity:0}
+.tm-item.on .mk{opacity:1}
+
+/* ---- STAGE ---- */
+.stage{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--bg0);transition:background .35s}
+.session-head{
+  padding:16px 28px 14px;border-bottom:1px solid var(--line);
+  display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap;transition:border-color .35s;
+}
+.sh-left{flex:1;min-width:240px}
+.crumb{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--faint);letter-spacing:.04em}
+.crumb b{color:var(--teal);font-weight:500}
+.sh-title{font-family:'Space Grotesk','Noto Sans SC',sans-serif;font-size:21px;font-weight:700;letter-spacing:.01em;margin-top:4px;display:flex;align-items:center;gap:11px}
+.run-badge{
+  display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:500;color:var(--amber);
+  border:1px solid rgba(247,114,52,.35);background:rgba(247,114,52,.08);
+  padding:3px 9px;border-radius:999px;vertical-align:3px;
+}
+.run-badge i{width:6px;height:6px;border-radius:50%;background:var(--amber);animation:pulse2 1.6s infinite}
+.sh-sub{font-size:12px;color:var(--dim);margin-top:5px;display:flex;gap:14px;flex-wrap:wrap}
+.sh-sub code{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--faint)}
+.sh-right{display:flex;align-items:center;gap:12px}
+.spark{width:120px;height:34px}
+.spark polyline{fill:none;stroke:var(--teal);stroke-width:2;stroke-linecap:round;stroke-dasharray:220;stroke-dashoffset:220;animation:draw 1.8s .4s cubic-bezier(.22,1,.36,1) forwards}
+.spark .fillp{fill:url(#sg);stroke:none;opacity:0;animation:fin .8s 1.4s forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+@keyframes fin{to{opacity:1}}
+.spark-label{font-size:10px;color:var(--faint);text-align:right;margin-top:2px;font-family:'JetBrains Mono',monospace}
+.spark-label b{color:var(--green);font-weight:600}
+.btn-ghost{
+  display:flex;align-items:center;gap:7px;padding:7px 13px;border-radius:8px;cursor:pointer;
+  border:1px solid var(--line2);background:var(--bg2);color:var(--dim);font-size:12.5px;transition:.2s;
+}
+.btn-ghost:hover{color:var(--text);border-color:var(--amber);transform:translateY(-1px)}
+.btn-ghost svg{width:13px;height:13px}
+
+.chat{flex:1;overflow-y:auto;padding:24px 28px 18px;scroll-behavior:smooth}
+.msg{display:flex;gap:13px;max-width:860px;margin:0 auto 20px;opacity:0;transform:translateY(12px);transition:opacity .45s,transform .45s cubic-bezier(.22,1,.36,1)}
+.msg.in{opacity:1;transform:none}
+.m-ava{width:30px;height:30px;border-radius:8px;flex:0 0 30px;display:grid;place-items:center;font-size:14px;font-weight:900}
+.msg.agent .m-ava{background:linear-gradient(135deg,var(--amber),var(--amber2));color:#fff;box-shadow:0 2px 10px rgba(247,114,52,.25)}
+[data-theme="dark"] .msg.agent .m-ava{color:#191006}
+.msg.user .m-ava{background:var(--bg3);border:1px solid var(--line2);color:var(--teal);font-family:'JetBrains Mono',monospace;font-size:12px}
+.m-main{flex:1;min-width:0}
+.m-meta{display:flex;align-items:baseline;gap:8px;margin-bottom:6px}
+.m-meta b{font-size:13.5px}
+.m-meta span{font-size:10.5px;color:var(--faint);border:1px solid var(--line);padding:1px 7px;border-radius:999px}
+.m-meta time{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--faint);margin-left:auto}
+.m-bubble{
+  background:var(--bg1);border:1px solid var(--line);border-radius:4px 12px 12px 12px;
+  padding:14px 16px;font-size:13.5px;line-height:1.75;color:var(--dim);transition:background .35s,border-color .35s;
+}
+[data-theme="dark"] .m-bubble{color:#CBD8EC}
+.msg.user .m-bubble{background:var(--bubble-user-bg);border-color:var(--bubble-user-bd);border-radius:12px 4px 12px 12px}
+.m-bubble strong{color:var(--text)}
+.m-bubble .hl{color:var(--amber);font-weight:700}
+.m-bubble code{font-family:'JetBrains Mono',monospace;font-size:12px;background:var(--bg3);padding:1px 6px;border-radius:5px;color:var(--teal)}
+.plan{margin-top:10px;border:1px dashed var(--line2);border-radius:9px;padding:10px 12px}
+.plan li{list-style:none;display:flex;gap:9px;align-items:center;font-size:12.5px;color:var(--dim);padding:3.5px 0}
+.plan li i{width:14px;height:14px;border-radius:4px;border:1.5px solid var(--line2);flex:0 0 14px;display:grid;place-items:center;transition:.3s}
+.plan li.ok i{border-color:var(--green);background:rgba(0,154,41,.12)}
+.plan li.ok i::after{content:"✓";font-size:9px;color:var(--green)}
+.plan li.ok{color:var(--text)}
+.plan li.now{color:var(--amber)}
+.plan li.now i{border-color:var(--amber);animation:pulse2 1.6s infinite}
+.tool{
+  max-width:860px;margin:0 auto 16px 43px;border:1px solid var(--line);border-radius:10px;
+  background:var(--bg1);overflow:hidden;opacity:0;transform:translateY(10px);
+  transition:opacity .4s,transform .4s,border-color .3s,background .35s;
+}
+.tool.in{opacity:1;transform:none}
+.tool.running{border-color:rgba(247,114,52,.4)}
+.tool.done{border-color:var(--line)}
+.tool-head{
+  width:100%;display:flex;align-items:center;gap:10px;padding:9px 13px;cursor:pointer;
+  background:none;border:none;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;text-align:left;
+}
+.tool-head:hover{background:var(--bg2)}
+.t-ico{width:22px;height:22px;border-radius:6px;background:var(--bg3);display:grid;place-items:center;flex:0 0 22px}
+.t-ico svg{width:12px;height:12px;color:var(--teal)}
+.t-name{color:var(--amber);font-weight:600}
+.t-args{color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+.t-status{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--faint);flex:0 0 auto}
+.spinner{width:11px;height:11px;border-radius:50%;border:2px solid var(--line2);border-top-color:var(--amber);animation:rot .7s linear infinite;display:inline-block}
+.t-check{color:var(--green);display:none;align-items:center;gap:4px}
+.tool.done .spinner{display:none}
+.tool.done .t-check{display:inline-flex}
+.t-chev{transition:transform .25s;color:var(--faint);flex:0 0 14px}
+.t-chev svg{width:13px;height:13px;display:block}
+.tool.collapsed .t-chev{transform:rotate(-90deg)}
+.tool-body{display:grid;grid-template-rows:1fr;transition:grid-template-rows .3s ease}
+.tool.collapsed .tool-body{grid-template-rows:0fr}
+.tool-inner{overflow:hidden;min-height:0}
+.tool-out{border-top:1px solid var(--line);padding:13px 15px;font-size:12.5px;background:var(--bg0);transition:background .35s}
+.meter{display:flex;align-items:center;gap:11px;margin-bottom:9px}
+.meter .ml{width:86px;flex:0 0 86px;font-size:12px;color:var(--dim)}
+.bar{flex:1;height:7px;border-radius:5px;background:var(--bg3);overflow:hidden}
+.bar i{display:block;height:100%;width:0;border-radius:5px;transition:width 1.1s cubic-bezier(.22,1,.36,1)}
+.on .bar i{width:var(--w)}
+.meter b{font-family:'Space Grotesk',sans-serif;font-size:14px;width:44px;text-align:right;flex:0 0 44px}
+.b-amber i{background:linear-gradient(90deg,var(--amber2),var(--amber))}
+.b-teal i{background:linear-gradient(90deg,#0DA5AA,var(--teal))}
+[data-theme="dark"] .b-teal i{background:linear-gradient(90deg,#2BA89A,var(--teal))}
+.b-violet i{background:linear-gradient(90deg,#6A3FC5,var(--violet))}
+[data-theme="dark"] .b-violet i{background:linear-gradient(90deg,#8B6FE8,var(--violet))}
+.b-blue i{background:linear-gradient(90deg,#2478CC,var(--blue))}
+[data-theme="dark"] .b-blue i{background:linear-gradient(90deg,#4A90D9,var(--blue))}
+.b-dim i{background:var(--faint)}
+.chk{display:flex;align-items:center;gap:9px;padding:4px 0;font-size:12.5px;color:var(--dim)}
+.chk svg{width:14px;height:14px;flex:0 0 14px}
+.chk.ok svg{color:var(--green)} .chk.ok{color:var(--text)}
+.chk.warn svg{color:var(--amber)} .chk.warn{color:var(--amber)}
+.crow{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.ctag{font-family:'JetBrains Mono',monospace;font-size:11px;padding:2px 8px;border-radius:5px;flex:0 0 96px;text-align:center;border:1px solid}
+.ctag.ds{color:var(--teal);border-color:rgba(13,165,170,.35);background:rgba(13,165,170,.07)}
+[data-theme="dark"] .ctag.ds{border-color:rgba(79,216,196,.35);background:rgba(79,216,196,.07)}
+.ctag.gpt{color:var(--violet);border-color:rgba(106,63,197,.35);background:rgba(106,63,197,.07)}
+[data-theme="dark"] .ctag.gpt{border-color:rgba(180,155,252,.35);background:rgba(180,155,252,.07)}
+.ctag.kimi{color:var(--blue);border-color:rgba(36,120,204,.35);background:rgba(36,120,204,.07)}
+[data-theme="dark"] .ctag.kimi{border-color:rgba(116,192,252,.35);background:rgba(116,192,252,.07)}
+.ctag.oth{color:var(--faint);border-color:var(--line2)}
+.crow b{font-family:'Space Grotesk',sans-serif;width:40px;text-align:right;flex:0 0 40px}
+.cnote{font-size:10.5px;color:var(--faint);flex:0 0 auto}
+.sent-line{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);display:flex;gap:16px;font-size:12px;color:var(--dim);flex-wrap:wrap}
+.sent-line b{color:var(--text);font-family:'Space Grotesk',sans-serif}
+.sent-line .up{color:var(--green)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin:12px 0 4px}
+.stat{background:var(--bg0);border:1px solid var(--line);border-radius:9px;padding:11px 12px;transition:.2s;position:relative;overflow:hidden}
+.stat:hover{transform:translateY(-2px);border-color:var(--line2);box-shadow:0 8px 20px var(--shadow)}
+.stat span{font-size:10.5px;color:var(--faint);letter-spacing:.06em}
+.stat b{font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;display:block;margin-top:4px}
+.stat .sub{font-size:10.5px;font-family:'JetBrains Mono',monospace;margin-top:2px;display:block}
+.stat.a b{color:var(--amber)} .stat.t b{color:var(--teal)} .stat.g b{color:var(--green)} .stat.v b{color:var(--violet)}
+.ring{position:absolute;right:10px;top:10px;width:34px;height:34px}
+.ring circle{fill:none;stroke-width:3.4}
+.ring .rb{stroke:var(--bg3)}
+.ring .rf{stroke:var(--teal);stroke-linecap:round;stroke-dasharray:88;stroke-dashoffset:88;transform:rotate(-90deg);transform-origin:center;transition:stroke-dashoffset 1.4s cubic-bezier(.22,1,.36,1)}
+.on .ring .rf{stroke-dashoffset:var(--off)}
+.mini-spark{position:absolute;right:8px;bottom:8px;width:56px;height:20px;opacity:.9}
+.mini-spark polyline{fill:none;stroke:var(--amber);stroke-width:1.6;stroke-linecap:round}
+.thinking{display:flex;gap:13px;max-width:860px;margin:0 auto 18px 0;align-items:center}
+.tdots{display:flex;gap:5px;background:var(--bg1);border:1px solid var(--line);border-radius:12px;padding:12px 16px}
+.tdots i{width:6px;height:6px;border-radius:50%;background:var(--amber);animation:tb 1.2s infinite}
+.tdots i:nth-child(2){animation-delay:.15s}.tdots i:nth-child(3){animation-delay:.3s}
+@keyframes tb{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-5px);opacity:1}}
+.composer{padding:12px 28px 18px;border-top:1px solid var(--line);transition:border-color .35s}
+.c-box{
+  max-width:860px;margin:0 auto;border:1px solid var(--line2);border-radius:13px;background:var(--bg1);
+  transition:.25s;box-shadow:0 10px 34px var(--shadow);
+}
+.c-box:focus-within{border-color:var(--amber);box-shadow:0 0 0 3px rgba(247,114,52,.13),0 10px 34px var(--shadow)}
+.c-row1{display:flex;align-items:center;gap:8px;padding:9px 12px 0}
+.mode-chip{
+  display:flex;align-items:center;gap:6px;font-size:11.5px;font-family:'JetBrains Mono',monospace;cursor:pointer;
+  padding:4px 10px;border-radius:7px;border:1px solid var(--line2);color:var(--teal);background:rgba(13,165,170,.06);transition:.2s;
+}
+[data-theme="dark"] .mode-chip{background:rgba(79,216,196,.06)}
+.mode-chip:hover{border-color:var(--teal)}
+.mode-chip svg{width:11px;height:11px}
+.c-mini{font-size:11px;color:var(--faint);font-family:'JetBrains Mono',monospace}
+.c-hint{margin-left:auto;font-size:10.5px;color:var(--faint);font-family:'JetBrains Mono',monospace}
+.c-box textarea{
+  width:100%;background:none;border:none;outline:none;resize:none;color:var(--text);
+  font-size:13.5px;line-height:1.6;padding:10px 14px 4px;min-height:44px;
+}
+.c-box textarea::placeholder{color:var(--faint)}
+.c-row2{display:flex;align-items:center;gap:6px;padding:8px 10px 10px}
+.c-ico{width:28px;height:28px;border-radius:7px;display:grid;place-items:center;color:var(--faint);cursor:pointer;border:none;background:none;transition:.2s}
+.c-ico:hover{color:var(--text);background:var(--bg3)}
+.c-ico svg{width:15px;height:15px}
+.c-send{
+  margin-left:auto;display:flex;align-items:center;gap:8px;border:none;cursor:pointer;
+  padding:7px 15px;border-radius:8px;background:linear-gradient(135deg,var(--amber),var(--amber2));
+  color:#fff;font-weight:700;font-size:12.5px;
+  box-shadow:0 3px 12px rgba(247,114,52,.25);transition:.2s;
+}
+[data-theme="dark"] .c-send{color:#1C1207}
+.c-send:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(247,114,52,.4)}
+.c-send:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none}
+.c-send svg{width:13px;height:13px}
+
+/* ---- RIGHT PANEL ---- */
+.panel{
+  width:402px;flex:0 0 402px;background:var(--bg1);border-left:1px solid var(--line);
+  display:flex;flex-direction:column;min-height:0;transition:background .35s,border-color .35s;
+}
+.p-tabs{display:flex;border-bottom:1px solid var(--line);padding:0 8px;gap:2px}
+.p-tab{
+  display:flex;align-items:center;gap:7px;padding:11px 12px;cursor:pointer;font-size:12.5px;color:var(--faint);
+  border:none;border-bottom:2px solid transparent;transition:.2s;background:none;font-family:inherit;
+}
+.p-tab svg{width:13px;height:13px}
+.p-tab:hover{color:var(--dim)}
+.p-tab.on{color:var(--text);border-bottom-color:var(--amber)}
+.p-tab .bdg{font-family:'JetBrains Mono',monospace;font-size:9.5px;background:var(--bg3);color:var(--dim);padding:1px 6px;border-radius:999px}
+.p-tab .bdg.hot{background:rgba(247,114,52,.12);color:var(--amber)}
+.p-body{flex:1;overflow-y:auto;padding:14px}
+.pane{display:none}
+.pane.on{display:block;animation:fin .3s}
+.diff-card{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--bg0);transition:box-shadow .4s,background .35s}
+.diff-card.flash{box-shadow:0 0 0 2px var(--amber),0 0 30px rgba(247,114,52,.2)}
+.diff-head{display:flex;align-items:center;gap:9px;padding:9px 13px;border-bottom:1px solid var(--line);background:var(--bg2);font-family:'JetBrains Mono',monospace;font-size:11.5px}
+.diff-head .fname{color:var(--text)}
+.chip{font-size:10px;padding:1px 8px;border-radius:999px;font-family:'JetBrains Mono',monospace}
+.chip.mod{color:var(--amber);border:1px solid rgba(247,114,52,.4)}
+.chip.add{color:var(--green);background:rgba(0,154,41,.1)}
+.chip.del{color:var(--red);background:rgba(230,62,62,.1)}
+.diff-head .raw{margin-left:auto;color:var(--faint);cursor:pointer;font-size:11px}
+.diff-head .raw:hover{color:var(--teal)}
+.dl{display:flex;font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.9;transition:background .15s}
+.dl:hover{background:rgba(120,150,200,.06)}
+.dl .no{width:34px;flex:0 0 34px;text-align:right;padding-right:11px;color:var(--faint);user-select:none;opacity:.5}
+.dl .tx{white-space:pre;color:var(--dim)}
+.dl.add{background:rgba(0,154,41,.07)}
+.dl.add .tx{color:var(--green)}
+.dl.add .no{color:var(--green);opacity:.6;background:rgba(0,154,41,.05)}
+.dl.del{background:rgba(230,62,62,.06)}
+.dl.del .tx{color:var(--red);text-decoration:line-through;text-decoration-color:rgba(230,62,62,.4)}
+.dl.del .no{color:var(--red);opacity:.6}
+.diff-foot{padding:8px 13px;border-top:1px solid var(--line);font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--faint);display:flex;gap:12px}
+.diff-foot b.g{color:var(--green)} .diff-foot b.r{color:var(--red)}
+.serp{background:var(--serp-bg);border-radius:11px;padding:16px 17px;color:var(--serp-text);border:1px solid var(--line);transition:background .35s}
+.serp .sc{font-size:11px;color:var(--serp-sub);display:flex;align-items:center;gap:6px}
+.serp .sc i{width:14px;height:14px;border-radius:50%;background:linear-gradient(135deg,var(--amber),var(--amber2));display:inline-grid;place-items:center;font-style:normal;font-size:8px;color:#fff;font-weight:900}
+.serp h4{font-size:16px;color:var(--serp-link);font-weight:500;margin:6px 0 3px;cursor:pointer;line-height:1.4}
+.serp h4:hover{text-decoration:underline}
+.serp .stars{font-size:11.5px;color:var(--serp-sub)}
+.serp .stars b{color:#E8A33D;letter-spacing:1px}
+.serp p{font-size:12px;color:var(--serp-sub);line-height:1.65;margin-top:5px}
+.serp .pills{display:flex;gap:6px;margin-top:9px}
+.serp .pills span{font-size:10.5px;background:var(--serp-pill);border-radius:5px;padding:2px 8px;color:var(--serp-sub)}
+.geo-quote{margin-top:13px;border:1px solid var(--line);border-radius:10px;background:var(--bg0);padding:13px 14px;transition:background .35s}
+.geo-quote .gq-t{font-size:10.5px;letter-spacing:.14em;color:var(--faint);font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:7px}
+.geo-quote .gq-t svg{width:12px;height:12px;color:var(--teal)}
+.geo-quote blockquote{font-size:12.5px;color:var(--dim);line-height:1.7;border-left:2px solid var(--teal);padding-left:11px;font-style:normal}
+.gq-src{display:flex;gap:6px;margin-top:9px}
+.term{border:1px solid var(--line);border-radius:10px;background:var(--term-bg);padding:13px 14px;font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:2;transition:background .35s}
+.term .tl{color:var(--term-text);white-space:pre-wrap;word-break:break-all}
+.term .tl .p{color:var(--teal)}
+.term .tl .ok{color:var(--green)}
+.term .tl .up{color:var(--amber)}
+.term .tl .dim{color:var(--faint)}
+.cursor{display:inline-block;width:7px;height:13px;background:var(--teal);vertical-align:-2px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.art{display:flex;align-items:center;gap:11px;padding:11px 12px;border:1px solid var(--line);border-radius:9px;margin-bottom:8px;background:var(--bg0);transition:.2s;cursor:pointer}
+.art:hover{border-color:var(--line2);transform:translateX(3px)}
+.art .f-ico{width:30px;height:30px;border-radius:7px;background:var(--bg3);display:grid;place-items:center;flex:0 0 30px}
+.art .f-ico svg{width:14px;height:14px;color:var(--blue)}
+.art b{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;display:block}
+.art span{font-size:10.5px;color:var(--faint);font-family:'JetBrains Mono',monospace}
+.art .chip{margin-left:auto}
+.art .dl-btn{width:26px;height:26px;border-radius:6px;display:grid;place-items:center;color:var(--faint);border:none;background:none;cursor:pointer;transition:.2s;flex:0 0 26px}
+.art .dl-btn:hover{color:var(--amber);background:var(--bg3)}
+.art .dl-btn svg{width:13px;height:13px}
+
+/* ---- STATUSBAR ---- */
+.statusbar{
+  height:30px;flex:0 0 30px;border-top:1px solid var(--line);background:var(--bg1);
+  display:flex;align-items:center;gap:16px;padding:0 14px;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--faint);
+  transition:background .35s,border-color .35s;
+}
+.sb-item{display:flex;align-items:center;gap:6px}
+.sb-item svg{width:11px;height:11px}
+.sb-item .ok{color:var(--green)} .sb-item .am{color:var(--amber)}
+.sb-right{margin-left:auto;display:flex;gap:16px;align-items:center}
+.ctx-mini{width:52px;height:4px;border-radius:3px;background:var(--bg3);overflow:hidden}
+.ctx-mini i{display:block;height:100%;width:38%;background:linear-gradient(90deg,var(--teal),var(--blue))}
+.toast{position:fixed;right:18px;bottom:44px;z-index:99;display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+.t-item{
+  background:var(--bg1);border:1px solid var(--line2);border-left:3px solid var(--amber);
+  padding:10px 15px;border-radius:9px;font-size:12.5px;box-shadow:0 12px 34px var(--shadow);
+  animation:tin .3s cubic-bezier(.34,1.4,.64,1);color:var(--text);
+}
+@keyframes tin{from{opacity:0;transform:translateX(24px)}}
+.t-item.out{opacity:0;transform:translateX(24px);transition:.3s}
+
+@media (max-width:1240px){.panel{display:none}}
+@media (max-width:900px){
+  .sidebar{position:fixed;left:0;top:52px;bottom:30px;z-index:50;transform:translateX(-105%);transition:transform .3s;box-shadow:20px 0 50px var(--shadow)}
+  body.nav-open .sidebar{transform:none}
+  .nav-toggle{display:grid}
+  .sys-chip span{display:none}
+  .sh-right{display:none}
+}
+</style>
+</head>
+<body data-theme="dark">
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3L2 20h20L12 3z"/><path d="M12 10v4M12 17.2v.1"/></symbol>
+  <symbol id="i-zap" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/></symbol>
+  <symbol id="i-term" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l6-5-6-5M12 19h8"/></symbol>
+  <symbol id="i-diff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="6" cy="6" r="2.4"/><circle cx="18" cy="18" r="2.4"/><path d="M6 8.5v5a3 3 0 003 3h6.5"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M21 8l-9-5-9 5v8l9 5 9-5V8z"/><path d="M3 8l9 5 9-5M12 13v8"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/><path d="M14 2v6h6"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24" fill="currentColor"><path d="M3 11l19-8-8 19-2.5-8.5L3 11z"/></symbol>
+  <symbol id="i-clip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 12.5l-8.5 8.5a5.5 5.5 0 01-7.8-7.8L13 4.9a3.7 3.7 0 015.2 5.2l-8.2 8.2a1.85 1.85 0 01-2.6-2.6l7.5-7.5"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 11-2.6-6.4M21 3v6h-6"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 10-12 0c0 7-3 8-3 8h18s-3-1-3-8M10.3 21a2 2 0 003.4 0"/></symbol>
+  <symbol id="i-set" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.7 1.7 0 00-1.87-.34 1.7 1.7 0 00-1 1.55V21a2 2 0 11-4 0v-.09a1.7 1.7 0 00-1-1.55 1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.7 1.7 0 004.6 15a1.7 1.7 0 00-1.55-1H3a2 2 0 110-4h.09a1.7 1.7 0 001.55-1 1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06A1.7 1.7 0 009 4.6a1.7 1.7 0 001-1.55V3a2 2 0 114 0v.09a1.7 1.7 0 001 1.55 1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06a1.7 1.7 0 00-.34 1.87 1.7 1.7 0 001.55 1H21a2 2 0 110 4h-.09a1.7 1.7 0 00-1.55 1z"/></symbol>
+  <symbol id="i-branch" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="6" cy="5" r="2.3"/><circle cx="6" cy="19" r="2.3"/><circle cx="18" cy="8" r="2.3"/><path d="M6 7.3v9.4M18 10.3c0 4-4 4.2-6 5.2-2 1-4 1.2-4 3"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 010 18 15 15 0 010-18z"/></symbol>
+  <symbol id="i-dl" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></symbol>
+  <symbol id="i-robot" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4M8 4h8"/><circle cx="9" cy="14" r="1.2" fill="currentColor"/><circle cx="15" cy="14" r="1.2" fill="currentColor"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.3" fill="currentColor"/><circle cx="4.5" cy="12" r="1.3" fill="currentColor"/><circle cx="4.5" cy="18" r="1.3" fill="currentColor"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></symbol>
+  <symbol id="i-palette" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 000 20c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.2 0-1.1.9-2 2-2h2.4A4.6 4.6 0 0022 11c0-5-4.5-9-10-9z"/><circle cx="7.5" cy="11.5" r="1.2" fill="currentColor"/><circle cx="10.5" cy="7.5" r="1.2" fill="currentColor"/><circle cx="15" cy="7.5" r="1.2" fill="currentColor"/></symbol>
+</svg>
+
+<div class="app">
+  <header class="topbar">
+    <button class="icon-btn nav-toggle" id="navToggle"><svg><use href="#i-menu"/></svg></button>
+    <div class="logo"><div class="logo-mark">壶</div><div class="logo-word"><b>壶天</b><span>AGENT WORKBENCH</span></div></div>
+    <div class="tb-div"></div>
+    <div class="ws-pick"><span class="ws-dot"></span><code>hutian / seo-geo-workspace</code><svg width="12" height="12" style="color:var(--faint)"><use href="#i-chev"/></svg></div>
+    <div class="tb-spacer"></div>
+    <div class="model-pill">
+      <button class="model-btn" id="modelBtn"><span class="mdot"></span><span id="modelName">壶天-Agent · DeepSeek-V3</span><svg width="12" height="12" style="color:var(--faint)"><use href="#i-chev"/></svg></button>
+      <div class="model-menu" id="modelMenu">
+        <div class="mm-item on" data-m="壶天-Agent · DeepSeek-V3"><i style="background:var(--teal)"></i>DeepSeek-V3<span class="mk">✓ 路由首选</span></div>
+        <div class="mm-item" data-m="壶天-Agent · GPT-4o"><i style="background:var(--violet)"></i>GPT-4o<span class="mk">备选</span></div>
+        <div class="mm-item" data-m="壶天-Agent · Kimi-K2"><i style="background:var(--blue)"></i>Kimi-K2<span class="mk">备选</span></div>
+      </div>
+    </div>
+    <button class="icon-btn" id="refreshBtn" title="刷新数据"><svg><use href="#i-refresh"/></svg></button>
+    <button class="icon-btn" id="bellBtn" title="通知"><svg><use href="#i-bell"/></svg><span class="ndot"></span></button>
+    <div class="sys-chip"><i></i><span>系统正常</span></div>
+    <div class="avatar">O</div>
+  </header>
+
+  <div class="workspace">
+    <aside class="sidebar">
+      <div class="sb-top">
+        <button class="btn-new" id="newTask"><svg width="14" height="14"><use href="#i-plus"/></svg>新建任务</button>
+        <div class="sb-search"><svg><use href="#i-search"/></svg><input placeholder="搜索会话 / 产物…"></div>
+      </div>
+      <div class="sb-scroll">
+        <div class="sb-label">会话 <em>6</em></div>
+        <div class="s-item on"><span class="s-st run"></span><div class="s-ico" style="color:var(--amber)"><svg><use href="#i-zap"/></svg></div><div class="s-body"><div class="s-title">产品页 GEO 优化 · TC-DIODE-001</div><div class="s-meta">运行中 · 5 个工具调用 · 2 分钟前</div></div></div>
+        <div class="s-item"><span class="s-st done"></span><div class="s-ico" style="color:var(--teal)"><svg><use href="#i-globe"/></svg></div><div class="s-body"><div class="s-title">品牌实体图谱构建（壶天）</div><div class="s-meta">已完成 · 今天 11:20</div></div></div>
+        <div class="s-item"><span class="s-st done"></span><div class="s-ico" style="color:var(--blue)"><svg><use href="#i-file"/></svg></div><div class="s-body"><div class="s-title">Schema.org 全站映射</div><div class="s-meta">已完成 · 昨天</div></div></div>
+        <div class="s-item"><span class="s-st done"></span><div class="s-ico" style="color:var(--violet)"><svg><use href="#i-robot"/></svg></div><div class="s-body"><div class="s-title">AI 引用周报 · W30</div><div class="s-meta">已完成 · 7月21日</div></div></div>
+        <div class="s-item"><span class="s-st queue"></span><div class="s-ico" style="color:var(--dim)"><svg><use href="#i-list"/></svg></div><div class="s-body"><div class="s-title">竞品引擎可见度对比</div><div class="s-meta">排队中 · 预计 14:50</div></div></div>
+        <div class="s-item"><span class="s-st queue"></span><div class="s-ico" style="color:var(--dim)"><svg><use href="#i-globe"/></svg></div><div class="s-body"><div class="s-title">多语言 hreflang 审计</div><div class="s-meta">排队中</div></div></div>
+        <div class="sb-label">运行时</div>
+        <div class="rt-card">
+          <div class="rt-row"><span>上下文窗口</span><b>48.2K / 200K</b></div>
+          <div class="ctx-bar"><i id="ctxBar"></i></div>
+          <div class="rt-grid">
+            <div class="rt-mini"><span>模型路由</span><b>DeepSeek-V3</b></div>
+            <div class="rt-mini"><span>工具</span><b>14 已启用</b></div>
+            <div class="rt-mini"><span><i class="gdot"></i> MCP 服务</span><b>3 已连接</b></div>
+            <div class="rt-mini"><span>沙箱</span><b>isolated ✓</b></div>
+          </div>
+        </div>
+      </div>
+      <!-- ★ 左下：用户 + 主题切换 -->
+      <div class="sb-bottom">
+        <div class="sb-user">
+          <div class="avatar" style="background:linear-gradient(135deg,var(--teal),var(--blue))">O</div>
+          <div><b>ops@hutian</b><span>SEO/GEO · 管理员</span></div>
+          <div class="sb-actions">
+            <div class="theme-wrap">
+              <button class="icon-btn" id="themeBtn" title="切换主题"><svg><use href="#i-palette"/></svg></button>
+              <div class="theme-menu" id="themeMenu">
+                <div class="tm-item on" data-tv="dark"><svg><use href="#i-moon"/></svg>深色<span class="mk">✓</span></div>
+                <div class="tm-item" data-tv="light"><svg><use href="#i-sun"/></svg>浅色<span class="mk">✓</span></div>
+              </div>
+            </div>
+            <button class="icon-btn"><svg><use href="#i-set"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="stage">
+      <div class="session-head">
+        <div class="sh-left">
+          <div class="crumb">sessions / <b>geo-opt-tc-diode-001</b> · #S-20260725-041</div>
+          <h1 class="sh-title">产品页 GEO 优化 <span class="run-badge"><i></i>运行中</span></h1>
+          <div class="sh-sub"><span>目标：<code>hutian.com/products/tc-diode-001</code></span><span>分支：<code>feat/brand-hutian</code></span><span>开始于 <code>14:30:12</code></span></div>
+        </div>
+        <div class="sh-right">
+          <div>
+            <svg class="spark" viewBox="0 0 120 34">
+              <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgba(13,165,170,.25)"/><stop offset="1" stop-color="rgba(13,165,170,0)"/></linearGradient></defs>
+              <polygon class="fillp" points="2,28 14,26 26,27 38,22 50,23 62,17 74,18 86,12 98,10 110,5 118,4 118,32 2,32"/>
+              <polyline points="2,28 14,26 26,27 38,22 50,23 62,17 74,18 86,12 98,10 110,5 118,4"/>
+            </svg>
+            <div class="spark-label">搜索流量 <b>+89%</b> / 30d</div>
+          </div>
+          <button class="btn-ghost" id="syncBtn"><svg><use href="#i-refresh"/></svg>刷新数据</button>
+        </div>
+      </div>
+      <div class="chat" id="chat">
+        <div class="msg user in">
+          <div class="m-ava">YOU</div>
+          <div class="m-main">
+            <div class="m-meta"><b>你</b><time>14:30</time></div>
+            <div class="m-bubble">品牌已由「天启芯 / Tikchip」更名为 <strong class="hl">壶天</strong>。请完成：① 全站品牌实体与结构化数据更新；② 诊断产品页 <code>TC-DIODE-001</code> 的引擎可见度；③ 补齐面向生成式引擎引用的 Schema 并提交语义站点地图。</div>
+          </div>
+        </div>
+      </div>
+      <div class="composer">
+        <div class="c-box">
+          <div class="c-row1">
+            <div class="mode-chip" id="modeChip"><svg><use href="#i-zap"/></svg><span id="modeTxt">Auto</span></div>
+            <span class="c-mini">tools: all · sandbox: on</span>
+            <span class="c-hint">Enter 发送 · Shift+Enter 换行</span>
+          </div>
+          <textarea id="cInput" rows="1" placeholder="向壶天描述任务，例如：为二极管产品线生成 FAQPage 结构化数据…" disabled></textarea>
+          <div class="c-row2">
+            <button class="c-ico" title="附加文件"><svg><use href="#i-clip"/></svg></button>
+            <button class="c-ico" title="产物库"><svg><use href="#i-box"/></svg></button>
+            <span class="c-mini" id="tokEst">≈ 0 tokens</span>
+            <button class="c-send" id="cSend" disabled>发送<svg><use href="#i-send"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <aside class="panel">
+      <div class="p-tabs">
+        <button class="p-tab on" data-pane="diff"><svg><use href="#i-diff"/></svg>Diff</button>
+        <button class="p-tab" data-pane="preview"><svg><use href="#i-eye"/></svg>预览</button>
+        <button class="p-tab" data-pane="term"><svg><use href="#i-term"/></svg>终端<span class="bdg" id="termBdg">4</span></button>
+        <button class="p-tab" data-pane="arts"><svg><use href="#i-box"/></svg>产物<span class="bdg">4</span></button>
+      </div>
+      <div class="p-body">
+        <div class="pane on" id="pane-diff">
+          <div class="diff-card" id="diffCard">
+            <div class="diff-head"><svg width="13" height="13" style="color:var(--blue)"><use href="#i-file"/></svg><span class="fname">schema/product.jsonld</span><span class="chip mod">已修改</span><span class="raw">查看原始文件 →</span></div>
+            <div>
+<div class="dl"><span class="no">1</span><span class="tx">{</span></div>
+<div class="dl"><span class="no">2</span><span class="tx">  "@context": "https://schema.org",</span></div>
+<div class="dl"><span class="no">3</span><span class="tx">  "@type": "Product",</span></div>
+<div class="dl"><span class="no">4</span><span class="tx">  "name": "半导体二极管",</span></div>
+<div class="dl del"><span class="no">5</span><span class="tx">  "brand": "Tikchip",</span></div>
+<div class="dl add"><span class="no">5</span><span class="tx">  "brand": "壶天",</span></div>
+<div class="dl"><span class="no">6</span><span class="tx">  "description": "高性能半导体器件，适用于工业控制与物联网。",</span></div>
+<div class="dl"><span class="no">7</span><span class="tx">  "sku": "TC-DIODE-001",</span></div>
+<div class="dl add"><span class="no">8</span><span class="tx">  "gtin": "6970000000017",</span></div>
+<div class="dl add"><span class="no">9</span><span class="tx">  "sameAs": ["https://www.wikidata.org/wiki/Q128888"],</span></div>
+<div class="dl"><span class="no">10</span><span class="tx">  "offers": {</span></div>
+<div class="dl"><span class="no">11</span><span class="tx">    "@type": "Offer",</span></div>
+<div class="dl del"><span class="no">12</span><span class="tx">    "availability": "https://schema.org/InStock"</span></div>
+<div class="dl add"><span class="no">12</span><span class="tx">    "availability": "https://schema.org/InStock",</span></div>
+<div class="dl add"><span class="no">13</span><span class="tx">    "price": "12.80",</span></div>
+<div class="dl add"><span class="no">14</span><span class="tx">    "priceCurrency": "CNY"</span></div>
+<div class="dl"><span class="no">15</span><span class="tx">  },</span></div>
+<div class="dl add"><span class="no">16</span><span class="tx">  "subjectOf": {</span></div>
+<div class="dl add"><span class="no">17</span><span class="tx">    "@type": "TechArticle",</span></div>
+<div class="dl add"><span class="no">18</span><span class="tx">    "name": "工业控制选型指南"</span></div>
+<div class="dl add"><span class="no">19</span><span class="tx">  }</span></div>
+<div class="dl"><span class="no">20</span><span class="tx">}</span></div>
+            </div>
+            <div class="diff-foot"><span><b class="g">+9</b> / <b class="r">−2</b></span><span>JSON-LD · UTF-8</span><span style="margin-left:auto">壶天 · edit_file</span></div>
+          </div>
+          <div style="margin-top:12px;font-size:11.5px;color:var(--faint);line-height:1.8">校验：<span style="color:var(--green)">✓ schema.org 语法通过</span> · <span style="color:var(--green)">✓ 富媒体结果资格</span> · <span style="color:var(--amber)">⚠ 建议补充 aggregateRating</span></div>
+        </div>
+        <div class="pane" id="pane-preview">
+          <div class="serp">
+            <div class="sc"><i>壶</i>hutian.com › products › tc-diode-001</div>
+            <h4>半导体二极管 TC-DIODE-001 — 高性能半导体器件 | 壶天</h4>
+            <div class="stars"><b>★★★★★</b> 4.9 · 128 条评价</div>
+            <p>高性能半导体器件，适用于工业控制与物联网场景。壶天官方直营，现货供应，24 小时发货。</p>
+            <div class="pills"><span>¥12.80</span><span>现货 InStock</span><span>24h 发货</span></div>
+          </div>
+          <div class="geo-quote">
+            <div class="gq-t"><svg><use href="#i-robot"/></svg>GEO 引用预览 · 生成式引擎如何提及</div>
+            <blockquote>"壶天 TC-DIODE-001 适用于工业控制与物联网场景，现货供应，是性价比突出的半导体二极管方案。"</blockquote>
+            <div class="gq-src"><span class="ctag ds">DeepSeek-V3</span><span class="ctag gpt">GPT-4o</span><span class="ctag kimi">Kimi</span></div>
+          </div>
+        </div>
+        <div class="pane" id="pane-term">
+          <div class="term" id="termBox">
+            <div class="tl"><span class="p">➜</span> hutian entity rename --from "天启芯,Tikchip" --to "壶天"</div>
+            <div class="tl"><span class="ok">✓</span> 命中 37 个文件 · 替换 428 处 · 耗时 1.8s</div>
+            <div class="tl"><span class="p">➜</span> hutian lint --schema ./schema/</div>
+            <div class="tl"><span class="ok">✓</span> 214 个节点通过 · 0 error · 1 warning</div>
+            <div class="tl" id="termCursor"><span class="cursor"></span></div>
+          </div>
+        </div>
+        <div class="pane" id="pane-arts">
+          <div class="art"><div class="f-ico"><svg><use href="#i-file"/></svg></div><div><b>schema/product.jsonld</b><span>1.2 KB · 2 分钟前</span></div><span class="chip mod">已修改</span><button class="dl-btn"><svg><use href="#i-dl"/></svg></button></div>
+          <div class="art"><div class="f-ico"><svg><use href="#i-globe"/></svg></div><div><b>semantic-sitemap.xml</b><span>84 KB · 待提交</span></div><span class="chip add">就绪</span><button class="dl-btn"><svg><use href="#i-dl"/></svg></button></div>
+          <div class="art"><div class="f-ico"><svg><use href="#i-robot"/></svg></div><div><b>geo-report-w30.md</b><span>6.4 KB · 今天 11:02</span></div><span class="chip add">已生成</span><button class="dl-btn"><svg><use href="#i-dl"/></svg></button></div>
+          <div class="art"><div class="f-ico"><svg><use href="#i-box"/></svg></div><div><b>entity-graph.json</b><span>218 KB · 壶天品牌图谱</span></div><span class="chip add">已同步</span><button class="dl-btn"><svg><use href="#i-dl"/></svg></button></div>
+          <div style="font-size:11px;color:var(--faint);margin-top:10px;line-height:1.8">产物由 Agent 自动写入 <code style="font-family:'JetBrains Mono',monospace;color:var(--dim)">/artifacts</code>，随会话归档，可一键回滚。</div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <footer class="statusbar">
+    <span class="sb-item"><svg class="am"><use href="#i-branch"/></svg>feat/brand-hutian</span>
+    <span class="sb-item"><span class="ok">✓</span> 已同步</span>
+    <span class="sb-item" id="sbAgent"><span class="am">●</span> Agent 运行中 · 工具 0/5</span>
+    <div class="sb-right">
+      <span class="sb-item">ctx <span class="ctx-mini"><i id="ctxMini"></i></span> 38%</span>
+      <span class="sb-item">tokens 48,210 / 200K</span>
+      <span class="sb-item">延迟 <span style="color:var(--green)">312ms</span></span>
+      <span class="sb-item" id="clock">--:--:--</span>
+    </div>
+  </footer>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
+const chat=$('#chat');
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const now=()=>new Date().toTimeString().slice(0,5);
+const scrollBottom=()=>chat.scrollTo({top:chat.scrollHeight,behavior:'smooth'});
+function mk(html){const t=document.createElement('template');t.innerHTML=html.trim();return t.content.firstChild;}
+
+/* ══════ THEME ══════ */
+const themeBtn=$('#themeBtn'),themeMenu=$('#themeMenu');
+themeBtn.addEventListener('click',e=>{e.stopPropagation();themeMenu.classList.toggle('open');});
+document.addEventListener('click',()=>themeMenu.classList.remove('open'));
+themeMenu.addEventListener('click',e=>e.stopPropagation());
+$$('.tm-item').forEach(it=>it.addEventListener('click',()=>{
+  const tv=it.dataset.tv;
+  document.body.setAttribute('data-theme',tv);
+  $$('.tm-item').forEach(x=>x.classList.toggle('on',x.dataset.tv===tv));
+  themeMenu.classList.remove('open');
+  toast(tv==='light'?'☀️ 已切换为浅色主题':'🌙 已切换为深色主题');
+}));
+
+/* ══════ TOAST ══════ */
+function toast(msg){
+  const t=mk('<div class="t-item">'+msg+'</div>');
+  $('#toast').appendChild(t);
+  setTimeout(()=>{t.classList.add('out');setTimeout(()=>t.remove(),320)},2600);
+}
+
+/* ══════ MESSAGES ══════ */
+function agentMsg(html){
+  const n=mk('<div class="msg agent"><div class="m-ava">壶</div><div class="m-main"><div class="m-meta"><b>壶天</b><span>Agent · Auto</span><time>'+now()+'</time></div><div class="m-bubble">'+html+'</div></div></div>');
+  chat.appendChild(n);requestAnimationFrame(()=>n.classList.add('in'));scrollBottom();return n;
+}
+function userMsg(text){
+  const n=mk('<div class="msg user"><div class="m-ava">YOU</div><div class="m-main"><div class="m-meta"><b>你</b><time>'+now()+'</time></div><div class="m-bubble"></div></div></div>');
+  n.querySelector('.m-bubble').textContent=text;
+  chat.appendChild(n);requestAnimationFrame(()=>n.classList.add('in'));scrollBottom();
+}
+function thinking(){
+  const n=mk('<div class="thinking"><div class="m-ava" style="background:linear-gradient(135deg,var(--amber),var(--amber2));color:#fff;border-radius:8px;display:grid;place-items:center;font-weight:900">壶</div><div class="tdots"><i></i><i></i><i></i></div></div>');
+  chat.appendChild(n);scrollBottom();return n;
+}
+
+/* ══════ TOOLS ══════ */
+let toolCount=0;
+async function tool(name,args,outHTML,dur){
+  $$('.tool.done').forEach(t=>t.classList.add('collapsed'));
+  const n=mk('<div class="tool running"><button class="tool-head"><span class="t-ico"><svg><use href="#i-term"/></svg></span><span class="t-name">'+name+'</span><span class="t-args">'+args+'</span><span class="t-status"><span class="spinner"></span><span class="t-check"><svg width="12" height="12"><use href="#i-check"/></svg><span class="t-time"></span></span></span><span class="t-chev"><svg><use href="#i-chev"/></svg></span></button><div class="tool-body"><div class="tool-inner"><div class="tool-out">'+outHTML+'</div></div></div></div>');
+  n.querySelector('.tool-head').addEventListener('click',()=>n.classList.toggle('collapsed'));
+  chat.appendChild(n);requestAnimationFrame(()=>n.classList.add('in'));scrollBottom();
+  await sleep(dur);
+  n.classList.remove('running');n.classList.add('done');
+  n.querySelector('.t-time').textContent=(dur/1000).toFixed(1)+'s';
+  n.querySelector('.tool-out').classList.add('on');
+  toolCount++;$('#sbAgent').innerHTML='<span class="am">●</span> Agent 运行中 · 工具 '+toolCount+'/5';
+  scrollBottom();return n;
+}
+
+function countUp(el,to,o){
+  o=o||{};var pre=o.pre||'',suf=o.suf||'',dec=o.dec||0,dur=o.dur||1300,t0=performance.now();
+  (function f(t){var p=Math.min((t-t0)/dur,1),e=1-Math.pow(1-p,3),v=to*e;
+  el.textContent=pre+(dec?v.toFixed(dec):Math.round(v).toLocaleString())+suf;
+  if(p<1)requestAnimationFrame(f);})(t0);
+}
+
+var outRename='<div class="chk ok"><svg><use href="#i-check"/></svg>命中 <b style="font-family:Space Grotesk">&nbsp;37&nbsp;</b> 个文件 · 替换 <b style="font-family:Space Grotesk">428</b> 处（schema / OG / sitemap / 页脚）</div><div class="chk ok"><svg><use href="#i-check"/></svg>实体主键已切换 → <code style="font-family:JetBrains Mono;color:var(--teal)">wikidata:壶天 (Hutian)</code></div><div class="chk ok"><svg><use href="#i-check"/></svg>旧品牌名 301 重定向规则已写入 <code style="font-family:JetBrains Mono;color:var(--teal)">redirects.conf</code></div>';
+var outDiag='<div class="meter"><span class="ml">传统 SEO</span><div class="bar b-amber"><i style="--w:64%"></i></div><b style="color:var(--amber)">64%</b></div><div class="meter"><span class="ml">生成式 GEO</span><div class="bar b-teal"><i style="--w:92%"></i></div><b style="color:var(--teal)">92%</b></div><div style="height:8px"></div><div class="chk ok"><svg><use href="#i-check"/></svg>实体清晰度 — 通过</div><div class="chk ok"><svg><use href="#i-check"/></svg>语义链接 — 通过</div><div class="chk warn"><svg><use href="#i-warn"/></svg>结构化数据缺失 — Product 缺少 gtin / price / sameAs</div>';
+var outCite='<div class="crow"><span class="ctag ds">DeepSeek-V3</span><div class="bar b-teal"><i style="--w:42%"></i></div><b style="color:var(--teal)">42%</b><span class="cnote">主要来源</span></div><div class="crow"><span class="ctag gpt">GPT-4o</span><div class="bar b-violet"><i style="--w:28%"></i></div><b style="color:var(--violet)">28%</b><span class="cnote">次要权威</span></div><div class="crow"><span class="ctag kimi">Kimi</span><div class="bar b-blue"><i style="--w:15%"></i></div><b style="color:var(--blue)">15%</b><span class="cnote">提及</span></div><div class="crow"><span class="ctag oth">其他</span><div class="bar b-dim"><i style="--w:15%"></i></div><b style="color:var(--dim)">15%</b><span class="cnote">长尾</span></div><div class="sent-line"><span>引用量 <b class="cnt" data-to="2410">0</b></span><span>情感倾向 <b style="color:var(--green)">正面 87%</b></span><span>周增速 <b class="up">+12.5%</b></span></div>';
+var outEdit='<div class="chk ok"><svg><use href="#i-check"/></svg>schema/product.jsonld&nbsp; <b style="color:var(--green);font-family:JetBrains Mono">+9</b>&nbsp;/&nbsp;<b style="color:var(--red);font-family:JetBrains Mono">−2</b> — 右侧 Diff 面板已高亮</div><div class="chk ok"><svg><use href="#i-check"/></svg>brand 字段统一为「壶天」，补充 gtin / price / sameAs / subjectOf</div><div class="chk ok"><svg><use href="#i-check"/></svg>JSON-LD 语法校验通过 · 富媒体结果资格 ✓</div>';
+var outSitemap='<div class="chk ok"><svg><use href="#i-check"/></svg>解析 <b style="font-family:Space Grotesk">1,284</b> 个 URL（含 96 个实体锚点）</div><div class="chk ok"><svg><use href="#i-check"/></svg>IndexNow 提交 → Google / Bing · <b style="color:var(--green)">200 OK</b> · 312ms</div><div class="chk ok"><svg><use href="#i-check"/></svg>抓取队列已预热，预计 40 分钟内完成再索引</div>';
+
+async function run(){
+  await sleep(500);
+  var th=thinking();await sleep(1100);th.remove();
+  agentMsg('收到。品牌更名是本次会话的<strong>前置约束</strong>，我会先固化实体，再做可见度诊断与结构化补齐。执行计划：<ul class="plan" id="plan"><li><i></i>全站品牌实体更新 → 壶天（schema / OG / sitemap）</li><li><i></i>运行 SEO / GEO 综合诊断</li><li><i></i>追踪 AI 引用来源与情感倾向</li><li><i></i>补齐 Product 结构化数据（JSON-LD）</li><li><i></i>提交语义站点地图并验证收录</li></ul>');
+  var planItems=$$('#plan li');
+  function markPlan(i){planItems.forEach(function(li,j){li.classList.toggle('ok',j<i);li.classList.toggle('now',j===i);});}
+  await sleep(700);markPlan(0);
+  await tool('entity_rename','from="天启芯 / Tikchip" → to="壶天"',outRename,1800);
+  markPlan(1);
+  await tool('run_diagnosis','target=hutian.com/products/tc-diode-001',outDiag,1600);
+  markPlan(2);
+  await tool('trace_citations','window=30d · engines=all',outCite,1700);
+  document.querySelectorAll('.cnt').forEach(function(el){countUp(el,+el.dataset.to);});
+  markPlan(3);
+  th=thinking();await sleep(900);th.remove();
+  agentMsg('诊断结论：GEO 表现强劲（<span class="hl">92%</span>），但 <code>Product</code> 结构化数据缺 <code>gtin / price / sameAs</code>，会拉低生成式引擎的<strong>事实采纳率</strong>。现在写入修补 —— 注意右侧面板。');
+  await sleep(600);
+  await tool('edit_file','schema/product.jsonld',outEdit,1500);
+  setTab('diff');
+  var dc=$('#diffCard');dc.classList.add('flash');setTimeout(function(){dc.classList.remove('flash');},1600);
+  markPlan(4);
+  await tool('submit_sitemap','semantic=true · targets=google,bing',outSitemap,1500);
+  setTab('term');
+  appendTerm('<span class="p">➜</span> hutian deploy --sitemap semantic.xml --targets google,bing');
+  await sleep(400);
+  appendTerm('<span class="up">↑</span> 1,284 URLs · IndexNow <span class="ok">200 OK</span> <span class="dim">· 312ms</span>');
+  $('#termBdg').textContent='6';$('#termBdg').classList.add('hot');
+  markPlan(5);
+  await sleep(500);th=thinking();await sleep(1000);th.remove();
+  var sum=agentMsg('全部完成 ✅ 本次会话共执行 <strong>5 个工具调用</strong>，关键指标：<div class="stats"><div class="stat a"><span>搜索流量</span><b class="n" data-to="89" data-pre="+" data-suf="%">+0%</b><span class="sub" style="color:var(--green)">▲ 30 天环比</span><svg class="mini-spark" viewBox="0 0 56 20"><polyline points="2,16 10,14 18,15 26,10 34,11 42,6 50,4 54,2"/></svg></div><div class="stat t"><span>GEO 饱和度</span><b class="n" data-to="92" data-suf="%">0%</b><svg class="ring" viewBox="0 0 34 34"><circle class="rb" cx="17" cy="17" r="14"/><circle class="rf" cx="17" cy="17" r="14" style="--off:7"/></svg></div><div class="stat v"><span>AI 引用量</span><b class="n" data-to="2410">0</b><span class="sub">DeepSeek 占 42%</span></div><div class="stat g"><span>引用增速</span><b class="n" data-to="12.5" data-dec="1" data-pre="+" data-suf="%">+0%</b><span class="sub" style="color:var(--green)">▲ 周环比</span></div></div>建议下一步（可直接交给我执行）：<ul class="plan"><li><i></i>为「壶天」注册 Wikidata 品牌实体条目，强化 sameAs 证据链</li><li><i></i>产品页追加 FAQPage 结构化数据，抢占生成式引用位</li><li><i></i>每周一 09:00 自动生成 GEO 引用周报并推送</li></ul>');
+  sum.querySelector('.m-bubble').classList.add('on');
+  sum.querySelectorAll('.n').forEach(function(el){countUp(el,+el.dataset.to,{pre:el.dataset.pre||'',suf:el.dataset.suf||'',dec:+(el.dataset.dec||0)});});
+  $('#cInput').disabled=false;$('#cSend').disabled=false;
+  $('#sbAgent').innerHTML='<span class="ok">✓</span> Agent 空闲 · 工具 5/5 完成';
+}
+function appendTerm(html){
+  var c=$('#termCursor');$('#termBox').insertBefore(mk('<div class="tl">'+html+'</div>'),c);
+}
+
+function setTab(name){
+  $$('.p-tab').forEach(function(t){t.classList.toggle('on',t.dataset.pane===name);});
+  $$('.pane').forEach(function(p){p.classList.toggle('on',p.id==='pane-'+name);});
+}
+$$('.p-tab').forEach(function(t){t.addEventListener('click',function(){setTab(t.dataset.pane);});});
+
+var input=$('#cInput');
+input.addEventListener('input',function(){
+  input.style.height='auto';input.style.height=Math.min(input.scrollHeight,140)+'px';
+  $('#tokEst').textContent='≈ '+Math.max(0,Math.ceil(input.value.length*1.6))+' tokens';
+});
+input.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}});
+$('#cSend').addEventListener('click',send);
+async function send(){
+  var v=input.value.trim();if(!v)return;
+  userMsg(v);input.value='';input.style.height='auto';$('#tokEst').textContent='≈ 0 tokens';
+  await sleep(600);
+  var th=thinking();await sleep(1200);th.remove();
+  agentMsg('收到，已将「<strong>'+(v.length>26?v.slice(0,26)+'…':v)+'</strong>」排入当前会话队列，正在加载上下文与工具…');
+  await tool('plan_task','goal="'+(v.length>20?v.slice(0,20)+'…':v)+'"','<div class="chk ok"><svg><use href="#i-check"/></svg>任务图已构建 · 3 个子任务 · 预计 2m40s</div><div class="chk ok"><svg><use href="#i-check"/></svg>依赖检查通过 · 沙箱就绪 · 产物目录可写</div>',1600);
+  agentMsg('子任务开始执行。你可以在右侧面板实时查看 Diff、终端输出与产物；执行完成后我会给出指标摘要。');
+}
+
+var mBtn=$('#modelBtn'),mMenu=$('#modelMenu');
+mBtn.addEventListener('click',function(e){e.stopPropagation();mMenu.classList.toggle('open');});
+document.addEventListener('click',function(){mMenu.classList.remove('open');});
+$$('.mm-item').forEach(function(it){it.addEventListener('click',function(){
+  $$('.mm-item').forEach(function(x){x.classList.remove('on');});it.classList.add('on');
+  $('#modelName').textContent=it.dataset.m;
+  toast('模型路由已切换 → '+it.dataset.m.split('· ')[1]);
+});});
+$('#refreshBtn').addEventListener('click',function(){
+  this.classList.add('spin');var s=this;setTimeout(function(){s.classList.remove('spin');},750);
+  toast('数据已同步至最新 · 刚刚');
+});
+$('#syncBtn').addEventListener('click',function(){toast('流量与引用数据已刷新 · 延迟 312ms');});
+$('#bellBtn').addEventListener('click',function(){toast('3 条未读：引用周报已生成、收录完成、实体同步');});
+$('#navToggle').addEventListener('click',function(){document.body.classList.toggle('nav-open');});
+$('#newTask').addEventListener('click',function(){
+  var n=mk('<div class="s-item"><span class="s-st queue"></span><div class="s-ico" style="color:var(--dim)"><svg><use href="#i-plus"/></svg></div><div class="s-body"><div class="s-title">新任务 · 草稿</div><div class="s-meta">刚刚创建 · 等待指令</div></div></div>');
+  $('.sb-scroll .s-item').parentNode.insertBefore(n,$('.sb-scroll .s-item'));
+  toast('已创建新任务会话');
+});
+$$('.s-item').forEach(function(s){s.addEventListener('click',function(){
+  $$('.s-item').forEach(function(x){x.classList.remove('on');});s.classList.add('on');
+});});
+$$('.art .dl-btn').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();toast('产物已开始下载');});});
+$('#modeChip').addEventListener('click',function(){
+  var t=$('#modeTxt'),auto=t.textContent==='Auto';
+  t.textContent=auto?'Manual':'Auto';
+  toast(auto?'已切换为 Manual：工具调用需逐步确认':'已切换为 Auto：Agent 自主编排工具');
+});
+
+setInterval(function(){$('#clock').textContent=new Date().toTimeString().slice(0,8);},1000);
+setTimeout(function(){$('#ctxBar').style.width='38%';$('#ctxMini').style.width='38%';},400);
+run();
+</script>
+</body>
+</html>

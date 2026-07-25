@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "edit_file|write_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"提示：若本次改动了 .jsonld 或 JSON-LD 块，请调用 check_schema(url, expected_type) 复验结构化数据资格与富媒体结果资格。\""
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>壶天AI 建站 | 用一句话，AI 帮你建好站</title>
+<meta name="description" content="壶天AI 建站 —— 用自然语言描述需求，AI 自动生成 SEO 原生、GEO 友好、全端响应的高性能网站，30 秒上线。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --indigo:#4F46E5; --indigo2:#6366F1; --indigo-d:#3730A3;
+  --amber:#F59E0B; --amber2:#FBBF24;
+  --violet:#7C3AED; --teal:#0EA5A4; --green:#10B981; --pink:#EC4899;
+  --ink:#0F0E17; --ink2:#171527; --ink3:#211F33;
+  --paper:#FAFBFC; --white:#FFFFFF;
+  --text:#1A1A2E; --dim:#5B5B73; --faint:#9090A6;
+  --line:#E8E8F0; --line2:#DADAE6;
+  --disp:'Space Grotesk','Noto Sans SC',sans-serif;
+  --body:'Noto Sans SC',system-ui,-apple-system,sans-serif;
+  --mono:'JetBrains Mono','Noto Sans SC',monospace;
+  --shadow-sm:0 2px 8px rgba(20,20,46,.06);
+  --shadow-md:0 12px 32px rgba(20,20,46,.10);
+  --shadow-lg:0 28px 70px rgba(20,20,46,.16);
+  --r:16px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--paper);line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+img{max-width:100%;display:block}
+a{color:inherit;text-decoration:none}
+::selection{background:rgba(79,70,229,.22)}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:#c9c9d8;border-radius:8px;border:2px solid var(--paper)}
+::-webkit-scrollbar-track{background:transparent}
+.wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+section{scroll-margin-top:84px}
+
+/* ============ NAV ============ */
+.nav{position:fixed;top:0;left:0;right:0;z-index:100;transition:background .3s,box-shadow .3s,border-color .3s;border-bottom:1px solid transparent}
+.nav .wrap{display:flex;align-items:center;height:68px;gap:28px}
+.nav.scrolled{background:rgba(255,255,255,.82);backdrop-filter:saturate(180%) blur(14px);-webkit-backdrop-filter:saturate(180%) blur(14px);box-shadow:var(--shadow-sm);border-bottom-color:var(--line)}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--disp);font-weight:700;font-size:18px;color:#fff;transition:color .3s}
+.nav.scrolled .brand{color:var(--text)}
+.brand .mk{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;background:linear-gradient(135deg,var(--indigo),var(--violet));color:#fff;font-weight:900;font-size:18px;box-shadow:0 4px 14px rgba(79,70,229,.4)}
+.brand small{font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:var(--faint);display:block;font-weight:500;margin-top:-2px}
+.nav-links{display:flex;align-items:center;gap:6px;margin-left:14px}
+.nav-links a{font-size:14px;color:rgba(255,255,255,.78);padding:8px 12px;border-radius:9px;transition:.2s;font-weight:500}
+.nav.scrolled .nav-links a{color:var(--dim)}
+.nav-links a:hover{color:#fff;background:rgba(255,255,255,.1)}
+.nav.scrolled .nav-links a:hover{color:var(--indigo);background:rgba(79,70,229,.08)}
+.nav-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:var(--body);font-weight:600;font-size:14px;border:none;cursor:pointer;border-radius:11px;padding:10px 18px;transition:transform .2s,box-shadow .2s,background .2s,color .2s;white-space:nowrap}
+.btn svg{width:16px;height:16px}
+.btn-ghost{background:transparent;color:rgba(255,255,255,.85);border:1px solid rgba(255,255,255,.22)}
+.nav.scrolled .btn-ghost{color:var(--dim);border-color:var(--line2)}
+.btn-ghost:hover{background:rgba(255,255,255,.1);color:#fff}
+.nav.scrolled .btn-ghost:hover{background:var(--paper);color:var(--text)}
+.btn-primary{background:linear-gradient(135deg,var(--indigo),var(--indigo2));color:#fff;box-shadow:0 6px 20px rgba(79,70,229,.35)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(79,70,229,.45)}
+.btn-amber{background:linear-gradient(135deg,var(--amber),var(--amber2));color:#3a2400;box-shadow:0 6px 20px rgba(245,158,11,.35)}
+.btn-amber:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(245,158,11,.45)}
+.btn-lg{padding:14px 26px;font-size:15.5px;border-radius:13px}
+.nav-toggle{display:none;width:42px;height:42px;border-radius:10px;border:1px solid rgba(255,255,255,.22);background:transparent;color:#fff;cursor:pointer;place-items:center}
+.nav.scrolled .nav-toggle{color:var(--text);border-color:var(--line2)}
+.nav-toggle svg{width:20px;height:20px}
+
+/* ============ HERO ============ */
+.hero{position:relative;background:var(--ink);color:#fff;padding:140px 0 90px;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px);background-size:46px 46px;mask-image:radial-gradient(ellipse 80% 70% at 50% 30%,#000 30%,transparent 75%);-webkit-mask-image:radial-gradient(ellipse 80% 70% at 50% 30%,#000 30%,transparent 75%)}
+.hero::after{content:"";position:absolute;inset:0;background:radial-gradient(680px 420px at 12% 8%,rgba(99,102,241,.32),transparent 60%),radial-gradient(620px 420px at 92% 18%,rgba(124,58,237,.26),transparent 60%),radial-gradient(560px 380px at 70% 96%,rgba(245,158,11,.16),transparent 60%)}
+.hero .wrap{position:relative;z-index:2;display:grid;grid-template-columns:1.05fr .95fr;gap:54px;align-items:center}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:var(--amber2);background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);padding:6px 13px;border-radius:999px;margin-bottom:22px}
+.eyebrow i{width:7px;height:7px;border-radius:50%;background:var(--amber2);box-shadow:0 0 8px var(--amber2);animation:blink 1.8s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+.hero h1{font-family:var(--disp);font-size:clamp(34px,4.6vw,58px);line-height:1.08;font-weight:700;letter-spacing:-.01em}
+.hero h1 .grad{background:linear-gradient(100deg,var(--amber2),var(--pink) 55%,var(--indigo2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p.lead{margin-top:20px;font-size:17px;color:rgba(255,255,255,.72);max-width:520px;line-height:1.75}
+.hero-cta{margin-top:30px;display:flex;gap:14px;flex-wrap:wrap}
+.hero-cta .btn-ghost{padding:14px 22px}
+.trust{margin-top:26px;display:flex;align-items:center;gap:14px;font-size:13px;color:rgba(255,255,255,.55)}
+.avatars{display:flex}
+.avatars span{width:30px;height:30px;border-radius:50%;border:2px solid var(--ink);margin-left:-9px;display:grid;place-items:center;font-size:12px;font-weight:700;color:#fff}
+.avatars span:first-child{margin-left:0}
+.avatars span:nth-child(1){background:linear-gradient(135deg,#6366F1,#8B5CF6)}
+.avatars span:nth-child(2){background:linear-gradient(135deg,#0EA5A4,#10B981)}
+.avatars span:nth-child(3){background:linear-gradient(135deg,#F59E0B,#EF4444)}
+.avatars span:nth-child(4){background:linear-gradient(135deg,#EC4899,#8B5CF6)}
+.stars{color:var(--amber2);letter-spacing:2px}
+
+/* mockup */
+.mock{position:relative;perspective:1400px}
+.mock-frame{background:linear-gradient(180deg,#1c1a2e,#15131f);border:1px solid rgba(255,255,255,.1);border-radius:16px;box-shadow:0 40px 90px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.04) inset;overflow:hidden;transform:rotateY(-7deg) rotateX(4deg);transition:transform .4s cubic-bezier(.22,1,.36,1)}
+.mock-bar{display:flex;align-items:center;gap:8px;padding:11px 14px;background:rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.07)}
+.mock-bar .dots{display:flex;gap:6px}
+.mock-bar .dots i{width:11px;height:11px;border-radius:50%}
+.mock-bar .dots i:nth-child(1){background:#FF5F57}.mock-bar .dots i:nth-child(2){background:#FEBC2E}.mock-bar .dots i:nth-child(3){background:#28C840}
+.mock-url{flex:1;margin-left:8px;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.08);border-radius:7px;padding:5px 12px;font-family:var(--mono);font-size:11.5px;color:rgba(255,255,255,.6);display:flex;align-items:center;gap:7px}
+.mock-url .lock{color:var(--green)}
+.mock-body{display:grid;grid-template-columns:1fr 1.25fr;min-height:300px}
+.mock-chat{padding:16px;border-right:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;gap:10px}
+.mock-chat .lab{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:rgba(255,255,255,.4)}
+.prompt-box{background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.3);border-radius:10px;padding:11px 12px;font-size:12.5px;color:rgba(255,255,255,.92);line-height:1.6;min-height:62px}
+.prompt-box .cur{display:inline-block;width:7px;height:14px;background:var(--amber2);vertical-align:-2px;animation:blink 1s steps(1) infinite}
+.mock-tag{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--green);background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);padding:4px 9px;border-radius:7px;align-self:flex-start}
+.mock-tag svg{width:12px;height:12px}
+.mock-prev{padding:16px;background:rgba(255,255,255,.02)}
+.mock-prev .lab{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:rgba(255,255,255,.4);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
+.prog{height:4px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden}
+.prog i{display:block;height:100%;width:30%;border-radius:3px;background:linear-gradient(90deg,var(--indigo2),var(--violet));animation:load 2.4s ease-in-out infinite}
+@keyframes load{0%{width:8%;margin-left:0}50%{width:60%;margin-left:20%}100%{width:8%;margin-left:92%}}
+.skel{margin-top:12px;display:flex;flex-direction:column;gap:9px}
+.skel .row{height:11px;border-radius:5px;background:linear-gradient(90deg,rgba(255,255,255,.05),rgba(255,255,255,.12),rgba(255,255,255,.05));background-size:200% 100%;animation:shim 1.5s infinite}
+@keyframes shim{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.skel .row.w70{width:70%}.skel .row.w90{width:90%}.skel .row.w50{width:50%}
+.skel .blocks{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:6px}
+.skel .blocks div{height:46px;border-radius:8px;background:linear-gradient(90deg,rgba(255,255,255,.05),rgba(255,255,255,.12),rgba(255,255,255,.05));background-size:200% 100%;animation:shim 1.5s infinite}
+.skel .blocks div:nth-child(2){animation-delay:.2s}.skel .blocks div:nth-child(3){animation-delay:.4s}
+.mock-float{position:absolute;background:rgba(23,21,39,.92);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:10px 13px;font-size:12px;display:flex;align-items:center;gap:9px;box-shadow:0 16px 40px rgba(0,0,0,.45);animation:floaty 4s ease-in-out infinite}
+.mock-float svg{width:16px;height:16px}
+.mock-float.f1{top:-16px;right:-12px;color:var(--green)}
+.mock-float.f2{bottom:-16px;left:-14px;color:var(--amber2);animation-delay:1.5s}
+.mock-float b{color:#fff;font-family:var(--disp)}
+@keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+
+/* stats strip */
+.stats-strip{position:relative;z-index:2;margin-top:64px;display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.08);border-radius:16px;overflow:hidden}
+.stat-cell{background:rgba(255,255,255,.02);padding:24px 26px;text-align:center}
+.stat-cell b{font-family:var(--disp);font-size:34px;font-weight:700;display:block;background:linear-gradient(120deg,#fff,rgba(255,255,255,.7));-webkit-background-clip:text;background-clip:text;color:transparent}
+.stat-cell span{font-size:13px;color:rgba(255,255,255,.55);margin-top:4px;display:block}
+
+/* ============ SECTION HEAD ============ */
+.sec{padding:96px 0}
+.sec-head{text-align:center;max-width:680px;margin:0 auto 56px}
+.kicker{font-family:var(--mono);font-size:12px;letter-spacing:.16em;color:var(--indigo);text-transform:uppercase;font-weight:600}
+.sec-head h2{font-family:var(--disp);font-size:clamp(28px,3.4vw,42px);font-weight:700;letter-spacing:-.01em;margin-top:12px;line-height:1.15}
+.sec-head p{margin-top:14px;font-size:16.5px;color:var(--dim)}
+
+/* ============ FEATURES ============ */
+.feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+.feat{background:var(--white);border:1px solid var(--line);border-radius:var(--r);padding:30px 26px;transition:transform .3s,box-shadow .3s,border-color .3s;position:relative;overflow:hidden}
+.feat::after{content:"";position:absolute;inset:0;background:radial-gradient(420px 200px at 50% -20%,rgba(79,70,229,.07),transparent 70%);opacity:0;transition:opacity .3s}
+.feat:hover{transform:translateY(-6px);box-shadow:var(--shadow-md);border-color:transparent}
+.feat:hover::after{opacity:1}
+.feat .ic{width:52px;height:52px;border-radius:13px;display:grid;place-items:center;margin-bottom:18px;position:relative;z-index:1}
+.feat .ic svg{width:24px;height:24px;color:#fff}
+.ic.i1{background:linear-gradient(135deg,#6366F1,#8B5CF6)}
+.ic.i2{background:linear-gradient(135deg,#0EA5A4,#10B981)}
+.ic.i3{background:linear-gradient(135deg,#F59E0B,#EF4444)}
+.ic.i4{background:linear-gradient(135deg,#EC4899,#8B5CF6)}
+.ic.i5{background:linear-gradient(135deg,#3B82F6,#06B6D4)}
+.ic.i6{background:linear-gradient(135deg,#10B981,#0EA5A4)}
+.feat h3{font-family:var(--disp);font-size:19px;font-weight:600;position:relative;z-index:1}
+.feat p{margin-top:9px;font-size:14px;color:var(--dim);line-height:1.7;position:relative;z-index:1}
+.feat .tag{display:inline-block;margin-top:14px;font-family:var(--mono);font-size:11px;color:var(--indigo);background:rgba(79,70,229,.08);padding:3px 9px;border-radius:6px;position:relative;z-index:1}
+
+/* ============ FLOW (dark) ============ */
+.flow{background:var(--ink);color:#fff;position:relative;overflow:hidden}
+.flow::after{content:"";position:absolute;inset:0;background:radial-gradient(620px 380px at 18% 12%,rgba(99,102,241,.18),transparent 60%),radial-gradient(560px 360px at 88% 90%,rgba(124,58,237,.16),transparent 60%)}
+.flow .wrap{position:relative;z-index:2}
+.flow .sec-head h2{color:#fff}
+.flow .sec-head p{color:rgba(255,255,255,.6)}
+.flow .kicker{color:var(--amber2)}
+.flow-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;position:relative}
+.flow-grid::before{content:"";position:absolute;top:34px;left:12%;right:12%;height:2px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent)}
+.step{text-align:center;position:relative}
+.step .num{width:68px;height:68px;border-radius:18px;margin:0 auto 18px;display:grid;place-items:center;background:var(--ink3);border:1px solid rgba(255,255,255,.12);position:relative;z-index:2;transition:.3s}
+.step:hover .num{transform:translateY(-5px);border-color:var(--indigo2);box-shadow:0 12px 30px rgba(99,102,241,.35)}
+.step .num svg{width:28px;height:28px;color:var(--amber2)}
+.step .idx{position:absolute;top:-9px;right:calc(50% - 42px);width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,var(--indigo),var(--violet));color:#fff;font-family:var(--disp);font-size:12px;font-weight:700;display:grid;place-items:center;z-index:3}
+.step h3{font-family:var(--disp);font-size:18px;font-weight:600}
+.step p{margin-top:8px;font-size:13.5px;color:rgba(255,255,255,.58);line-height:1.65}
+
+/* ============ TEMPLATES ============ */
+.tpl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.tpl{background:var(--white);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;transition:transform .3s,box-shadow .3s}
+.tpl:hover{transform:translateY(-6px);box-shadow:var(--shadow-md)}
+.tpl-thumb{height:178px;position:relative;overflow:hidden;padding:18px}
+.tpl-thumb.t1{background:linear-gradient(135deg,#4F46E5,#7C3AED)}
+.tpl-thumb.t2{background:linear-gradient(135deg,#F59E0B,#EF4444)}
+.tpl-thumb.t3{background:linear-gradient(135deg,#0EA5A4,#3B82F6)}
+.tpl-thumb .mini{background:rgba(255,255,255,.95);border-radius:9px;height:100%;padding:12px;box-shadow:0 12px 30px rgba(0,0,0,.25);display:flex;flex-direction:column;gap:7px}
+.tpl-thumb .mini .mh{height:9px;width:40%;border-radius:4px;background:linear-gradient(90deg,#c7c7d6,#e2e2ec)}
+.tpl-thumb .mini .mb{height:14px;width:75%;border-radius:4px;background:#dcdce6}
+.tpl-thumb .mini .mb2{height:8px;width:90%;border-radius:4px;background:#ececf2}
+.tpl-thumb .mini .mc{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:auto}
+.tpl-thumb .mini .mc div{height:30px;border-radius:6px;background:#f0f0f6}
+.tpl-body{padding:20px 22px 24px}
+.tpl-body .pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.tpl-body .pills span{font-size:11px;font-family:var(--mono);color:var(--dim);background:var(--paper);border:1px solid var(--line);padding:3px 9px;border-radius:6px}
+.tpl-body h3{font-family:var(--disp);font-size:18px;font-weight:600}
+.tpl-body p{margin-top:7px;font-size:13.5px;color:var(--dim);line-height:1.65}
+.tpl-body .use{margin-top:16px;display:inline-flex;align-items:center;gap:7px;font-size:13.5px;font-weight:600;color:var(--indigo)}
+.tpl-body .use svg{width:15px;height:15px;transition:transform .2s}
+.tpl:hover .use svg{transform:translateX(4px)}
+
+/* ============ PRICING ============ */
+.price-sec{background:linear-gradient(180deg,var(--paper),#F1F0FB)}
+.toggle{display:inline-flex;align-items:center;gap:12px;background:var(--white);border:1px solid var(--line);border-radius:999px;padding:5px;margin:0 auto 44px;font-size:13.5px;font-weight:600}
+.toggle button{border:none;background:transparent;cursor:pointer;padding:8px 18px;border-radius:999px;color:var(--dim);font-family:var(--body);font-weight:600;font-size:13.5px;transition:.2s}
+.toggle button.on{background:var(--indigo);color:#fff;box-shadow:0 4px 12px rgba(79,70,229,.3)}
+.toggle .save{font-family:var(--mono);font-size:10.5px;color:var(--green);background:rgba(16,185,129,.12);padding:2px 7px;border-radius:5px;margin-left:2px}
+.price-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;align-items:stretch}
+.price{background:var(--white);border:1px solid var(--line);border-radius:20px;padding:32px 28px;display:flex;flex-direction:column;transition:transform .3s,box-shadow .3s;position:relative}
+.price:hover{transform:translateY(-5px);box-shadow:var(--shadow-md)}
+.price.pop{border:2px solid var(--indigo);box-shadow:var(--shadow-lg);transform:scale(1.03)}
+.price.pop:hover{transform:scale(1.03) translateY(-5px)}
+.price .badge{position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,var(--indigo),var(--violet));color:#fff;font-size:12px;font-weight:700;padding:5px 16px;border-radius:999px;box-shadow:0 6px 16px rgba(79,70,229,.4);white-space:nowrap}
+.price h3{font-family:var(--disp);font-size:20px;font-weight:600}
+.price .desc{font-size:13.5px;color:var(--dim);margin-top:5px;min-height:38px}
+.price .amt{margin:18px 0 4px;display:flex;align-items:baseline;gap:4px}
+.price .amt .cur{font-family:var(--disp);font-size:22px;font-weight:600;color:var(--dim)}
+.price .amt .val{font-family:var(--disp);font-size:46px;font-weight:700;letter-spacing:-.02em}
+.price .amt .per{font-size:14px;color:var(--faint)}
+.price .yr-note{font-size:12px;color:var(--faint);min-height:18px}
+.price ul{list-style:none;margin:22px 0;display:flex;flex-direction:column;gap:11px;flex:1}
+.price li{display:flex;align-items:flex-start;gap:10px;font-size:13.5px;color:var(--text)}
+.price li svg{width:17px;height:17px;color:var(--green);flex:0 0 17px;margin-top:2px}
+.price li.off{color:var(--faint)}
+.price li.off svg{color:var(--line2)}
+.price .btn{width:100%}
+.price.pop .btn-primary{background:linear-gradient(135deg,var(--indigo),var(--violet))}
+
+/* ============ CTA ============ */
+.cta{padding:30px 0 96px}
+.cta-box{position:relative;background:linear-gradient(120deg,var(--indigo-d),var(--indigo) 45%,var(--violet));border-radius:28px;padding:64px 40px;text-align:center;color:#fff;overflow:hidden;box-shadow:0 30px 80px rgba(79,70,229,.35)}
+.cta-box::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px);background-size:40px 40px;mask-image:radial-gradient(ellipse 70% 80% at 50% 50%,#000,transparent 75%);-webkit-mask-image:radial-gradient(ellipse 70% 80% at 50% 50%,#000,transparent 75%)}
+.cta-box::after{content:"";position:absolute;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(245,158,11,.4),transparent 70%);top:-120px;right:-60px}
+.cta-box>*{position:relative;z-index:2}
+.cta-box h2{font-family:var(--disp);font-size:clamp(28px,3.6vw,44px);font-weight:700;letter-spacing:-.01em}
+.cta-box p{margin-top:14px;font-size:17px;color:rgba(255,255,255,.82);max-width:540px;margin-left:auto;margin-right:auto}
+.cta-box .hero-cta{justify-content:center;margin-top:30px}
+
+/* ============ FOOTER ============ */
+.foot{background:var(--ink);color:rgba(255,255,255,.6);padding:64px 0 30px}
+.foot-grid{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:40px}
+.foot .brand{color:#fff;margin-bottom:16px}
+.foot-about{font-size:13.5px;line-height:1.75;max-width:300px;color:rgba(255,255,255,.5)}
+.foot-social{display:flex;gap:10px;margin-top:20px}
+.foot-social a{width:36px;height:36px;border-radius:9px;display:grid;place-items:center;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);transition:.2s}
+.foot-social a:hover{background:var(--indigo);border-color:var(--indigo);color:#fff;transform:translateY(-2px)}
+.foot-social svg{width:17px;height:17px}
+.foot-col h4{color:#fff;font-family:var(--disp);font-size:14px;font-weight:600;margin-bottom:16px}
+.foot-col a{display:block;font-size:13.5px;padding:6px 0;transition:.2s}
+.foot-col a:hover{color:#fff;transform:translateX(3px)}
+.foot-bottom{margin-top:48px;padding-top:24px;border-top:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;font-size:12.5px;color:rgba(255,255,255,.4)}
+.foot-bottom .links{display:flex;gap:20px}
+
+/* ============ REVEAL ============ */
+.reveal{opacity:0;transform:translateY(26px);transition:opacity .7s cubic-bezier(.22,1,.36,1),transform .7s cubic-bezier(.22,1,.36,1)}
+.reveal.in{opacity:1;transform:none}
+
+/* ============ RESPONSIVE ============ */
+@media (max-width:1024px){
+  .hero .wrap{grid-template-columns:1fr;gap:48px}
+  .mock{max-width:560px}
+  .feat-grid{grid-template-columns:repeat(2,1fr)}
+  .flow-grid{grid-template-columns:repeat(2,1fr);gap:34px 20px}
+  .flow-grid::before{display:none}
+  .tpl-grid{grid-template-columns:repeat(2,1fr)}
+  .price-grid{grid-template-columns:1fr;max-width:440px;margin:0 auto}
+  .price.pop{transform:none}
+  .price.pop:hover{transform:translateY(-5px)}
+  .foot-grid{grid-template-columns:1fr 1fr;gap:32px}
+}
+@media (max-width:760px){
+  .nav-links,.nav-right .btn-ghost{display:none}
+  .nav-toggle{display:grid}
+  body.nav-open .nav-links{display:flex;position:fixed;top:68px;left:0;right:0;flex-direction:column;align-items:stretch;background:var(--white);border-bottom:1px solid var(--line);padding:14px 24px 20px;box-shadow:var(--shadow-md);gap:2px}
+  body.nav-open .nav-links a{color:var(--text);padding:12px 14px}
+  body.nav-open .nav-links a:hover{background:var(--paper);color:var(--indigo)}
+  .sec{padding:70px 0}
+  .hero{padding:120px 0 70px}
+  .feat-grid,.tpl-grid{grid-template-columns:1fr}
+  .flow-grid{grid-template-columns:1fr}
+  .stats-strip{grid-template-columns:1fr}
+  .stat-cell{padding:18px}
+  .mock-body{grid-template-columns:1fr}
+  .mock-chat{border-right:none;border-bottom:1px solid rgba(255,255,255,.07)}
+  .foot-grid{grid-template-columns:1fr 1fr}
+  .cta-box{padding:48px 24px}
+  .foot-bottom{flex-direction:column;text-align:center}
+}
+</style>
+</head>
+<body>
+
+<!-- ===== ICONS ===== -->
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 01-11.5 7.2L4 20l1-4.5A8 8 0 1121 12z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></symbol>
+  <symbol id="i-robot" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4M8 4h8"/><circle cx="9" cy="14" r="1.2" fill="currentColor"/><circle cx="15" cy="14" r="1.2" fill="currentColor"/></symbol>
+  <symbol id="i-zap" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/></symbol>
+  <symbol id="i-devices" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="2" y="4" width="14" height="10" rx="1.5"/><path d="M2 18h11"/><rect x="17" y="9" width="5" height="11" rx="1.2"/></symbol>
+  <symbol id="i-rocket" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M5 15c-1.5 1.5-2 5-2 5s3.5-.5 5-2M14.5 4.5C18 3 21 3 21 3s0 3-1.5 6.5C17.5 14 12 17 12 17l-5-5s3-5.5 7.5-7.5z"/><circle cx="15" cy="9" r="1.4"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.8 5.4L19 9l-5.2 1.6L12 16l-1.8-5.4L5 9l5.2-1.6L12 2zM19 14l.9 2.6L22 17l-2.1.7L19 20l-.9-2.3L16 17l2.1-.4L19 14z"/></symbol>
+  <symbol id="i-tune" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h10M18 6h2M4 12h2M10 12h10M4 18h8M16 18h4"/><circle cx="16" cy="6" r="2" fill="currentColor"/><circle cx="8" cy="12" r="2" fill="currentColor"/><circle cx="14" cy="18" r="2" fill="currentColor"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M5 16v2a2 2 0 002 2h10a2 2 0 002-2v-2"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></symbol>
+  <symbol id="i-github" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 00-3.2 19.5c.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.3-3.4-1.3-.5-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.6 2.4 1.1 3 .8.1-.6.3-1.1.6-1.4-2.2-.2-4.6-1.1-4.6-5 0-1.1.4-2 1-2.7-.1-.3-.4-1.3.1-2.7 0 0 .8-.3 2.7 1a9.3 9.3 0 015 0c1.9-1.3 2.7-1 2.7-1 .5 1.4.2 2.4.1 2.7.6.7 1 1.6 1 2.7 0 3.9-2.4 4.8-4.6 5 .3.3.7 1 .7 2v2.9c0 .3.2.6.7.5A10 10 0 0012 2z"/></symbol>
+  <symbol id="i-twitter" viewBox="0 0 24 24" fill="currentColor"><path d="M18 3h3l-7 8 8 10h-6l-5-6-5 6H3l7-9L2 3h6l4 5 6-5z"/></symbol>
+  <symbol id="i-wechat" viewBox="0 0 24 24" fill="currentColor"><path d="M9 4C5 4 2 6.7 2 10c0 1.9 1 3.5 2.6 4.6L4 17l2.6-1.3c.8.2 1.6.3 2.4.3h.5a5 5 0 01-.2-1.4c0-3 2.9-5.3 6.4-5.3h.6C15.7 6 12.7 4 9 4zm-2.4 4a1 1 0 110 2 1 1 0 010-2zm4.8 0a1 1 0 110 2 1 1 0 010-2zM16 10c-3 0-5.5 2-5.5 4.6S13 19 16 19c.7 0 1.3-.1 1.9-.3L20 20l-.5-1.7c1.2-.9 2-2.2 2-3.7C21.5 12 19 10 16 10zm-1.8 3a.8.8 0 110 1.6.8.8 0 010-1.6zm3.6 0a.8.8 0 110 1.6.8.8 0 010-1.6z"/></symbol>
+</svg>
+
+<!-- ===== NAV ===== -->
+<nav class="nav" id="nav">
+  <div class="wrap">
+    <a href="#top" class="brand"><span class="mk">壶</span><span>壶天AI 建站<small>HUTIAN AI BUILDER</small></span></a>
+    <div class="nav-links">
+      <a href="#features">产品能力</a>
+      <a href="#flow">建站流程</a>
+      <a href="#templates">模板中心</a>
+      <a href="#pricing">定价</a>
+      <a href="#docs">文档</a>
+    </div>
+    <div class="nav-right">
+      <a href="#" class="btn btn-ghost">登录</a>
+      <a href="#cta" class="btn btn-primary">免费开始<svg><use href="#i-arrow"/></svg></a>
+      <button class="nav-toggle" id="navToggle" aria-label="菜单"><svg><use href="#i-menu"/></svg></button>
+    </div>
+  </div>
+</nav>
+
+<!-- ===== HERO ===== -->
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="hero-text">
+      <span class="eyebrow"><i></i>SEO 原生 · GEO 生成式优化内置</span>
+      <h1>用一句话描述，<br><span class="grad">AI 帮你建好站</span></h1>
+      <p class="lead">壶天AI 建站把自然语言变成可上线的高性能网站。无需代码，AI 自动生成结构、内容与 Schema 标记，让你的站点同时被传统搜索引擎与 AI 生成引擎看见。</p>
+      <div class="hero-cta">
+        <a href="#cta" class="btn btn-amber btn-lg">30 秒免费建站<svg><use href="#i-arrow"/></svg></a>
+        <a href="#flow" class="btn btn-ghost btn-lg"><svg><use href="#i-play"/></svg>观看演示</a>
+      </div>
+      <div class="trust">
+        <div class="avatars"><span>L</span><span>W</span><span>Z</span><span>+</span></div>
+        <span><span class="stars">★★★★★</span>&nbsp; 12,000+ 团队正在用壶天建站</span>
+      </div>
+    </div>
+
+    <div class="mock" id="mock">
+      <div class="mock-frame" id="mockFrame">
+        <div class="mock-bar">
+          <div class="dots"><i></i><i></i><i></i></div>
+          <div class="mock-url"><svg class="lock" width="11" height="11"><use href="#i-lock"/></svg>hutian.ai / build</div>
+        </div>
+        <div class="mock-body">
+          <div class="mock-chat">
+            <span class="lab">你的需求</span>
+            <div class="prompt-box"><span id="typer"></span><span class="cur"></span></div>
+            <span class="mock-tag"><svg><use href="#i-check"/></svg>已生成 6 个区块</span>
+          </div>
+          <div class="mock-prev">
+            <div class="lab"><span>实时预览</span><span style="color:var(--amber2)">生成中…</span></div>
+            <div class="prog"><i></i></div>
+            <div class="skel">
+              <div class="row w50"></div>
+              <div class="row w90"></div>
+              <div class="row w70"></div>
+              <div class="blocks"><div></div><div></div><div></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="mock-float f1"><svg><use href="#i-zap"/></svg><span>Lighthouse <b>98</b></span></div>
+      <div class="mock-float f2"><svg><use href="#i-robot"/></svg><span>GEO 可见度 <b>92%</b></span></div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="stats-strip reveal">
+      <div class="stat-cell"><b class="cnt" data-to="12000" data-suf="+">0</b><span>已生成网站</span></div>
+      <div class="stat-cell"><b class="cnt" data-to="89" data-pre="+" data-suf="%">0</b><span>平均搜索流量提升</span></div>
+      <div class="stat-cell"><b class="cnt" data-to="30" data-pre="&lt;" data-suf="s">0</b><span>从描述到上线</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- ===== FEATURES ===== -->
+<section class="sec" id="features">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="kicker">PRODUCT CAPABILITIES</span>
+      <h2>不只是建站，而是建一个能被搜到的站</h2>
+      <p>从内容生成到搜索优化，壶天把整条链路打包进一次对话。</p>
+    </div>
+    <div class="feat-grid">
+      <div class="feat reveal"><div class="ic i1"><svg><use href="#i-chat"/></svg></div><h3>自然语言建站</h3><p>用一句话描述你的业务，AI 自动规划页面结构、撰写文案并生成视觉布局，所见即所得。</p><span class="tag">no-code</span></div>
+      <div class="feat reveal"><div class="ic i2"><svg><use href="#i-search"/></svg></div><h3>SEO 原生内置</h3><p>标题层级、Meta、内链、Core Web Vitals 在生成时即达标，技术 SEO 不再事后补救。</p><span class="tag">schema.org</span></div>
+      <div class="feat reveal"><div class="ic i3"><svg><use href="#i-robot"/></svg></div><h3>GEO 生成式优化</h3><p>面向 DeepSeek、GPT、Kimi 等生成式引擎优化实体与引用结构，让 AI 主动提及你的品牌。</p><span class="tag">AI-ready</span></div>
+      <div class="feat reveal"><div class="ic i4"><svg><use href="#i-zap"/></svg></div><h3>极致性能</h3><p>静态优先 + 边缘分发，首屏毫秒级加载，Lighthouse 性能评分稳定 95+。</p><span class="tag">edge cdn</span></div>
+      <div class="feat reveal"><div class="ic i5"><svg><use href="#i-devices"/></svg></div><h3>全端响应式</h3><p>桌面、平板、手机一套结构自适应，断点与触控体验由 AI 自动校准。</p><span class="tag">responsive</span></div>
+      <div class="feat reveal"><div class="ic i6"><svg><use href="#i-rocket"/></svg></div><h3>一键部署</h3><p>绑定域名、HTTPS、IndexNow 收录提交全自动，发布即被搜索引擎发现。</p><span class="tag">auto-deploy</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FLOW ===== -->
+<section class="sec flow" id="flow">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="kicker">HOW IT WORKS</span>
+      <h2>四步，从想法到上线</h2>
+      <p>把过去数周的建站流程，压缩进一杯咖啡的时间。</p>
+    </div>
+    <div class="flow-grid">
+      <div class="step reveal"><div class="num"><svg><use href="#i-edit"/></svg></div><span class="idx">1</span><h3>描述需求</h3><p>用自然语言说出你的品牌、产品与目标受众，越具体越好。</p></div>
+      <div class="step reveal"><div class="num"><svg><use href="#i-spark"/></svg></div><span class="idx">2</span><h3>AI 生成</h3><p>模型自动生成页面结构、文案、配图与结构化数据。</p></div>
+      <div class="step reveal"><div class="num"><svg><use href="#i-tune"/></svg></div><span class="idx">3</span><h3>可视化调整</h3><p>在画布上拖拽微调，或继续用对话让 AI 修改任意区块。</p></div>
+      <div class="step reveal"><div class="num"><svg><use href="#i-upload"/></svg></div><span class="idx">4</span><h3>一键发布</h3><p>绑定域名即刻上线，自动提交收录，搜索与 AI 同步可见。</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== TEMPLATES ===== -->
+<section class="sec" id="templates">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="kicker">TEMPLATE CENTER</span>
+      <h2>从模板开始，更快一步</h2>
+      <p>精选行业模板，全部预置 SEO/GEO 最佳实践，套用后再用 AI 个性化。</p>
+    </div>
+    <div class="tpl-grid">
+      <div class="tpl reveal">
+        <div class="tpl-thumb t1"><div class="mini"><div class="mh"></div><div class="mb"></div><div class="mb2"></div><div class="mc"><div></div><div></div><div></div></div></div></div>
+        <div class="tpl-body"><div class="pills"><span>SaaS</span><span>落地页</span><span>暗色</span></div><h3>SaaS 产品官网</h3><p>Hero + 特性 + 定价 + 客户证言的标准高转化结构，适合工具与平台类产品。</p><a href="#cta" class="use">使用模板<svg><use href="#i-arrow"/></svg></a></div>
+      </div>
+      <div class="tpl reveal">
+        <div class="tpl-thumb t2"><div class="mini"><div class="mh"></div><div class="mb"></div><div class="mb2"></div><div class="mc"><div></div><div></div><div></div></div></div></div>
+        <div class="tpl-body"><div class="pills"><span>电商</span><span>品牌站</span><span>Product Schema</span></div><h3>电商品牌站</h3><p>内置 Product / Offer 结构化数据，商品页天然适配富媒体结果与 AI 引用。</p><a href="#cta" class="use">使用模板<svg><use href="#i-arrow"/></svg></a></div>
+      </div>
+      <div class="tpl reveal">
+        <div class="tpl-thumb t3"><div class="mini"><div class="mh"></div><div class="mb"></div><div class="mb2"></div><div class="mc"><div></div><div></div><div></div></div></div></div>
+        <div class="tpl-body"><div class="pills"><span>作品集</span><span>个人</span><span>Person Schema</span></div><h3>个人作品集</h3><p>突出项目与经历的极简布局，Person 实体标记强化个人品牌在搜索中的呈现。</p><a href="#cta" class="use">使用模板<svg><use href="#i-arrow"/></svg></a></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== PRICING ===== -->
+<section class="sec price-sec" id="pricing">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="kicker">PRICING</span>
+      <h2>简单透明的定价</h2>
+      <p>从免费起步，随业务增长平滑升级，无隐藏费用。</p>
+    </div>
+    <div style="text-align:center"><div class="toggle reveal" id="toggle"><button class="on" data-cyc="m">按月</button><button data-cyc="y">按年<span class="save">省 20%</span></button></div></div>
+    <div class="price-grid">
+      <div class="price reveal">
+        <h3>免费版</h3><div class="desc">适合个人尝鲜与验证想法</div>
+        <div class="amt"><span class="cur">¥</span><span class="val">0</span><span class="per">/ 月</span></div>
+        <div class="yr-note">&nbsp;</div>
+        <ul>
+          <li><svg><use href="#i-check"/></svg>1 个 AI 生成站点</li>
+          <li><svg><use href="#i-check"/></svg>基础 SEO 优化</li>
+          <li><svg><use href="#i-check"/></svg>壶天子域名</li>
+          <li class="off"><svg><use href="#i-x"/></svg>自定义域名</li>
+          <li class="off"><svg><use href="#i-x"/></svg>GEO 生成式优化</li>
+        </ul>
+        <a href="#cta" class="btn btn-ghost" style="border-color:var(--line2);color:var(--text)">免费开始</a>
+      </div>
+      <div class="price pop reveal">
+        <span class="badge">★ 最受欢迎</span>
+        <h3>专业版</h3><div class="desc">适合成长期团队与品牌官网</div>
+        <div class="amt"><span class="cur">¥</span><span class="val" data-m="99" data-y="79">99</span><span class="per">/ 月</span></div>
+        <div class="yr-note" data-note>&nbsp;</div>
+        <ul>
+          <li><svg><use href="#i-check"/></svg>10 个站点 · 无限页面</li>
+          <li><svg><use href="#i-check"/></svg>自定义域名 + HTTPS</li>
+          <li><svg><use href="#i-check"/></svg>完整 SEO + GEO 优化</li>
+          <li><svg><use href="#i-check"/></svg>Schema.org 自动生成</li>
+          <li><svg><use href="#i-check"/></svg>IndexNow 收录提交</li>
+        </ul>
+        <a href="#cta" class="btn btn-primary">升级专业版</a>
+      </div>
+      <div class="price reveal">
+        <h3>企业版</h3><div class="desc">适合多站点与团队协作</div>
+        <div class="amt"><span class="cur">¥</span><span class="val" data-m="399" data-y="319">399</span><span class="per">/ 月</span></div>
+        <div class="yr-note" data-note>&nbsp;</div>
+        <ul>
+          <li><svg><use href="#i-check"/></svg>无限站点 + 团队席位</li>
+          <li><svg><use href="#i-check"/></svg>私有部署 / SSO</li>
+          <li><svg><use href="#i-check"/></svg>API 与 Webhook</li>
+          <li><svg><use href="#i-check"/></svg>专属客户成功经理</li>
+          <li><svg><use href="#i-check"/></svg>SLA 99.9% 保障</li>
+        </ul>
+        <a href="#cta" class="btn btn-ghost" style="border-color:var(--line2);color:var(--text)">联系销售</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== CTA ===== -->
+<section class="cta" id="cta">
+  <div class="wrap">
+    <div class="cta-box reveal">
+      <h2>30 秒，让 AI 为你建好站</h2>
+      <p>无需信用卡，免费生成你的第一个站点。看看一句话能变成什么。</p>
+      <div class="hero-cta">
+        <a href="#top" class="btn btn-amber btn-lg">立即免费建站<svg><use href="#i-arrow"/></svg></a>
+        <a href="#docs" class="btn btn-ghost btn-lg">查看文档</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer class="foot" id="docs">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div>
+        <a href="#top" class="brand"><span class="mk">壶</span><span>壶天AI 建站<small>HUTIAN AI BUILDER</small></span></a>
+        <p class="foot-about">用自然语言驱动的智能建站平台，让每个网站天生具备 SEO 与 GEO 竞争力。</p>
+        <div class="foot-social">
+          <a href="#" aria-label="GitHub"><svg><use href="#i-github"/></svg></a>
+          <a href="#" aria-label="Twitter"><svg><use href="#i-twitter"/></svg></a>
+          <a href="#" aria-label="WeChat"><svg><use href="#i-wechat"/></svg></a>
+        </div>
+      </div>
+      <div class="foot-col"><h4>产品</h4><a href="#features">产品能力</a><a href="#flow">建站流程</a><a href="#templates">模板中心</a><a href="#pricing">定价方案</a></div>
+      <div class="foot-col"><h4>资源</h4><a href="#">开发文档</a><a href="#">SEO 指南</a><a href="#">GEO 白皮书</a><a href="#">更新日志</a></div>
+      <div class="foot-col"><h4>公司</h4><a href="#">关于我们</a><a href="#">联系销售</a><a href="#">加入团队</a><a href="#">品牌资源</a></div>
+    </div>
+    <div class="foot-bottom">
+      <span>© 2026 壶天AI 建站 · Hutian AI Builder. 保留所有权利。</span>
+      <div class="links"><a href="#">隐私政策</a><a href="#">服务条款</a><a href="#">Cookie 设置</a></div>
+    </div>
+  </div>
+</footer>
+
+<script>
+var $=function(s){return document.querySelector(s);};
+var $$=function(s){return document.querySelectorAll(s);};
+
+/* ---- nav scroll state ---- */
+var nav=$('#nav');
+function onScroll(){ if(window.scrollY>30){nav.classList.add('scrolled');}else{nav.classList.remove('scrolled');} }
+window.addEventListener('scroll',onScroll,{passive:true}); onScroll();
+
+/* ---- mobile menu ---- */
+$('#navToggle').addEventListener('click',function(){document.body.classList.toggle('nav-open');});
+$$('.nav-links a').forEach(function(a){a.addEventListener('click',function(){document.body.classList.remove('nav-open');});});
+
+/* ---- reveal on scroll ---- */
+var io=new IntersectionObserver(function(es){
+  es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
+},{threshold:.14});
+$$('.reveal').forEach(function(el){io.observe(el);});
+
+/* ---- count up ---- */
+function countUp(el,to,pre,suf){
+  pre=pre||'';suf=suf||'';var t0=performance.now(),dur=1500;
+  (function f(t){var p=Math.min((t-t0)/dur,1),e=1-Math.pow(1-p,3),v=Math.round(to*e);
+   el.innerHTML=pre+v.toLocaleString()+suf; if(p<1)requestAnimationFrame(f);})(t0);
+}
+var cio=new IntersectionObserver(function(es){
+  es.forEach(function(e){ if(e.isIntersecting){ var el=e.target; countUp(el,+el.dataset.to,el.dataset.pre||'',el.dataset.suf||''); cio.unobserve(el); } });
+},{threshold:.5});
+$$('.cnt').forEach(function(el){cio.observe(el);});
+
+/* ---- hero mockup 3D tilt ---- */
+var mock=$('#mock'),frame=$('#mockFrame');
+if(mock&&frame){
+  mock.addEventListener('mousemove',function(e){
+    var r=mock.getBoundingClientRect();
+    var px=(e.clientX-r.left)/r.width-.5, py=(e.clientY-r.top)/r.height-.5;
+    frame.style.transform='rotateY('+(px*10)+'deg) rotateX('+(-py*8)+'deg)';
+  });
+  mock.addEventListener('mouseleave',function(){frame.style.transform='rotateY(-7deg) rotateX(4deg)';});
+}
+
+/* ---- hero typer ---- */
+var phrases=['帮我建一个 SaaS 产品官网，主打 AI 客服，暗色科技风。','做一个半导体器件的电商品牌站，要带商品结构化数据。','生成我的设计师作品集，突出近三年项目案例。'];
+var typer=$('#typer'),pi=0,ci=0,deleting=false;
+function type(){
+  if(!typer)return;
+  var word=phrases[pi];
+  if(!deleting){
+    typer.textContent=word.slice(0,++ci);
+    if(ci===word.length){deleting=true;setTimeout(type,1500);return;}
+  }else{
+    typer.textContent=word.slice(0,--ci);
+    if(ci===0){deleting=false;pi=(pi+1)%phrases.length;}
+  }
+  setTimeout(type,deleting?35:70);
+}
+type();
+
+/* ---- pricing toggle ---- */
+var toggle=$('#toggle');
+if(toggle){
+  toggle.querySelectorAll('button').forEach(function(b){
+    b.addEventListener('click',function(){
+      toggle.querySelectorAll('button').forEach(function(x){x.classList.remove('on');});
+      b.classList.add('on');
+      var y=b.dataset.cyc==='y';
+      $$('.price .val').forEach(function(v){ if(v.dataset.m){ v.textContent=y?v.dataset.y:v.dataset.m; } });
+      $$('[data-note]').forEach(function(n){ n.textContent=y?'按年支付，折合每月价格':' '; });
+    });
+  });
+}
+</script>
+</body>
+</html>

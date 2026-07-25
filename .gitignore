@@ -1,0 +1,34 @@
+# 依赖
+node_modules/
+__pycache__/
+*.pyc
+
+# 构建产物
+.next/
+out/
+dist/
+build/
+.turbo/
+
+# 环境变量(含真实密钥,禁止提交)
+.env
+.env.local
+.env.*.local
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 日志
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# 工作区临时
+agent_workspace/

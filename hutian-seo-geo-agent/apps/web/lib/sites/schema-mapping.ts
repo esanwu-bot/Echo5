@@ -34,6 +34,7 @@ export interface ArticleSchema extends SchemaBase {
 
 export interface ProductSchema extends SchemaBase {
   "@type": "Product";
+  "@id"?: string;
   name: string;
   description: string;
   sku: string;
@@ -122,6 +123,7 @@ export function buildProductSchema(
   const schema: ProductSchema = {
     "@context": "https://schema.org",
     "@type": "Product",
+    "@id": pageUrl,
     name: product.name,
     description: product.description || product.name,
     sku: String(product.id),

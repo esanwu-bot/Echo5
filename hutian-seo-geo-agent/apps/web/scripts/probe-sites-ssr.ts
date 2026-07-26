@@ -126,9 +126,10 @@ async function probePage(
     html,
     /<link[^>]+rel="canonical"[^>]+href="([^"]+)"/i
   );
+  // γ 尾巴（红线 12）：canonical 必须含 /site/ 前缀，否则两套 URL 空间会打架
   asserts.push({
-    name: `[${url}] <link rel="canonical"> 非空`,
-    pass: !!canonical && canonical.trim().length > 0,
+    name: `[${url}] <link rel="canonical"> 含 /site/ 前缀`,
+    pass: !!canonical && /\/site\//.test(canonical),
     detail: canonical || "missing",
   });
 

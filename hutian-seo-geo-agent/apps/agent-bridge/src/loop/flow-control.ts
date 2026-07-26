@@ -193,6 +193,8 @@ export interface RunCtx {
   brand?: string;
   /** trace_citations 时间窗口，默认 30 */
   windowDays?: number;
+  /** 建站腿：渲染器 base URL（默认 http://localhost:3000） */
+  sitesBaseUrl?: string;
 }
 
 /**
@@ -249,6 +251,27 @@ export function shouldReverifyAfterWrite(
       name: "trace_citations",
       args: { brand, window_days: windowDays },
       reason: `auto-reverify: sitemap 提交后复测「${brand}」AI 引用（${windowDays}d）`,
+    };
+  }
+
+  // ── 建站腿校验链：cms_create_page / cms_configure_product → check_schema 渲染器 URL
+  // 与 SEO 腿 entity_rename → check_schema 同构（Qwen 清单 #4）
+  // single source：check_schema 验渲染器注入的 JSON-LD（schema-mapping.ts 生成）
+  if (toolName === "cms_create_page" || toolName === "cms_configure_product") {
+    const output = result.output as { data?: { id?: number } } | null;
+    const id = output?.data?.id;
+    if (!id) return null;
+
+    const baseUrl = ctx.sitesBaseUrl || "http://localhost:3000";
+    const expectedType = toolName === "cms_create_page" ? "Article" : "Product";
+    const pathPrefix =
+      toolName === "cms_create_page" ? "articles" : "products";
+    const url = `${baseUrl}/site/${pathPrefix}/${id}`;
+
+    return {
+      name: "check_schema",
+      args: { url, expected_type: expectedType },
+      reason: `auto-reverify: 建站后复验渲染器 JSON-LD（${expectedType} @ ${url}）`,
     };
   }
 

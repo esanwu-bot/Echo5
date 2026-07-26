@@ -25,16 +25,23 @@ const MODEL_LABELS: Record<string, string> = {
 };
 
 export default function WorkbenchPage() {
-  const { state, send, setPanel } = useAgentSession("sse");
+  // 真流默认不 auto-send —— 用户实测后再决定是否加开场示例（避免"自动烧钱"）
+  // mock 模式照旧自动播 demo 时间线（demo 不计费、不入历史）
+  // 切 mock 走 ?mode=mock query 或环境变量（demo / 桌面壳）
+  const mode: "mock" | "sse" =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("mode") === "mock"
+      ? "mock"
+      : "sse";
+  const { state, send, setPanel, startMock } = useAgentSession(mode);
   const [model, setModel] = useState("deepseek-v4-flash");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  // 进入自动触发首次诊断（SSE 模式：lazy 创建 session + POST message）
+  // mock 模式进入自动播 demo；sse 模式首屏是可输入的空工作台
   useEffect(() => {
-    const t = setTimeout(() => send("请诊断 https://example.com 的 SEO 情况"), 600);
-    return () => clearTimeout(t);
-  }, [send]);
+    if (mode === "mock") startMock();
+  }, [mode, startMock]);
 
   const addToast = useCallback((text: string, accent?: Toast["accent"]) => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;

@@ -519,7 +519,7 @@ export type AgentEvent =
 - **组件树**：`TopBar / Sidebar(含 RuntimeCard) / ChatStream(Message|ToolCall|PlanChecklist|StatTiles|ThinkingDots) / RightPanel(Diff|Preview|Terminal|Artifacts) / Composer / StatusBar`。
 - **数据流**：`useAgentSession(mode)` → `useReducer(streamReducer)`；`mode="mock"` 用 `mockStream`，`mode="sse"` 用 `EventSource`。
 - **mock 时间线编排**（← §5 状态机，顺序固定）：`meta → thinking → user → plan(5) → t1 entity_rename → t2 run_diagnosis → t3 trace_citations → agent → t4 edit_file(+diff 闪+切标签) → t5 submit_sitemap(+terminal+artifact) → stats → agent → done`。数字取自 PRD §4.3。
-- **轻量自实现**：内联 markdown（`**bold**`/`` `code` ``/列表）、Diff 行渲染、终端光标，避免重依赖。
+- **Markdown 渲染**：`react-markdown` + `remark-gfm`（GFM 表格/任务列表/删除线/自动链接）+ `rehype-raw`（兼容 demo 中的 `<strong>/<code>/<br/>` 等 raw HTML）；代码块带语言标签 + copy 按钮；表格带 `tbody divide-y` + `tr` 斑马纹。刻意不引更重的（如 shiki 代码高亮）。门禁：`pnpm --filter @hutian/web run probe:md-table` 验 GFM 竖线表格 + HTML 表格都被解析为 `<table>`，fixture 落盘 `docs/probes/md-table-ssr.txt`。Diff 行渲染、终端光标仍自实现。
 
 ---
 

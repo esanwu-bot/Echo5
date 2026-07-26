@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type { StreamState } from "@/lib/streamReducer";
+import { MarkdownRenderer } from "./MarkdownRenderer";
 import Thinking from "./Thinking";
 import ToolCall from "./ToolCall";
 import PlanList from "./PlanList";
@@ -36,7 +37,7 @@ export default function ChatStream({ state }: ChatStreamProps) {
       className="flex-1 overflow-y-auto"
     >
       <div className="mx-auto max-w-3xl space-y-3 py-4">
-        {/* 用户首条消息（mock 场景的触发语） */}
+        {/* 空状态：可输入的空工作台（不再 auto-send 烧钱） */}
         {state.timeline.length === 0 && (
           <div className="animate-fade-in-up px-4 py-8 text-center">
             <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-amber to-amber2 text-white shadow-glow">
@@ -48,9 +49,13 @@ export default function ChatStream({ state }: ChatStreamProps) {
             <p className="mt-1.5 text-[13px] text-dim">
               用一句话下达意图，Agent 自主完成诊断—修复—提交—验证闭环
             </p>
-            <div className="mt-4 inline-flex items-center gap-2 rounded-lg border border-line bg-bg1 px-3 py-1.5 text-[12px] text-faint">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber" />
-              正在准备演示时间线…
+            <div className="mt-4 rounded-lg border border-line bg-bg1 px-3 py-2 text-left text-[12px] text-faint">
+              <div className="mb-1 font-medium text-dim">试试这些：</div>
+              <ul className="space-y-1">
+                <li>· 诊断 https://example.com 的 SEO 情况</li>
+                <li>· 追踪「壶天」在 AI 引擎里的引用</li>
+                <li>· 把品牌从「天启芯」改为「壶天」</li>
+              </ul>
             </div>
           </div>
         )}
@@ -128,7 +133,11 @@ function MessageBubble({
             : undefined
         }
       >
-        <div dangerouslySetInnerHTML={{ __html: msg.content }} />
+        {isUser ? (
+          <div>{msg.content}</div>
+        ) : (
+          <MarkdownRenderer content={msg.content} />
+        )}
         <div
           className={`mt-1 font-mono text-[10px] text-faint ${
             isUser ? "text-right" : ""

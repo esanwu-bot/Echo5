@@ -237,7 +237,8 @@
 
 - [ ] `pnpm install` 无 peer 报错；`pnpm dev` 同时起 web(:3000) 与 bridge(:4317)
 - [ ] `/` 官网：导航滚动变色、Hero 3D+打字机、数据条滚动、定价月/年切价、滚动揭示
-- [ ] `/workbench`：进入自动播 mock 时间线；5 工具块 spinner→✓ 且旧块折叠；`edit_file` 触发 Diff 闪
+- [ ] `/workbench?mode=mock`：进入自动播 mock 时间线；5 工具块 spinner→✓ 且旧块折叠；`edit_file` 触发 Diff 闪
+- [ ] `/workbench`（默认 sse）：首屏为**可输入的空工作台**，不自动发送首次诊断（避免"自动烧钱"），等待用户输入
 - [ ] 计划清单逐项点亮；收尾指标卡数字滚动；输入框 done 后可编辑并触发新一轮
 - [ ] 主题深↔浅平滑，**官网配色不变**
 - [ ] `tsc --noEmit` 零报错；`next build` 通过；`/` 静态/ISR、`/workbench` 客户端渲染
@@ -269,18 +270,20 @@
 
 ---
 
-## 16. 桌面版（本地优先线）
+## 16. 桌面版（本地优先线 · Wails 壳）
 
 > **战略定位**：桌面版是"本地优先"的第二条产品腿，不是 SaaS 的替代品。
 > 桌面版（本地、单用户、免费体验+买断）与 SaaS（云端、多租户、订阅）**共享 100% 前端代码**，
 > 差异只在部署拓扑。两条线并行，服务 PRD §3 的不同画像。
+> **现状校准（2026-07-26）**：v1 已切 **Wails v2.12（Go 主进程 + WebView2）**，`wails build -nsis`
+> 出 `hutian-agent.exe`（约 11.8 MB），无需 MSVC；Tauri 路线已放弃。
 
 ### 16.1 画像分流
 
 | 形态 | 服务谁（§3） | 部署 | 变现 | 接 grok |
 |---|---|---|---|---|
-| 桌面版（Tauri） | 独立开发者/小团队、技术 SEO/前端 | 本地单体 | 免费体验 + 专业版买断 | ✅ 本地 spawn，自然 |
-| SaaS（Web） | 增长/SEO 负责人、品牌/电商运营 | 云端多租户 | 订阅 + 运营后台 | 远程 bridge，较重 |
+| 桌面版（Wails） | 独立开发者/小团队、技术 SEO/前端 | 本地单体 exe | 免费体验 + 专业版买断 | 与 SaaS 同构：grok 仅作可选 LLM 后端，不本地 spawn |
+| SaaS（Web） | 增长/SEO 负责人、品牌/电商运营 | 云端多租户 | 订阅 + 运营后台 | 远程 bridge，可选 CodeBuddy/grok |
 
 ### 16.2 功能需求
 
@@ -289,7 +292,7 @@
 | FR-D01 | 下载入口 | 官网 /download 页提供 Windows 安装包下载，含版本号、changelog、文件大小 | P0 |
 | FR-D02 | 离线 mock 体验 | 桌面版启动后自动播 mock 时间线，零后端依赖，双击即用 | P0 |
 | FR-D03 | 本地工具闭环 | v2 起 sidecar 模式内嵌 bridge+MCP，五工具本地真跑 | P1 |
-| FR-D04 | 自动更新 | Tauri updater，官网静态服务放更新清单，用户无感升级 | P1 |
+| FR-D04 | 自动更新 | Wails 内置更新 / 官网静态服务放更新清单，用户无感升级 | P1 |
 | FR-D05 | 代码签名 | Windows 代码签名证书，避免 SmartScreen 拦截 | P1 |
 | FR-D06 | WebView2 降级 | Win10 老版本检测 + bootstrapper 引导安装 | P2 |
 
@@ -297,15 +300,15 @@
 
 | 档 | 主题 | 包含 | 后端依赖 |
 |---|---|---|---|
-| v1 | 体验/获客 | Tauri 壳 + workbench 前端 mode="mock" | 零后端 |
-| v2 | 真干活 | + bridge sidecar (Node SEA) + MCP sidecar (PyInstaller) | 本地 sidecar |
-| v3 | 满血 | + grok sidecar (Rust 二进制)，本地 spawn | 本地全栈 |
+| v1 | 体验/获客 | Wails 壳（Go `//go:embed` 嵌 dist）+ workbench 前端 mode="mock" | 零后端 |
+| v2 | 真干活 | + bridge sidecar（Go `os/exec` 起 Node bridge）+ MCP sidecar（Python） | 本地 sidecar |
+| v3 | 满血 | + grok **不作本地 host**，若启用是经 CLIProxyAPI 的 LLM 后端，与 CodeBuddy 平级 | 本地全栈 |
 
 ### 16.4 安全模型
 
 桌面版用户是机主，安全重点从"防不可信用户输入"转向"**防工具误操作用户本地文件**"：
 - `entity_rename` 的 `dry_run` 在桌面版**默认 true**，用户确认后才写盘
-- 所有文件操作工具须经用户显式授权（Tauri fs scope）
+- 所有文件操作工具须经用户显式授权（Wails 运行时权限 / 桌面端显式确认 UI）
 - 本地数据不外传（除非用户主动提交 sitemap）
 
 ### 16.5 版本规划（桌面线，与 SaaS 线并行）
@@ -314,7 +317,7 @@
 |---|---|---|
 | MD1 | 纯前端 mock 打包 | FR-D01, FR-D02 |
 | MD2 | sidecar（bridge+MCP） | FR-D03 |
-| MD3 | grok sidecar | 接 Phase3 |
+| MD3 | grok 可选 LLM 后端 | 接 §10 可选后端 |
 
 
 ---
@@ -329,6 +332,8 @@
 | 版本 | v0.3 |
 | 关联 | PRD（需求 ID：`FR/UX/DATA/NFR`）· 开发计划（任务 ID：`T*`） |
 | 决策基调 | **不 fork grok-build 内核**，用其官方扩展系统（MCP + skills + commands + agents + hooks + plugin）做插件；前端 Next.js，bridge 常驻服务接 Agent 运行时 |
+
+> **现状校准（2026-07-26）**：grok 不再作为 agent host。Agent loop 已自建于 `apps/agent-bridge/src/loop` 内（详见 `docs/自建loop.md`），grok 经 CLIProxyAPI 仅作为**可选 LLM 推理后端**与 CodeBuddy/DeepSeek 平级。下文 §2/§3/§10 中"bridge spawn grok / grok 当运行时"的叙述为立项原案，**以自建 loop 为准**；保留旧文是为记录决策演进。
 
 ---
 
@@ -351,6 +356,9 @@
 ---
 
 ## 2. 技术选型与"为什么是插件模式"（ADR）
+
+> **现状校准（2026-07-26）**：M4 已放弃"grok 当 host / bridge spawn grok"路线，改为**自建 loop**。
+> 本节保留立项时 ADR 原文，作为决策演进记录；当前实现以 `docs/自建loop.md` 为准。
 
 **决策**：采用 grok-build 插件模式（路线 A），否决 fork 内核（路线 B）。
 
@@ -391,6 +399,29 @@
 ```
 
 三层职责铁律：**Next.js 只渲染 + 代理，不跑 Agent**；**Bridge 持有会话并翻译事件**；**MCP 提供领域工具**。Serverless 无法维持长会话，故 bridge 必须常驻。
+
+> **现状校准（2026-07-26）**：上图"Phase3: spawn grok"已不执行。当前架构为：
+>
+> ```
+> 浏览器 / 桌面壳
+>   └─ 工作台 (workbench)          ← 客户端组件 + EventSource
+>          │  SSE (/api/sessions/[id]/stream)        POST messages
+>          ▼
+>     Next.js Route Handler (BFF：鉴权 + 代理)        ← NFR-05
+>          │  SSE / HTTP
+>          ▼
+>     Agent Bridge (Node 常驻)      ← 自建 loop：意图围栏 + GuardrailPipeline + MCP 编排
+>          │  LLMClient（CodeBuddy / grok-via-CLIProxyAPI / MockLLMClient）
+>          ▼
+>     hutian-seo MCP server (Python)
+>          ├ run_diagnosis   ← FR-A01
+>          ├ check_schema    ← FR-A02
+>          ├ trace_citations ← FR-A03
+>          ├ submit_sitemap  ← FR-A04
+>          └ entity_rename   ← FR-A05
+> ```
+>
+> `LLMClient` 是 OpenAI 兼容协议抽象层；grok 不是运行时 host，只是可插拔的推理后端之一。
 
 ---
 
@@ -518,6 +549,7 @@ export type AgentEvent =
 - **字体**：`next/font/google` 注入 `--font-disp`(Space Grotesk) / `--font-sans`(Noto Sans SC) / `--font-mono`(JetBrains Mono)；**禁止 `<link>` 外链字体**（避免 CLS 与国内不稳，← NFR-01）。
 - **组件树**：`TopBar / Sidebar(含 RuntimeCard) / ChatStream(Message|ToolCall|PlanChecklist|StatTiles|ThinkingDots) / RightPanel(Diff|Preview|Terminal|Artifacts) / Composer / StatusBar`。
 - **数据流**：`useAgentSession(mode)` → `useReducer(streamReducer)`；`mode="mock"` 用 `mockStream`，`mode="sse"` 用 `EventSource`。
+  - `mock` 模式进入页面即自动播放 demo 时间线；`sse` 模式首屏为可输入空工作台，默认不 auto-send，避免未经验证就触发真实 LLM 调用。
 - **mock 时间线编排**（← §5 状态机，顺序固定）：`meta → thinking → user → plan(5) → t1 entity_rename → t2 run_diagnosis → t3 trace_citations → agent → t4 edit_file(+diff 闪+切标签) → t5 submit_sitemap(+terminal+artifact) → stats → agent → done`。数字取自 PRD §4.3。
 - **Markdown 渲染**：`react-markdown` + `remark-gfm`（GFM 表格/任务列表/删除线/自动链接）+ `rehype-raw`（兼容 demo 中的 `<strong>/<code>/<br/>` 等 raw HTML）；代码块带语言标签 + copy 按钮；表格带 `tbody divide-y` + `tr` 斑马纹。刻意不引更重的（如 shiki 代码高亮）。门禁：`pnpm --filter @hutian/web run probe:md-table` 验 GFM 竖线表格 + HTML 表格都被解析为 `<table>`，fixture 落盘 `docs/probes/md-table-ssr.txt`。Diff 行渲染、终端光标仍自实现。
 
@@ -529,10 +561,16 @@ export type AgentEvent =
 - 发送：前端 `POST /api/sessions/[id]/messages` → BFF → bridge `session.send()`。
 - 背压/断线：bridge 在 `req.close` 清理订阅；前端 `onerror` 关闭并提示，v1.0 加指数退避重连 + `Last-Event-ID` 续传。
 - 鉴权在 BFF 层完成，bridge 不直接暴露公网（← NFR-05）。
+- **M5 硬约束（生产安全）**：dev 期用 Next.js `rewrites` 绕过 Route Handler SSE 缓冲坑（直连 bridge），但**生产环境禁照搬**——否则绕过 BFF 鉴权层，密钥/限流/审计全失效。生产二选一：① 修好 Route Handler 流式代理（signal/headers/edge runtime）后撤 rewrites；② 前置 nginx/Caddy 反代 + 鉴权前置，BFF 仅做业务路由。
 
 ---
 
-## 10. Phase3 接 grok-build
+## 10. Phase3 接 grok-build（已改为自建 loop + 可选 LLM 后端）
+
+> **现状校准（2026-07-26）**：本节原标题为"Phase3 接 grok-build"，计划由 bridge spawn grok headless/ACP 作为运行时。
+> M4 已转向 **自建 loop**（`apps/agent-bridge/src/loop`）：bridge 内直接编排 MCP 工具调用，LLM 仅用于意图分类、参数抽取与结果总结。
+> grok 经 CLIProxyAPI 作为**可选 LLM 后端**接入（`LLM_PROVIDER=grok`），与 CodeBuddy/DeepSeek 平级；启用前需 `probe:grok-derived` 与 `probe:grok-loop` 双绿。
+> 下文保留立项原案，作为决策演进记录。
 
 两种模式，v1.0 二选一或并存：
 
@@ -541,7 +579,7 @@ export type AgentEvent =
 
 **输出→事件映射**：识别工具调用边界（开始/结束/耗时）、文件编辑（→`diff`，行级 add/del 由 grok 编辑结果或内置 diff 生成）、终端输出（→`terminal`）、最终文本（→`message`）。
 
-**fake-grok 模拟器**：为不装 grok 也能验证全链路 SSE，bridge 内置一个按脚本吐行的 fake 进程，接口与真 grok 同构，便于 CI 与本地联调。
+**fake-grok / MockLLMClient**：为不装 grok 也能验证全链路 SSE，bridge 内置 `MockLLMClient` 按脚本返回结构化 `toolCalls`，用于 loop 骨架与 CI 兜底；`fake-grok` 已重定位为"无真实 LLM 时的 loop 验证器"，不再模拟 grok 的 stdout 协议。
 
 ---
 
@@ -612,29 +650,30 @@ export type AgentEvent =
 | NFR-02 | §9 心跳/时延 |
 | NFR-05 | §9 BFF + §12 |
 | NFR-08 | §5 artifact + 产物归档 |
-| FR-D01..D06 | §17 Tauri 桌面版 |
+| FR-D01..D06 | §17 Wails 桌面版 |
 
 ---
 
-## 17. Tauri 桌面版部署拓扑
+## 17. Wails 桌面版部署拓扑
 
 > 实现 PRD §16 桌面版（本地优先线）。桌面版与 SaaS 共享前端代码，差异在部署。
+> **现状校准（2026-07-26）**：Tauri 路线已放弃，v1 用 **Wails v2.12 + Go 1.26 + WebView2**。
 
 ### 17.1 仓库结构
 
 ```
 apps/
   web/          ← Next.js 官网 + 工作台（SaaS 线）
-  desktop/      ← Tauri 桌面壳（本地优先线）
+  desktop/      ← Wails 桌面壳（本地优先线）
     src/
       main.tsx              ← Vite 入口，引用 web/ 工作台组件（零复制）
       next-themes-shim.ts   ← next-themes 桌面端替换（localStorage 实现）
-    src-tauri/
-      Cargo.toml            ← Rust 依赖（tauri 2）
-      tauri.conf.json        ← 窗口/打包/图标配置
-      src/lib.rs             ← Tauri 主进程（v1 仅加载前端，无 sidecar）
+    main.go                 ← Wails 主进程入口
+    app.go                  ← Wails App 结构（//go:embed 嵌 dist）
+    go.mod                  ← Go 模块
+    wails.json              ← 窗口/打包/图标/frontend 配置
     vite.config.ts          ← alias @ → ../web，next-themes → shim
-    tailwind.config.js      ← content 扫描 web/workbench 组件
+    tailwind.config.js      ← content 绝对路径扫描 web/app/components/lib
 ```
 
 ### 17.2 前端共享策略
@@ -644,45 +683,46 @@ apps/
 - `next-themes` → `src/next-themes-shim.ts`（桌面无 Next.js 运行时）
 - `@hutian/agent-protocol` → `packages/agent-protocol/src/index.ts`
 
-工作台走 `useAgentSession("mock")`，内置 mockStream 播 demo-events，
-**零后端依赖**，双击即用。
+工作台在桌面壳写入 `window.__HUTIAN_DESKTOP_MODE__ = "mock"`，`useAgentSession` 强制走 mock，
+内置 `mockStream` 播 demo-events，**零后端依赖**，双击即用。
 
-### 17.3 Tauri 配置要点
+### 17.3 Wails 配置要点
 
 | 项 | 值 | 说明 |
 |---|---|---|
-| `build.frontendDist` | `../dist` | Vite 构建产物 |
-| `build.devUrl` | `http://localhost:1420` | Vite dev server |
-| `app.windows[0]` | 1440×900, min 1024×680 | 桌面窗口尺寸 |
-| `bundle.targets` | `["nsis","msi"]` | Windows 安装包格式 |
-| `bundle.icon` | `icons/*` | `tauri icon` 命令生成全套 |
+| `frontend:dir` | `./` | Vite 构建产物（`wails build` 先执行 `pnpm build`） |
+| `frontend:dev:serverUrl` | `http://localhost:1420` | Vite dev server |
+| `frontend:dev:watcher` | `pnpm dev` | Wails dev 监听 |
+| `outputfilename` | `hutian-agent` | 最终 exe 名 |
+| `info.productName` | `壶天SEO-GEO Agent` | 窗口标题 |
+| `nsis` | 中文包（0x0804）| 安装程序语言 |
 
 ### 17.4 工具链要求
 
 | 工具 | 版本 | 用途 |
 |---|---|---|
-| Rust | 1.97+ | Tauri 主进程编译 |
-| Rust 工具链 | `stable-x86_64-pc-windows-gnu`（v1）或 `msvc`（生产） | GNU 免装 VS；MSVC 需 Build Tools |
+| Go | 1.26+ | Wails 主进程编译 |
+| Wails CLI | 2.12.0 | `wails build` / `wails dev` |
 | Node.js | 20+ | Vite 构建 + pnpm |
-| `@tauri-apps/cli` | 2.11+ | `tauri build` / `tauri icon` |
+| WebView2 Runtime | 系统自带或 bootstrapper | 渲染引擎 |
 
 ### 17.5 v2 Sidecar 打包路线（未实现，备忘）
 
-v2 起需内嵌后端进程，Tauri sidecar 要求**独立可执行文件**：
-- **Node bridge** → `bun build --compile` 或 `pkg` 编译成无依赖 exe
-- **Python MCP** → `PyInstaller --onefile` 打成独立 exe
-- **grok**（v3）→ 本身是 Rust 二进制，天然 sidecar
-
-sidecar 配置在 `tauri.conf.json` 的 `bundle.externalBin`，运行时用 `tauri.shell.sidecar()` spawn。
+v2 起需内嵌后端进程，Wails 侧 car 由 Go 主进程通过 `os/exec` 直接 spawn，
+比 Tauri `externalBin` 更轻量：
+- **Node bridge** → `pkg` / Node SEA 编译成无依赖 exe，Go 主进程 `exec.Command` 拉起
+- **Python MCP** → `PyInstaller --onefile` 或系统 Python，Go 主进程 `exec.Command` 拉起
+- **grok**（v3）→ **不作本地 host**，若启用是经 CLIProxyAPI 的可选 LLM 后端；bridge 内 loop 调 MCP
 
 ### 17.6 已知坑
 
 1. **WebView2**：Win10 1809 以下不带，需 bootstrapper；Win11 内置。
 2. **代码签名**：未签名 exe 被 SmartScreen 拦截，砍下载转化。证书需预算。
-3. **自动更新**：Tauri updater 需静态服务放 `latest.json` 清单，官网可托管。
-4. **ESM require**：Vite config 中 `require()` 在 ESM 下不可用，需用 `import`。
+3. **SSE mixed-content**：Wails 壳内页面协议为 `wails://`，v2 若直连 `http://127.0.0.1:4317` bridge 会触发 mixed-content 拦截。可选方案：① Go 主进程通过 Wails Events/Runtime 暴露原生 SSE 通道；② bridge 内嵌到桌面壳一起分发，前端用 `fetch` 走相对路径；③ 等 v1.5 隔离中间件。
+4. **NSIS 安装包**：`wails build -nsis` 需单独安装 `makensis`，否则只出 exe 不出 installer。
 5. **next-themes**：桌面端无 Next.js，需 shim（localStorage + documentElement.class）。
-6. **TS paths**：Vite alias 与 tsconfig paths 需对齐，跨目录 include 需注意相对层级。
+6. **TS paths / Tailwind content**：Vite alias 与 tsconfig paths 需对齐；Tailwind content 必须用绝对路径扫描 `apps/web/app`、`components`、`lib`，否则桌面版会丢失 95% utilities（已踩坑）。
+7. **强制 mock 模式**：桌面壳需通过 `window.__HUTIAN_DESKTOP_MODE__ = "mock"` 让 `WorkbenchPage` 不走 sse，否则会向不存在的 `/api/sessions` 发请求，报 HTTP 405。
 
 ---
 ---

@@ -5,10 +5,21 @@
  * 全程产出 AgentEvent（复用前端契约，一行不改前端）。
  *
  * 终止条件（T4.6 简版）：MAX_TURNS 防死循环；LLM finishReason=stop 收工。
+ *
+ * intent 围栏 + GuardrailPipeline（§harness 显式化 P0）：
+ *  - loop 启动时调 classifyIntent 产 Intent
+ *  - pipeline.before(intent) 注入硬约束到 system prompt
+ *  - intent.needsClarify → 直接产 message 反问，不进循环
+ *  - 每轮：pipeline.exec(toolCall, intent) 破坏性闸门 → MCP exec → pipeline.after 派生 stats/复验
+ *  - 破坏性 toolCall（entity_rename dry_run=false / submit_sitemap）执行前，
+ *    用 isDestructiveAuthorized(intent) 守 —— 只信规则判定的 confirm。
  */
 import type { AgentEvent } from "@hutian/agent-protocol";
 import type { LLMClient, Message, ToolSchema } from "../llm/types.ts";
 import type { McpToolClient } from "../mcp/client.ts";
+import { classifyIntent, type Intent } from "./intent.ts";
+import { GuardrailPipeline } from "./guardrail-pipeline.ts";
+import type { RunCtx } from "./flow-control.ts";
 
 const MAX_TURNS = 15;
 
@@ -33,6 +44,8 @@ export interface AgentLoopInput {
   prompt: string;
   /** 可选：覆盖默认 system prompt */
   systemPrompt?: string;
+  /** 可选：从外部传入已分类好的 intent（skip classifyIntent，用于测试/续作） */
+  intent?: Intent;
 }
 
 /**
@@ -51,18 +64,42 @@ export async function* runAgentLoop(
   // 1. 派生工具 schema（T4.2）
   const tools: ToolSchema[] = await deps.mcp.listToolSchemas();
 
-  // 2. 初始化消息
+  // 2. intent 围栏：分类（圈 1 规则快通道 + 圈 2 LLM enum）
+  const intent =
+    input.intent ??
+    (await classifyIntent(input.prompt, { llm: deps.llm, signal: deps.signal }));
+
+  // 3. ambiguous → 直接反问，不进 loop
+  if (intent.needsClarify && intent.clarifyQuestion) {
+    yield { type: "meta", totalTools: tools.length };
+    yield { type: "thinking", on: true };
+    yield { type: "thinking", on: false };
+    yield { type: "message", role: "agent", content: intent.clarifyQuestion };
+    yield { type: "done" };
+    return;
+  }
+
+  // 4. before guardrail：注入硬约束到 system prompt
+  const before = GuardrailPipeline.before(intent);
+  const systemContent = `${input.systemPrompt ?? SYSTEM_PROMPT}${before.systemPromptSuffix}`;
   const messages: Message[] = [
-    { role: "system", content: input.systemPrompt ?? SYSTEM_PROMPT },
+    { role: "system", content: systemContent },
     { role: "user", content: input.prompt },
   ];
 
-  // 3. 发开场事件（对齐 demo 节奏）
+  // 5. 发开场事件（对齐 demo 节奏）
   yield { type: "meta", totalTools: tools.length };
 
   let turn = 0;
   let toolCallCount = 0;
   const planItems: string[] = [];
+
+  // C 规则复验用 ctx：run_diagnosis 灌 lastUrl，trace_citations 灌 brand
+  const ctx: RunCtx = {
+    lastUrl: intent.slots.url,
+    brand: intent.slots.brand,
+    windowDays: intent.slots.windowDays,
+  };
 
   while (turn < MAX_TURNS) {
     turn++;
@@ -71,7 +108,7 @@ export async function* runAgentLoop(
       break;
     }
 
-    // 4. 调 LLM 前 → thinking on
+    // 6. 调 LLM 前 → thinking on
     yield { type: "thinking", on: true };
 
     let res;
@@ -87,10 +124,10 @@ export async function* runAgentLoop(
       break;
     }
 
-    // 5. 收到响应 → thinking off（每轮配对，前端状态不卡）
+    // 7. 收到响应 → thinking off（每轮配对，前端状态不卡）
     yield { type: "thinking", on: false };
 
-    // 6. LLM 收工 —— 推总结 message + done
+    // 8. LLM 收工 —— 推总结 message + done
     if (res.finishReason === "stop" || res.toolCalls.length === 0) {
       if (planItems.length > 0) {
         yield { type: "plan", items: planItems };
@@ -101,31 +138,29 @@ export async function* runAgentLoop(
       break;
     }
 
-    // 7. 处理 toolCalls
-    // 记录 assistant 消息（含 tool_calls，喂回 LLM 用）
+    // 9. 处理 toolCalls
     messages.push({
       role: "assistant",
       content: res.content ?? "",
       tool_calls: res.toolCalls,
     });
 
-    // 如果是第一轮且有 content，推一条 message + plan
+    // 第一轮有 content → 推 message + plan
     if (turn === 1 && res.content) {
       yield { type: "message", role: "agent", content: res.content };
-      // 从 toolCalls 派生 plan（前端用 plan 渲染左侧计划栏）
       for (const tc of res.toolCalls) {
         planItems.push(planItemForTool(tc.name, tc.args));
       }
       yield { type: "plan", items: planItems };
     }
 
-    // 8. 串行执行每个 toolCall
+    // 10. 串行执行每个 toolCall（走 GuardrailPipeline.exec → MCP → after）
     for (let i = 0; i < res.toolCalls.length; i++) {
       const call = res.toolCalls[i];
       toolCallCount++;
       const toolId = call.id || `t${toolCallCount}`;
 
-      // tool_start
+      // tool_start（无论是否被闸门拦，都先推 tool_start）
       yield {
         type: "tool_start",
         id: toolId,
@@ -133,7 +168,31 @@ export async function* runAgentLoop(
         args: formatArgs(call.name, call.args),
       };
 
-      // 调 MCP 工具
+      // exec guardrail：破坏性闸门
+      const gate = GuardrailPipeline.exec(call.name, call.args, intent, toolId);
+      if (!gate.allowed) {
+        // 拦截：推 gate 产出的事件（tool_end ok=false）
+        if (gate.events) {
+          for (const ev of gate.events) yield ev;
+        }
+        yield {
+          type: "message",
+          role: "agent",
+          content: `⚠️ 即将执行破坏性操作 \`${call.name}\`，参数：\n\`\`\`json\n${JSON.stringify(call.args, null, 2)}\n\`\`\`\n\n回复「确认」继续，「取消」中止。`,
+        };
+        // 拒绝结果喂回 LLM
+        messages.push({
+          role: "tool",
+          tool_call_id: call.id,
+          content: JSON.stringify({
+            error: "destructive_gate_blocked",
+            note: gate.rejectReason ?? "用户需回复规则判定的 confirm 词",
+          }),
+        });
+        continue; // 继续下一个 toolCall
+      }
+
+      // 执行 MCP 工具
       const result = await deps.mcp.callTool(call.name, call.args);
 
       // tool_end
@@ -148,20 +207,26 @@ export async function* runAgentLoop(
       // plan_update（第 i 个工具完成）
       yield { type: "plan_update", done: toolCallCount, current: toolCallCount };
 
-      // 把工具结果喂回 LLM（OpenAI 格式：role=tool, tool_call_id=call.id）
+      // 把工具结果喂回 LLM
       messages.push({
         role: "tool",
         tool_call_id: call.id,
         content: JSON.stringify(result.output),
       });
 
-      // T4.4 流程控制钩子点（见 flow-control.ts）
-      yield* flowControlHook(call.name, call.args, result, deps);
+      // after guardrail：派生 stats + 触发复验（传 ctx，可能更新 lastUrl/brand）
+      const after = GuardrailPipeline.after(call.name, call.args, result, ctx);
+      if (after.statsItems && after.statsItems.length > 0) {
+        yield { type: "stats", items: after.statsItems };
+      }
+      if (after.reverifyTask) {
+        yield* runReverify(after.reverifyTask, deps);
+      }
     }
-    // 继续下一轮（让 LLM 看到工具结果后决定下一步）
+    // 继续下一轮
   }
 
-  // 8. 收尾
+  // 11. 收尾
   if (turn >= MAX_TURNS) {
     yield { type: "thinking", on: false };
     yield {
@@ -175,43 +240,28 @@ export async function* runAgentLoop(
 }
 
 /**
- * T4.4 流程控制钩子 —— 路线 Y 精髓：把"求 LLM 遵守"变代码强制。
- * MVP 只做关键几条（自建loop.md §4）。
- *
- * 当前实现：detect edit_file/写 JSON-LD 后自动插 check_schema 复验。
- * 注意：我们的五工具里没有 edit_file，entity_rename(dry_run=false) 是写操作，
- * 触发条件改为：entity_rename 写入后 → 自动 run_diagnosis 复验。
+ * 执行 after guardrail 派生的复验任务（C 规则）。
+ * 自动插入一个 tool_start/tool_end，让前端看到复验过程。
  */
-async function* flowControlHook(
-  toolName: string,
-  _args: Record<string, unknown>,
-  result: { ok: boolean; output: unknown },
+async function* runReverify(
+  task: { name: string; args: Record<string, unknown>; reason: string },
   deps: AgentLoopDeps,
 ): AsyncIterable<AgentEvent> {
-  // 规则：entity_rename 写入后，自动 run_diagnosis 复验
-  if (toolName === "entity_rename" && result.ok) {
-    const output = result.output as { written?: boolean; dry_run?: boolean } | null;
-    if (output && output.dry_run === false) {
-      // 自动插入一个 check_schema 调用（复验）
-      yield {
-        type: "tool_start",
-        id: `auto_check_${Date.now()}`,
-        name: "check_schema",
-        args: "auto-triggered by flow-control (entity_rename written)",
-      };
-      const recheck = await deps.mcp.callTool("check_schema", {
-        url: "https://example.com", // MVP 占位；真实场景从 entity_rename 上下文取
-      });
-      yield {
-        type: "tool_end",
-        id: `auto_check_${Date.now()}`,
-        ok: recheck.ok,
-        durationMs: recheck.ms,
-        output: recheck.output,
-      };
-    }
-  }
-  // 未来扩展：edit_file 后 check_schema；首品牌更名优先 entity_rename(dry_run=true) 等
+  const id = `auto_${task.name}_${Date.now()}`;
+  yield {
+    type: "tool_start",
+    id,
+    name: task.name,
+    args: task.reason,
+  };
+  const r = await deps.mcp.callTool(task.name, task.args);
+  yield {
+    type: "tool_end",
+    id,
+    ok: r.ok,
+    durationMs: r.ms,
+    output: r.output,
+  };
 }
 
 /** 从工具名派生 plan item 文本（前端左侧计划栏用） */

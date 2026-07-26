@@ -13,14 +13,26 @@
  *     前端 stats 卡显示工具权威数据，LLM 文本里说的数字不影响
  *
  *  C. 写后必复验（geo-optimize §5「重新提交后用 trace_citations 重新测量」）
- *     entity_rename(dry_run=false) 写入成功 → 自动 trace_citations(brand=new_name)
- *     复测新品牌在 AI 引擎中的可见度
+ *     两条复验链路（C 规则校准版）：
+ *     - 校验链：写操作（entity_rename dry_run=false 改 JSON-LD brand 字段）
+ *       → 自动 check_schema(url) 复验结构化数据没被改坏
+ *     - 引用链：submit_sitemap 完成后
+ *       → 自动 trace_citations(brand, window_days) 复测新 sitemap 是否提升 AI 引用
+ *
+ *  参数传递：afterGuardrail 接受 RunCtx，从 ctx 取 url（run_diagnosis 派生）
+ *  与 brand（intent.slots.brand 或 trace_citations 派生）。
+ *
+ * intent 围栏升级（§intent 围栏）：
+ *  - detectBrandRenameIntent 等正则降为快通道/兜底，主体逻辑挂到 applyFlowControl(intent)
+ *  - applyFlowControl 接受统一 Intent，按 kind 分发硬约束 / 自动任务 / 反问
+ *  - 破坏性闸门（dry_run=false / submit_sitemap）只信规则判定的 confirm，绝不信 LLM
  *
  * 留作 T4.6+ 的（自建loop.md §4 ⚠️ 标）：
  *  - dry_run 先统计再确认：loop 暂停等用户 approval 事件（需 inbox 协作流）
  *  - edit_file 后 check_schema：MVP 无 edit_file 工具
  */
 import type { StatItem } from "@hutian/agent-protocol";
+import type { Intent, IntentSlots } from "./intent.ts";
 
 // ───────────────────────────────────────────────────────────────
 // A. 品牌前置
@@ -173,11 +185,28 @@ export interface ReverifyTask {
   reason: string;
 }
 
+/** loop 运行时上下文 —— 给 afterGuardrail 取参数用 */
+export interface RunCtx {
+  /** 最近一次 run_diagnosis 的 url，作 check_schema 复验目标 */
+  lastUrl?: string;
+  /** 当前意图的 brand（intent.slots.brand 或 trace_citations 派生） */
+  brand?: string;
+  /** trace_citations 时间窗口，默认 30 */
+  windowDays?: number;
+}
+
 /**
  * 写操作完成后，决定是否要自动插入复验工具调用。
  *
- * 规则：entity_rename(dry_run=false) 写入成功 → trace_citations(brand=new_name)
- *       复测新品牌在 AI 引擎中的可见度。
+ * C 规则校准版（两条复验链路）：
+ *
+ *  1. 校验链：entity_rename(dry_run=false) 写入 → check_schema(url)
+ *     - 改 JSON-LD 的 brand 字段后，立即复验结构化数据完整性
+ *     - url 从 ctx.lastUrl 取（run_diagnosis 派生），无 url 则不触发
+ *
+ *  2. 引用链：submit_sitemap 完成 → trace_citations(brand, window_days)
+ *     - 提交新 sitemap 后，复测 AI 引用是否提升
+ *     - brand 从 ctx.brand 取，无 brand 则不触发
  *
  * 返回 null 表示不需要复验。
  */
@@ -185,23 +214,144 @@ export function shouldReverifyAfterWrite(
   toolName: string,
   args: Record<string, unknown>,
   result: { ok: boolean; output: unknown },
+  ctx: RunCtx,
 ): ReverifyTask | null {
-  if (toolName !== "entity_rename" || !result.ok) return null;
+  if (!result.ok) return null;
 
-  // 必须是 dry_run=false（实际写入），dry_run=true 不复验
-  if (args.dry_run !== false) return null;
+  // ── 校验链：entity_rename 写入 → check_schema 复验
+  if (toolName === "entity_rename") {
+    // 必须是 dry_run=false（实际写入），dry_run=true 不复验
+    if (args.dry_run !== false) return null;
 
-  // 从 args 拿 new_name
-  const newName = typeof args.new_name === "string" ? args.new_name : null;
-  if (!newName) return null;
+    // 从 entity_rename 输出确认写入确实发生了
+    const output = result.output as { written?: boolean; dry_run?: boolean } | null;
+    if (!output || output.written !== true) return null;
 
-  // 从 entity_rename 输出确认写入确实发生了
-  const output = result.output as { written?: boolean; dry_run?: boolean } | null;
-  if (!output || output.written !== true) return null;
+    // 复验需要 url —— 从 ctx.lastUrl 取（run_diagnosis 派生）
+    const url = ctx.lastUrl;
+    if (!url) return null;
 
+    return {
+      name: "check_schema",
+      args: { url, expected_type: "Product" },
+      reason: `auto-reverify: 写入后复验 JSON-LD 结构化数据（url=${url}）`,
+    };
+  }
+
+  // ── 引用链：submit_sitemap 完成 → trace_citations 复测
+  if (toolName === "submit_sitemap") {
+    // 复测需要 brand —— 从 ctx.brand 取
+    const brand = ctx.brand;
+    if (!brand) return null;
+
+    const windowDays = ctx.windowDays ?? 30;
+    return {
+      name: "trace_citations",
+      args: { brand, window_days: windowDays },
+      reason: `auto-reverify: sitemap 提交后复测「${brand}」AI 引用（${windowDays}d）`,
+    };
+  }
+
+  return null;
+}
+
+// ───────────────────────────────────────────────────────────────
+// D. applyFlowControl · intent 围栏统一入口
+// ───────────────────────────────────────────────────────────────
+
+/** 自动注入的首次任务（loop 启动前可挂一个，避免 LLM 漏调工具） */
+export interface AutoTask {
+  /** 工具名 */
+  name: string;
+  /** 工具参数 */
+  args: Record<string, unknown>;
+  /** 注入原因（日志/前端展示用） */
+  reason: string;
+}
+
+/** applyFlowControl 返回的硬约束 + 自动任务 + 反问 */
+export interface FlowControlPlan {
+  /** 注入到 system prompt 末尾的硬约束文本（空字符串表示不注入） */
+  systemPromptSuffix: string;
+  /** loop 启动前自动插入的首次任务（空数组表示不插入） */
+  autoTasks: AutoTask[];
+}
+
+/**
+ * intent 围栏下的统一流程控制入口。
+ *
+ * 按 intent.kind 分发：
+ *  - rename: 注入品牌前置硬约束（A 规则）
+ *  - diagnose + 有 url: 可选自动触发 run_diagnosis（视配置）
+ *  - ambiguous: loop 应直接产 message 反问，不进循环
+ *  - 其他: 仅守破坏性闸门（在 run-agent.ts 的工具执行前检查）
+ *
+ * 注意：本函数不调 LLM、不做破坏性动作，纯函数。
+ *      破坏性闸门在 run-agent.ts 的工具执行点用 isDestructiveAuthorized 守。
+ */
+export function applyFlowControl(intent: Intent): FlowControlPlan {
+  switch (intent.kind) {
+    case "rename": {
+      // A 规则：品牌前置 —— 把 intent.slots 转成 BrandRenameIntent，复用 buildBrandFirstConstraint
+      const brandIntent: BrandRenameIntent = {
+        oldHints: intent.slots.oldNames ?? [],
+        newHint: intent.slots.newName,
+      };
+      return {
+        systemPromptSuffix: buildBrandFirstConstraint(brandIntent),
+        autoTasks: [],
+      };
+    }
+
+    case "diagnose": {
+      // 诊断意图：URL 已抽到时，可记一条提示（但不强制自动调，保留 LLM 灵活性）
+      // 自建loop.md §4「四步诊断顺序」：prompt 引导即可，不硬编码
+      if (intent.slots.url) {
+        return {
+          systemPromptSuffix: [
+            "",
+            "【硬约束 · 诊断】",
+            `用户已指定目标 URL：${intent.slots.url}`,
+            "诊断必须调 run_diagnosis 工具，不要凭文本臆测评分。",
+            "所有数字（SEO/GEO 分数、实体清晰度）必须来自工具返回。",
+          ].join("\n"),
+          autoTasks: [],
+        };
+      }
+      return { systemPromptSuffix: "", autoTasks: [] };
+    }
+
+    case "submit": {
+      return {
+        systemPromptSuffix: [
+          "",
+          "【硬约束 · sitemap 提交】",
+          "submit_sitemap 是破坏性操作（向搜索引擎推送）。",
+          "调工具前必须先用一句话告诉用户即将提交的 host 与 URL 数量，",
+          "然后由 loop 的 confirm 闸门守 —— 未收到规则判定的 confirm 词前，禁止执行 submit_sitemap。",
+        ].join("\n"),
+        autoTasks: [],
+      };
+    }
+
+    case "report":
+    case "check_schema":
+    case "chitchat":
+    case "confirm":
+    case "cancel":
+    case "ambiguous":
+    default:
+      return { systemPromptSuffix: "", autoTasks: [] };
+  }
+}
+
+/**
+ * 把 IntentSlots 反向转成 BrandRenameIntent（A 规则复用）。
+ * 留作工具函数，run-agent.ts 在动态检测到 rename 意图但无 oldNames 时也可调。
+ */
+export function slotsToBrandIntent(slots: IntentSlots): BrandRenameIntent {
   return {
-    name: "trace_citations",
-    args: { brand: newName, window_days: 30 },
-    reason: `auto-reverify: 新品牌「${newName}」AI 引用基线（写后复验）`,
+    oldHints: slots.oldNames ?? [],
+    newHint: slots.newName,
   };
 }

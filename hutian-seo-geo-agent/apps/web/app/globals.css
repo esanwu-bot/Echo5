@@ -209,3 +209,54 @@ body {
     radial-gradient(860px 520px at 96% 112%, var(--glow2), transparent 62%),
     radial-gradient(520px 320px at 58% -4%, var(--glow3), transparent 60%);
 }
+
+/* ═══════════ INBOX · v0.2 站长协作收件箱 ═══════════ */
+
+/* 信件正文富文本样式 — .text-content 由 MailReader 的 Letter 渲染 */
+.text-content {
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--dim);
+}
+.text-content p {
+  margin-bottom: 10px;
+}
+.text-content strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.text-content .hl {
+  color: var(--amber);
+  font-weight: 700;
+}
+.text-content code {
+  font-family: var(--font-mono), monospace;
+  font-size: 12.5px;
+  background: var(--bg2);
+  padding: 1px 6px;
+  border-radius: 5px;
+  color: var(--teal);
+}
+
+/* inbox 入场动画 — 信件与证据卡错峰 rise */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-rise {
+  animation: rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes fly {
+  0%   { opacity: 0; transform: translateX(-8px); }
+  30%  { opacity: 1; }
+  100% { opacity: 1; transform: translateX(0); }
+}
+.animate-fly {
+  animation: fly 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* 信件间距工具类（Tailwind 不直接支持 1.125rem） */
+.gap-4\.5 {
+  gap: 1.125rem;
+}

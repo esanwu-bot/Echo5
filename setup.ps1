@@ -97,22 +97,10 @@ export type AgentEvent =
   | { type: "done" };
 '@
 
-# ===== 插件清单 / MCP 注册 / 市场 =====
+# ===== MCP 注册 =====
 Write-File "hutian-seo-plugin/.mcp.json" @'
 { "mcpServers": { "hutian-seo": { "command": "hutian-seo-mcp",
   "env": { "PAGESPEED_API_KEY": "${PAGESPEED_API_KEY}", "HUTIAN_CITATION_API": "${HUTIAN_CITATION_API}" } } } }
-'@
-
-Write-File "hutian-seo-plugin/.grok-plugin/plugin.json" @'
-{ "name": "hutian-seo", "version": "0.1.0",
-  "description": "壶天 SEO/GEO 智能优化：四步诊断、AI 引用追踪、结构化数据映射、站点地图提交、品牌实体更名",
-  "author": { "name": "Hutian" }, "category": "monitoring",
-  "keywords": ["seo","geo","schema.org","lighthouse","indexnow","json-ld"], "domains": ["hutian.com"] }
-'@
-
-Write-File "hutian-marketplace/.grok-plugin/marketplace.json" @'
-{ "name": "hutian-marketplace",
-  "plugins": [ { "name": "hutian-seo", "source": { "type": "local", "path": "../hutian-seo-plugin" } } ] }
 '@
 
 # ===== Agent Bridge（零依赖 SSE 骨架） =====

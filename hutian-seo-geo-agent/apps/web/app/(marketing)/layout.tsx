@@ -66,6 +66,10 @@ const MARKETING_CSS = `
 .mkt .nav.scrolled .nav-links a{color:var(--mkt-dim)}
 .mkt .nav-links a:hover{color:#fff;background:rgba(255,255,255,.1)}
 .mkt .nav.scrolled .nav-links a:hover{color:var(--mkt-indigo);background:rgba(79,70,229,.08)}
+.mkt .nav-links a.nav-dl{color:var(--mkt-amber2);font-weight:600}
+.mkt .nav.scrolled .nav-links a.nav-dl{color:var(--mkt-amber)}
+.mkt .nav-links a.nav-dl:hover{background:rgba(245,158,11,.14);color:var(--mkt-amber2)}
+.mkt .nav.scrolled .nav-links a.nav-dl:hover{color:var(--mkt-amber);background:rgba(245,158,11,.1)}
 .mkt .nav-right{margin-left:auto;display:flex;align-items:center;gap:10px}
 .mkt .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:var(--font-sans),sans-serif;font-weight:600;font-size:14px;border:none;cursor:pointer;border-radius:11px;padding:10px 18px;transition:transform .2s,box-shadow .2s,background .2s,color .2s;white-space:nowrap}
 .mkt .btn svg{width:16px;height:16px}

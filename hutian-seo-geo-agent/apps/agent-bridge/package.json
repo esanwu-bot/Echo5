@@ -1,3 +1,25 @@
-{ "name": "@hutian/agent-bridge", "version": "0.1.0", "private": true, "type": "module",
-  "scripts": { "dev": "tsx --watch src/server.ts", "start": "tsx src/server.ts" },
-  "devDependencies": { "@types/node": "^22.0.0", "tsx": "^4.19.0" } }
+{
+  "name": "@hutian/agent-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx --watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "probe:llm": "node --env-file=../../.env --import tsx src/llm/probe-codebuddy.ts",
+    "probe:derived": "node --env-file=../../.env --import tsx src/llm/probe-derived-schema.ts",
+    "verify:tools": "node --import tsx src/mcp/verify-schema.ts",
+    "verify:sanitize": "node --import tsx src/mcp/verify-sanitize.ts",
+    "verify:loop": "node --import tsx src/loop/verify-loop.ts",
+    "probe:realloop": "node --env-file=../../.env --import tsx src/loop/probe-real-loop.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hutian/agent-protocol": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.29.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0"
+  }
+}

@@ -8,9 +8,9 @@ Implements five tools on top of FastMCP (names are locked by the PRD/技术方�
 - submit_sitemap: IndexNow submission to Google/Bing.       ← FR-A04
 - entity_rename: project-wide brand entity rename.          ← FR-A05
 
-JSON-LD snippet *generation* is intentionally not a tool — grok's built-in
-edit_file/write_file handles authoring; check_schema only reports what is
-missing.
+JSON-LD snippet *generation* is intentionally not a tool — the agent loop's
+edit_file/write_file equivalent handles authoring; check_schema only reports
+what is missing.
 """
 
 from __future__ import annotations
@@ -45,17 +45,24 @@ _RECOMMENDED_PRODUCT_FIELDS = [
     "offers",
 ]
 
-# Dirs skipped by entity_rename (VCS / build / deps).
+# Dirs skipped by entity_rename (VCS / build / deps / docs / 测试).
+# docs 与历史文档按品牌约束 §4.1 应保留旧称，不参与改写。
 _SKIP_DIRS = {
     ".git", "node_modules", "dist", "build", ".next",
     "__pycache__", ".turbo", ".venv", "venv",
+    "docs",  # 历史文档/PRD/变更日志里的旧称应保留
+    "test", "tests", "__tests__", "fixtures",  # 测试 fixture 不应被改
 }
+# 额外跳过的文件名（与 _SKIP_DIRS 叠加，覆盖 docs 之外的散落变更日志）
+_SKIP_FILENAMES = {"CHANGELOG.md", "HISTORY.md"}
 # Only text/markup extensions are scanned/replaced by entity_rename.
 _TEXT_EXTS = {
     ".md", ".json", ".jsonld", ".html", ".htm", ".js", ".jsx",
     ".ts", ".tsx", ".py", ".yaml", ".yml", ".txt", ".css",
     ".xml", ".vue", ".svelte", ".toml", ".ini", ".conf",
 }
+# 文档类扩展名（dry_run 报告时单独归类，提示用户这些是"仅作历史映射"的提及）
+_DOC_EXTS = {".md"}
 
 
 def _fetch(url: str) -> requests.Response:
@@ -165,6 +172,21 @@ def run_diagnosis(url: str) -> str:
     else:
         issues.append("JSON-LD blocks lack an @type — weak entity signal")
 
+    # --- Semantic links: 内链锚点是否含 schema.org 实体引用（sameAs / @id / url） ---
+    # 信息已在 tools 内：sameAs 出现在 JSON-LD 块；@id 标识实体链接；<a> 内链数辅助。
+    semantic_links = False
+    if any(b.get("sameAs") or b.get("@id") or b.get("url") for b in jsonld):
+        semantic_links = True
+        geo_signals += 1
+    geo_total += 1
+    if not semantic_links:
+        issues.append("No semantic entity links (sameAs / @id / url) in JSON-LD")
+
+    # --- structured_data_missing: 是否存在缺字段（与 issues 同源，给布尔结论） ---
+    structured_data_missing = bool(
+        [i for i in issues if "missing recommended field" in i or "No JSON-LD" in i]
+    )
+
     # --- GEO completeness for Product blocks ---
     product_blocks = [b for b in typed if b.get("@type") == "Product"]
     if product_blocks:
@@ -224,13 +246,22 @@ def run_diagnosis(url: str) -> str:
     seo_score = round(seo_signals / seo_total * 100) if seo_total else 0
     geo_score = round(geo_signals / geo_total * 100) if geo_total else 0
 
+    # PRD §6.3 契约：嵌套 scores / conclusions，承载"双评分 + 三结论"语义。
+    # 扁平顶层会丢失 conclusions 的语义聚合（entity_clarity / semantic_links / structured_data_missing
+    # 是三个并列的诊断维度，应作为同级结论字段，而非散落顶层）。
     result = {
         "url": page_url,
-        "seo_score": seo_score,
-        "geo_score": geo_score,
-        "entity_clarity": entity_clarity,
+        "scores": {
+            "traditional_seo": seo_score,
+            "generative_geo": geo_score,
+        },
+        "performance": pagespeed,
+        "conclusions": {
+            "entity_clarity": entity_clarity,
+            "semantic_links": semantic_links,
+            "structured_data_missing": structured_data_missing,
+        },
         "jsonld_types": sorted({b.get("@type") for b in typed if b.get("@type")}),
-        "pagespeed": pagespeed,
         "issues": issues,
     }
     return json.dumps(result, ensure_ascii=False, indent=2)
@@ -265,11 +296,13 @@ def trace_citations(brand: str, window_days: int = 30) -> str:
         "brand": brand,
         "window_days": window_days,
         "source": source,
-        "engines": [
-            {"engine": "DeepSeek-V3", "share": 42, "tag": "ds", "note": "主要来源"},
-            {"engine": "GPT-4o", "share": 28, "tag": "gpt", "note": "次要权威"},
-            {"engine": "Kimi", "share": 15, "tag": "kimi", "note": "提及"},
-            {"engine": "其他", "share": 15, "tag": "oth", "note": "长尾"},
+        # PRD §6.3 契约：sources[{engine,share,role}]
+        # tag (ds/gpt/kimi/oth) 作为渲染样式 key 保留为额外字段
+        "sources": [
+            {"engine": "DeepSeek-V3", "share": 42, "role": "主要来源", "tag": "ds"},
+            {"engine": "GPT-4o", "share": 28, "role": "次要权威", "tag": "gpt"},
+            {"engine": "Kimi", "share": 15, "role": "提及", "tag": "kimi"},
+            {"engine": "其他", "share": 15, "role": "长尾", "tag": "oth"},
         ],
         "total_citations": 2410,
         "sentiment": "正面 87%",
@@ -311,20 +344,47 @@ def submit_sitemap(host: str, urls: list[str], indexnow_key: str) -> str:
                 headers={"Content-Type": "application/json; charset=utf-8"},
                 timeout=_TIMEOUT,
             )
+            # 裁决#4: 拆 accepted(HTTP 层) 与 verified(业务层)
+            # Bing IndexNow 对无效 host 也返 202，仅表示"通知已接收"；
+            # host 所有权经 key 文件异步验证，v0.2 无法同步判定，标 unknown。
+            accepted = resp.status_code in (200, 202)
             results[name] = {
                 "status": resp.status_code,
-                "ok": resp.status_code in (200, 202),
+                "accepted": accepted,
+                "verified": "unknown",  # v0.2 不做 key 文件可达性校验
             }
         except requests.RequestException as exc:
-            results[name] = {"status": None, "ok": False, "error": str(exc)}
+            results[name] = {
+                "status": None,
+                "accepted": False,
+                "verified": "unknown",
+                "error": str(exc),
+            }
 
-    any_ok = any(r.get("ok") for r in results.values())
+    # ok 仅在"至少一个目标 accepted 且无 error"时为 true；
+    # verified=unknown 时附 note 提示用户异步验证。
+    any_accepted = any(r.get("accepted") for r in results.values())
+    all_accepted = all(r.get("accepted") for r in results.values())
+    has_error = any("error" in r for r in results.values())
+    if all_accepted:
+        status = "ok"
+    elif any_accepted:
+        status = "partial"
+    elif has_error:
+        status = "error"
+    else:
+        status = "rejected"
     summary = {
         "host": hostname,
         "submitted": len(urls),
         "key_location": key_location,
         "targets": results,
-        "ok": any_ok,
+        "status": status,
+        "ok": any_accepted,
+        "note": (
+            "202/200 仅表示通知已被接收；host 所有权经 "
+            f"{key_location} 异步验证，请稍后确认该文件可达。"
+        ),
     }
     return json.dumps(summary, ensure_ascii=False, indent=2)
 
@@ -471,12 +531,20 @@ def entity_rename(
 
     pattern = re.compile("|".join(re.escape(str(n)) for n in old_names))
     files_hit: list[dict] = []
+    # 裁决#5: dry_run 分类报告——代码 vs 文档，让用户看清哪些真改、哪些是文档举例
+    files_code: list[dict] = []
+    files_doc: list[dict] = []
     total_matches = 0
+    skipped_files: list[str] = []
 
     for dirpath, dirnames, filenames in os.walk(root_path):
         # prune in-place so os.walk does not descend into them
         dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
         for fn in filenames:
+            # 跳过 CHANGELOG / HISTORY 等变更日志（旧称应保留）
+            if fn in _SKIP_FILENAMES:
+                skipped_files.append(os.path.relpath(os.path.join(dirpath, fn), root_path))
+                continue
             ext = os.path.splitext(fn)[1].lower()
             if ext not in _TEXT_EXTS:
                 continue
@@ -492,7 +560,13 @@ def entity_rename(
             count = len(matches)
             total_matches += count
             rel = os.path.relpath(fp, root_path)
-            files_hit.append({"path": rel, "matches": count})
+            entry = {"path": rel, "matches": count}
+            files_hit.append(entry)
+            # 分类：文档类（.md）单独归档，提示用户这些可能是"仅作历史映射"的提及
+            if ext in _DOC_EXTS:
+                files_doc.append(entry)
+            else:
+                files_code.append(entry)
             if not dry_run:
                 new_content = pattern.sub(new_name, content)
                 try:
@@ -508,9 +582,20 @@ def entity_rename(
         "new_name": new_name,
         "total_matches": total_matches,
         "files_affected": len(files_hit),
+        # 分类报告：代码文件（dry_run=false 时会被改写）
+        "files_code": files_code[:50],
+        "files_code_count": len(files_code),
+        # 文档文件（.md 等，按品牌约束 §4.1 可能是历史映射，需人工复核）
+        "files_doc": files_doc[:50],
+        "files_doc_count": len(files_doc),
+        # 兼容旧字段（保留 files 数组，内容=files_code + files_doc 合并前 50）
         "files": files_hit[:50],
+        # 跳过的文件清单（CHANGELOG/HISTORY 等）
+        "skipped_files": skipped_files[:20],
+        "skipped_count": len(skipped_files),
         "next": (
-            "set dry_run=false to write changes"
+            "set dry_run=false to write changes; review files_doc before writing — "
+            "docs may contain historical mentions that should be preserved"
             if dry_run
             else "changes written; re-run run_diagnosis / check_schema to verify"
         ),

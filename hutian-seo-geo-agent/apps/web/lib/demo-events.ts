@@ -6,6 +6,13 @@ import type { AgentEvent } from "@hutian/agent-protocol";
  */
 export const demoEvents: (AgentEvent & { delay: number })[] = [
   { type: "meta", totalTools: 5, delay: 300 },
+  {
+    type: "message",
+    role: "user",
+    content:
+      '品牌已由「天启芯 / Tikchip」更名为「壶天」，请诊断 TC-DIODE-001 产品页并补齐 Schema 结构化数据，随后提交语义站点地图。',
+    delay: 400,
+  },
   { type: "thinking", on: true, delay: 200 },
   { type: "thinking", on: false, delay: 1200 },
   {
@@ -48,6 +55,11 @@ export const demoEvents: (AgentEvent & { delay: number })[] = [
     },
     delay: 1800,
   },
+  {
+    type: "artifact",
+    data: { file: "entity-graph.json", size: "2.4 KB", status: "ok", kind: "add" },
+    delay: 200,
+  },
   { type: "plan_update", done: 1, current: 1, delay: 300 },
   {
     type: "tool_start",
@@ -88,13 +100,14 @@ export const demoEvents: (AgentEvent & { delay: number })[] = [
     ok: true,
     durationMs: 1700,
     output: {
-      citations: [
-        { engine: "DeepSeek-V3", share: 42, tag: "ds", note: "主要来源" },
-        { engine: "GPT-4o", share: 28, tag: "gpt", note: "次要权威" },
-        { engine: "Kimi", share: 15, tag: "kimi", note: "提及" },
-        { engine: "其他", share: 15, tag: "oth", note: "长尾" },
+      // 裁决#2: 三方统一 sources[{engine,share,role}]，与 PRD §6.3 / tools.py 一字不差
+      sources: [
+        { engine: "DeepSeek-V3", share: 42, role: "主要来源", tag: "ds" },
+        { engine: "GPT-4o",       share: 28, role: "次要权威", tag: "gpt" },
+        { engine: "Kimi",         share: 15, role: "提及",     tag: "kimi" },
+        { engine: "其他",          share: 15, role: "长尾",     tag: "oth" },
       ],
-      total: 2410,
+      total_citations: 2410,
       sentiment: "正面 87%",
       growth: "+12.5%",
     },
@@ -164,6 +177,11 @@ export const demoEvents: (AgentEvent & { delay: number })[] = [
     },
     delay: 1100,
   },
+  {
+    type: "artifact",
+    data: { file: "schema/product.jsonld", size: "1.8 KB", status: "ok", kind: "mod" },
+    delay: 200,
+  },
   { type: "plan_update", done: 4, current: 4, delay: 300 },
   {
     type: "tool_start",
@@ -195,6 +213,11 @@ export const demoEvents: (AgentEvent & { delay: number })[] = [
       ],
     },
     delay: 900,
+  },
+  {
+    type: "artifact",
+    data: { file: "semantic-sitemap.xml", size: "18.6 KB", status: "ok", kind: "add" },
+    delay: 200,
   },
   { type: "plan_update", done: 5, current: 5, delay: 300 },
   { type: "thinking", on: true, delay: 200 },

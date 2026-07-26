@@ -1,10 +1,35 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { CodeBuddyClient } from "./llm/codebuddy-client.ts";
+import { MockLLMClient, seoDemoScript } from "./llm/mock-client.ts";
+import { StdioMcpClient } from "./mcp/client.ts";
+import { runAgentLoop } from "./loop/run-agent.ts";
+import type { LLMClient } from "./llm/types.ts";
+import type { McpToolClient } from "./mcp/client.ts";
+import type { AgentEvent } from "@hutian/agent-protocol";
 
 type Sub = (data: string) => void;
 const sessions = new Map<string, Set<Sub>>();
 
 function sseHead(res: ServerResponse) {
   res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "Access-Control-Allow-Origin": "*" });
+}
+
+// ── T4.5 · Agent loop 接 SSE ──────────────────────────────────────────
+// 启动时构造 LLM + MCP client；缺 key 时回退 MockLLM（自建loop.md §验收）
+function buildLLM(): LLMClient {
+  try {
+    return CodeBuddyClient.fromEnv();
+  } catch (e) {
+    console.warn(`[agent-bridge] CodeBuddyClient 初始化失败，回退 MockLLM: ${(e as Error).message}`);
+    return new MockLLMClient({ steps: seoDemoScript(), name: "mock-fallback" });
+  }
+}
+
+// 共享 MCP client（每个 session 复用，避免每次 spawn hutian-seo-mcp）
+let sharedMcp: McpToolClient | null = null;
+function getMcp(): McpToolClient {
+  if (!sharedMcp) sharedMcp = new StdioMcpClient();
+  return sharedMcp;
 }
 
 /**
@@ -249,7 +274,7 @@ function readBody(req: IncomingMessage): Promise<string> {
   });
 }
 
-function route(req: IncomingMessage, res: ServerResponse) {
+async function route(req: IncomingMessage, res: ServerResponse) {
   const url = req.url ?? "";
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -292,8 +317,49 @@ function route(req: IncomingMessage, res: ServerResponse) {
     return res.end(JSON.stringify({ ok: true, id, events: demoEvents.length }));
   }
 
+  // T4.5 · POST /sessions/:id/messages —— 启动 runAgentLoop，事件推 SSE
+  const msgMatch = url.match(/^\/sessions\/([^/]+)\/messages$/);
+  if (req.method === "POST" && msgMatch) {
+    const id = msgMatch[1];
+    if (!sessions.has(id)) sessions.set(id, new Set());
+    const body = await readBody(req);
+    let prompt = "";
+    try {
+      const parsed = JSON.parse(body) as { prompt?: string; message?: string };
+      prompt = parsed.prompt ?? parsed.message ?? "";
+    } catch {
+      prompt = body;
+    }
+    if (!prompt) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: "prompt is required" }));
+    }
+    // 异步启动 loop，立即返回（事件走 SSE）
+    startAgentLoop(id, prompt).catch((e) => {
+      console.error(`[agent-bridge] loop error for session ${id}:`, e);
+      broadcast(id, { type: "message", role: "agent", content: `⚠️ 内部错误：${(e as Error).message}` });
+      broadcast(id, { type: "done" } satisfies AgentEvent);
+    });
+    res.writeHead(202, { "Content-Type": "application/json" });
+    return res.end(JSON.stringify({ ok: true, id, mode: "agent-loop" }));
+  }
+
   res.writeHead(404);
   res.end("not found");
+}
+
+/** T4.5 · 启动 agent loop，把 AgentEvent 推到 session 的 SSE 订阅者 */
+async function startAgentLoop(sessionId: string, prompt: string) {
+  const llm = buildLLM();
+  const mcp = getMcp();
+  console.log(`[agent-bridge] session ${sessionId} start loop (llm=${llm.name})`);
+
+  // 先推一条 user message（前端 chat 栏显示用户输入）
+  broadcast(sessionId, { type: "message", role: "user", content: prompt });
+
+  for await (const ev of runAgentLoop({ prompt }, { llm, mcp })) {
+    broadcast(sessionId, ev);
+  }
 }
 
 const port = Number(process.env.PORT ?? 4317);

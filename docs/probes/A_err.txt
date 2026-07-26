@@ -1,0 +1,77 @@
+[2m2026-07-26T00:48:48.444286Z[0m [33m WARN[0m [unified_log] write failed: 拒绝访问。 (os error 5)
+[2m2026-07-26T00:48:48.473831Z[0m [33m WARN[0m [unified_log] write failed: 拒绝访问。 (os error 5)
+[2m2026-07-26T00:48:48.503687Z[0m [33m WARN[0m [unified_log] write failed: 拒绝访问。 (os error 5)
+[2m2026-07-26T00:48:48.539214Z[0m [33m WARN[0m [unified_log] write failed: 拒绝访问。 (os error 5)
+[2m2026-07-26T00:48:48.562244Z[0m [33m WARN[0m [unified_log] write failed: 拒绝访问。 (os error 5)
+[2m2026-07-26T00:48:48.602943Z[0m [32m INFO[0m [3mevent[0m[2m=[0m"timing" [3mname[0m[2m=[0m"startup.early_prefetch_launch" [3melapsed_us[0m[2m=[0m10520
+[2m2026-07-26T00:48:48.630752Z[0m [32m INFO[0m [3mevent[0m[2m=[0m"timing" [3mname[0m[2m=[0m"startup.http_blocking_client_build" [3melapsed_us[0m[2m=[0m11774
+[2m2026-07-26T00:48:49.253029Z[0m [32m INFO[0m [3mevent[0m[2m=[0m"timing" [3mname[0m[2m=[0m"startup.early_settings_fetch" [3melapsed_us[0m[2m=[0m634074
+[2m2026-07-26T00:48:49.253769Z[0m [32m INFO[0m [3mevent[0m[2m=[0m"timing" [3mname[0m[2m=[0m"startup.early_prefetch" [3melapsed_us[0m[2m=[0m636609 [3mfields[0m[2m=[0mObject {"endpoint": String("https://cli-chat-proxy.grok.com/v1")}
+[2m2026-07-26T00:48:49.254497Z[0m [32m INFO[0m remote_settings fetched as shell-level fallback
+[2m2026-07-26T00:48:49.290413Z[0m [32m INFO[0m data capture config resolved [3mtelemetry[0m[2m=[0mtrue (remote) [3mtrace_upload[0m[2m=[0mfalse (remote) [3mfeedback[0m[2m=[0mtrue (default) [3mfeedback_url[0m[2m=[0mhttps://cli-chat-proxy.grok.com/v1 [3mfeedback_url_custom[0m[2m=[0mfalse [3mtrace_upload_url[0m[2m=[0mhttps://cli-chat-proxy.grok.com/v1 [3mtrace_upload_url_custom[0m[2m=[0mfalse [3mtrace_upload_bucket[0m[2m=[0m"none" [3mtrace_upload_region[0m[2m=[0m"none"
+[2m2026-07-26T00:48:49.303153Z[0m [32m INFO[0m [3mevent[0m[2m=[0m"timing" [3mname[0m[2m=[0m"startup.http_client_build" [3melapsed_us[0m[2m=[0m11915
+[2m2026-07-26T00:48:49.315956Z[0m [32m INFO[0m default model resolved [3mmodel_id[0m[2m=[0mgrok-4.5 [3msource[0m[2m=[0mremote
+[2m2026-07-26T00:48:49.317093Z[0m [33m WARN[0m [unified_log] write failed: 拒绝访问。 (os error 5)
+[2m2026-07-26T00:48:49.322240Z[0m [32m INFO[0m WORKTREE_CONFIG_SHELL: resolved worktree type at agent startup [3mworktree_type[0m[2m=[0mStandalone [3msource[0m[2m=[0m"remote"
+[2m2026-07-26T00:48:49.347545Z[0m [32m INFO[0m skills file watcher started [3mdirs[0m[2m=[0m5
+[2m2026-07-26T00:48:49.361663Z[0m [32m INFO[0m Received extension notification: method=x.ai/log
+[2m2026-07-26T00:48:49.362319Z[0m [33m WARN[0m [unified_log] write failed: 拒绝访问。 (os error 5)
+[2m2026-07-26T00:48:49.362946Z[0m [33m WARN[0m [unified_log] write failed: 拒绝访问。 (os error 5)
+[2m2026-07-26T00:48:49.363952Z[0m [32m INFO[0m CLEANUP_START: scanning for dead instance pool directories [3mpool_dir[0m[2m=[0mC:\Users\Administrator\.grok\worktree_pool
+[2m2026-07-26T00:48:49.364837Z[0m [32m INFO[0m CLEANUP_SKIP: pool directory does not exist or unreadable [3mpool_dir[0m[2m=[0mC:\Users\Administrator\.grok\worktree_pool
+[2m2026-07-26T00:48:49.365004Z[0m [33m WARN[0m [unified_log] write failed: 拒绝访问。 (os error 5)
+[2m2026-07-26T00:48:49.365444Z[0m [33m WARN[0m auto worktree gc failed [3merror[0m[2m=[0mneither $GROK_HOME nor $HOME is set
+[2m2026-07-26T00:48:49.366835Z[0m [32m INFO[0m Client type set to: Generic
+[2m2026-07-26T00:48:49.367341Z[0m [32m INFO[0m code-nav capability initialized from initialize request; index will start lazily on first x.ai/code/* request if eligible [3mcode_nav_enabled[0m[2m=[0mfalse [3mclient_type[0m[2m=[0mGeneric [3mevent[0m[2m=[0m"code_nav_capability_parsed"
+[2m2026-07-26T00:48:49.367853Z[0m [32m INFO[0m Buffering settings from init [3mbuffering_settings[0m[2m=[0mNone
+[2m2026-07-26T00:48:49.369189Z[0m [33m WARN[0m [unified_log] write failed: 拒绝访问。 (os error 5)
+[2m2026-07-26T00:48:49.370044Z[0m [33m WARN[0m [unified_log] write failed: 拒绝访问。 (os error 5)
+[2m2026-07-26T00:48:49.370452Z[0m [32m INFO[0m SESSION_CLEANUP_START: scanning for stale session files [3msessions_root[0m[2m=[0mC:\Users\Administrator\.grok\sessions [3mttl_days[0m[2m=[0m30 [3mskip[0m[2m=[0mNone
+[2m2026-07-26T00:48:49.371609Z[0m [33m WARN[0m [unified_log] write failed: 拒绝访问。 (os error 5)
+[2m2026-07-26T00:48:49.372194Z[0m [32m INFO[0m auth: advertising grok.com auth method [3mlabel[0m[2m=[0mNone [3mhas_auth_provider[0m[2m=[0mfalse
+[2m2026-07-26T00:48:49.373192Z[0m [33m WARN[0m [unified_log] write failed: 拒绝访问。 (os error 5)
+[2m2026-07-26T00:48:49.373827Z[0m [33m WARN[0m [unified_log] write failed: 拒绝访问。 (os error 5)
+[2m2026-07-26T00:48:49.375526Z[0m [32m INFO[0m auth: authenticate request [3mmethod[0m[2m=[0mcached_token
+[2m2026-07-26T00:48:49.376111Z[0m [33m WARN[0m [unified_log] write failed: 拒绝访问。 (os error 5)
+[2m2026-07-26T00:48:49.376928Z[0m [33m WARN[0m [unified_log] write failed: 拒绝访问。 (os error 5)
+[2m2026-07-26T00:48:49.386044Z[0m [32m INFO[0m Loaded MCP servers from ~/.claude.json [3mcount[0m[2m=[0m0
+[2m2026-07-26T00:48:49.387097Z[0m [32m INFO[0m Loaded Cursor MCP servers from ~/.cursor/mcp.json [3mcount[0m[2m=[0m0
+[2m2026-07-26T00:48:49.390971Z[0m [32m INFO[0m session search bootstrap starting [3mtotal_sessions[0m[2m=[0m9 [3mskipped_large[0m[2m=[0m0
+[2m2026-07-26T00:48:49.392391Z[0m [32m INFO[0m Loaded .mcp.json MCP servers [3mcount[0m[2m=[0m0
+[2m2026-07-26T00:48:49.417024Z[0m [33m WARN[0m failed to index session for search [3merror[0m[2m=[0msqlite error: unable to open database file [3msession_id[0m[2m=[0m019f9bd9-35d3-7a62-b7ca-c03dbd570810
+[2m2026-07-26T00:48:49.428468Z[0m [33m WARN[0m failed to index session for search [3merror[0m[2m=[0msqlite error: unable to open database file [3msession_id[0m[2m=[0m019f9bd0-479b-7250-84cf-68b440994280
+[2m2026-07-26T00:48:49.429633Z[0m [33m WARN[0m failed to index session for search [3merror[0m[2m=[0msqlite error: unable to open database file [3msession_id[0m[2m=[0m019f9bc0-c52a-7e50-bc00-0109885adf6c
+[2m2026-07-26T00:48:49.430549Z[0m [33m WARN[0m failed to index session for search [3merror[0m[2m=[0msqlite error: unable to open database file [3msession_id[0m[2m=[0m019f96de-3eef-7160-97fc-c1955ea30197
+[2m2026-07-26T00:48:49.436955Z[0m [32m INFO[0m Sent x.ai/mcp/servers_updated notification to client
+[2m2026-07-26T00:48:49.450244Z[0m [32m INFO[0m SESSION_CLEANUP_DONE [3msessions_root[0m[2m=[0mC:\Users\Administrator\.grok\sessions [3mfiles_deleted[0m[2m=[0m0 [3mdirs_removed[0m[2m=[0m0 [3merrors[0m[2m=[0m0
+[2m2026-07-26T00:48:49.455948Z[0m [33m WARN[0m failed to index session for search [3merror[0m[2m=[0msqlite error: unable to open database file [3msession_id[0m[2m=[0m019f8f16-550d-79e2-9036-70b86a39ef01
+[2m2026-07-26T00:48:49.462365Z[0m [33m WARN[0m failed to index session for search [3merror[0m[2m=[0msqlite error: unable to open database file [3msession_id[0m[2m=[0m019f8f45-7c74-7651-9e8b-cfff14a399fb
+[2m2026-07-26T00:48:49.462915Z[0m [33m WARN[0m failed to index session for search [3merror[0m[2m=[0msqlite error: unable to open database file [3msession_id[0m[2m=[0m019f91b1-ceed-7963-8eab-29900a4a7163
+[2m2026-07-26T00:48:49.463438Z[0m [33m WARN[0m failed to index session for search [3merror[0m[2m=[0msqlite error: unable to open database file [3msession_id[0m[2m=[0m019f7eff-3118-7403-9b59-dc07f89402ae
+[2m2026-07-26T00:48:49.486421Z[0m [33m WARN[0m failed to index session for search [3merror[0m[2m=[0msqlite error: unable to open database file [3msession_id[0m[2m=[0m019f6e5f-4651-78c2-bf03-b8b50a87352e
+[2m2026-07-26T00:48:49.508880Z[0m [33m WARN[0m session search bootstrap failed [3merror[0m[2m=[0msqlite error: unable to open database file
+[2m2026-07-26T00:48:49.685788Z[0m [32m INFO[0m post-auth settings refreshed
+[2m2026-07-26T00:48:49.697620Z[0m [32m INFO[0m post-auth data capture config re-resolved [3mtelemetry[0m[2m=[0mtrue (remote) [3mtrace_upload[0m[2m=[0mfalse (remote) [3mworkspace_teleport_feature[0m[2m=[0mtrue [3mworkspace_teleport[0m[2m=[0mfalse [3mdata_collection_disabled[0m[2m=[0mtrue [3mworkspace_snapshot_capture[0m[2m=[0mfalse
+[2m2026-07-26T00:48:49.714639Z[0m [32m INFO[0m pushing announcements update to clients [3mcount[0m[2m=[0m1 [3mmode[0m[2m=[0mIfChanged
+[2m2026-07-26T00:48:49.718531Z[0m [33m WARN[0m [unified_log] write failed: 拒绝访问。 (os error 5)
+[2m2026-07-26T00:48:49.726843Z[0m [32m INFO[0m Loaded MCP servers from ~/.claude.json [3mcount[0m[2m=[0m0
+[2m2026-07-26T00:48:49.728955Z[0m [32m INFO[0m Loaded Cursor MCP servers from ~/.cursor/mcp.json [3mcount[0m[2m=[0m0
+[2m2026-07-26T00:48:49.734326Z[0m [32m INFO[0m Loaded .mcp.json MCP servers [3mcount[0m[2m=[0m0
+[2m2026-07-26T00:48:50.032547Z[0m [32m INFO[0m post-auth settings refreshed
+[2m2026-07-26T00:48:50.044509Z[0m [32m INFO[0m post-auth data capture config re-resolved [3mtelemetry[0m[2m=[0mtrue (remote) [3mtrace_upload[0m[2m=[0mfalse (remote) [3mworkspace_teleport_feature[0m[2m=[0mtrue [3mworkspace_teleport[0m[2m=[0mfalse [3mdata_collection_disabled[0m[2m=[0mtrue [3mworkspace_snapshot_capture[0m[2m=[0mfalse
+[2m2026-07-26T00:48:50.067751Z[0m [32m INFO[0m pushing announcements update to clients [3mcount[0m[2m=[0m1 [3mmode[0m[2m=[0mForce
+[2m2026-07-26T00:48:50.108132Z[0m [32m INFO[0m plugins: discovery complete [3mdiscovered[0m[2m=[0m0 [3mcli[0m[2m=[0m0 [3mproject[0m[2m=[0m0 [3muser[0m[2m=[0m0 [3mconfig[0m[2m=[0m0
+[2m2026-07-26T00:48:50.120967Z[0m [32m INFO[0m [3mevent[0m[2m=[0m"timing" [3mname[0m[2m=[0m"plugin_discovery" [3melapsed_us[0m[2m=[0m20635
+[2m2026-07-26T00:48:50.136021Z[0m [32m INFO[0m MCP server loaded from source [3mserver[0m[2m=[0m"hutian-seo" [3msource[0m[2m=[0mConfigToml { path: "C:\\Users\\Administrator\\.grok\\config.toml" }
+[2m2026-07-26T00:48:50.157788Z[0m [32m INFO[0m [3mevent[0m[2m=[0m"timing" [3mname[0m[2m=[0m"mcp_merge_managed" [3melapsed_us[0m[2m=[0m36105
+[2m2026-07-26T00:48:50.202741Z[0m [32m INFO[0m [3mevent[0m[2m=[0m"client_new" [3mbase_url[0m[2m=[0mhttps://cli-chat-proxy.grok.com/v1 [3mmodel[0m[2m=[0mgrok-4.5 [3mapi_backend[0m[2m=[0mResponses [3mauth_scheme[0m[2m=[0mBearer [3mreasoning_effort[0m[2m=[0m"high" [3mhas_api_key[0m[2m=[0mtrue [3mhas_bearer_resolver[0m[2m=[0mfalse [3mhas_authorization_header[0m[2m=[0mtrue [3mhas_x_api_key_header[0m[2m=[0mfalse
+[2m2026-07-26T00:48:50.204730Z[0m [32m INFO[0m [3mevent[0m[2m=[0m"timing" [3mname[0m[2m=[0m"session.persistence_init" [3melapsed_us[0m[2m=[0m1344
+[2m2026-07-26T00:48:50.205308Z[0m [32m INFO[0m [3mevent[0m[2m=[0m"timing" [3mname[0m[2m=[0m"session.new_session" [3melapsed_us[0m[2m=[0m15179 [3mfields[0m[2m=[0mObject {"session_id": String("019f9be5-660e-7583-9b92-d74a0a6495ab"), "cwd": String("E:\\workspace\\hutianSEOGEOAGent")}
+Couldn't create session: Permission denied.: {
+  "code": "FS_PERMISSION_DENIED",
+  "detail": "拒绝访问。 (os error 5)"
+}
+Error: Couldn't create session: Permission denied.: {
+  "code": "FS_PERMISSION_DENIED",
+  "detail": "拒绝访问。 (os error 5)"
+}

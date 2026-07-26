@@ -1,2 +1,0 @@
-{ "name": "hutian-marketplace",
-  "plugins": [ { "name": "hutian-seo", "source": { "type": "local", "path": "../hutian-seo-plugin" } } ] }

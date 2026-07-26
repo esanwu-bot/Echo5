@@ -9,6 +9,7 @@ out/
 dist/
 build/
 .turbo/
+*.tsbuildinfo
 
 # 环境变量(含真实密钥,禁止提交)
 .env
@@ -32,3 +33,7 @@ pnpm-debug.log*
 
 # 工作区临时
 agent_workspace/
+tmp/
+
+# Tauri 编译产物
+**/src-tauri/target/

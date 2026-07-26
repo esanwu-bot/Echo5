@@ -25,16 +25,16 @@ const MODEL_LABELS: Record<string, string> = {
 };
 
 export default function WorkbenchPage() {
-  const { state, startMock, send, setPanel } = useAgentSession("mock");
+  const { state, send, setPanel } = useAgentSession("sse");
   const [model, setModel] = useState("deepseek-v4-flash");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  // 进入自动播 mock 时间线
+  // 进入自动触发首次诊断（SSE 模式：lazy 创建 session + POST message）
   useEffect(() => {
-    const t = setTimeout(() => startMock(), 600);
+    const t = setTimeout(() => send("请诊断 https://example.com 的 SEO 情况"), 600);
     return () => clearTimeout(t);
-  }, [startMock]);
+  }, [send]);
 
   const addToast = useCallback((text: string, accent?: Toast["accent"]) => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;

@@ -42,6 +42,7 @@ export default function Footer() {
             <a href="#flow">建站流程</a>
             <a href="#templates">模板中心</a>
             <a href="#pricing">定价方案</a>
+            <a href="/download">下载桌面版</a>
           </div>
           <div className="foot-col">
             <h4>资源</h4>

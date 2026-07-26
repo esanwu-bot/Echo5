@@ -155,17 +155,18 @@ function ToolOutput({ output }: { output: unknown }) {
         </div>
       )}
 
-      {/* citations 引用分布（trace_citations） */}
-      {Array.isArray(data.citations) && (
+      {/* sources 引用分布（trace_citations） */}
+      {/* PRD §6.3 新契约：sources[{engine,share,role}]，tag 保留作渲染颜色 key */}
+      {Array.isArray(data.sources) && (
         <div className="space-y-2">
           <div className="flex items-center justify-between text-[11px]">
             <span className="text-faint">AI 引用来源分布</span>
             <span className="font-mono text-violet">
-              总量 {data.total as number} · {data.sentiment as string} · 增速 {data.growth as string}
+              总量 {data.total_citations as number} · {data.sentiment as string} · 增速 {data.growth as string}
             </span>
           </div>
           <div className="flex h-6 overflow-hidden rounded-lg">
-            {(data.citations as Array<{ engine: string; share: number; tag: string; note: string }>).map(
+            {(data.sources as Array<{ engine: string; share: number; tag: string; role: string }>).map(
               (c, i) => (
                 <div
                   key={i}
@@ -174,7 +175,7 @@ function ToolOutput({ output }: { output: unknown }) {
                     width: `${c.share}%`,
                     background: ENGINE_COLORS[c.tag] ?? "#6A3FC5",
                   }}
-                  title={`${c.engine} · ${c.share}% · ${c.note}`}
+                  title={`${c.engine} · ${c.share}% · ${c.role}`}
                 >
                   {c.share >= 12 ? `${c.share}%` : ""}
                 </div>
@@ -182,14 +183,14 @@ function ToolOutput({ output }: { output: unknown }) {
             )}
           </div>
           <div className="flex flex-wrap gap-x-3 gap-y-1">
-            {(data.citations as Array<{ engine: string; share: number; tag: string }>).map(
+            {(data.sources as Array<{ engine: string; share: number; tag: string; role: string }>).map(
               (c, i) => (
                 <div key={i} className="flex items-center gap-1.5 text-[10.5px] text-dim">
                   <span
                     className="h-2 w-2 rounded-sm"
                     style={{ background: ENGINE_COLORS[c.tag] ?? "#6A3FC5" }}
                   />
-                  {c.engine} {c.share}%
+                  {c.engine} {c.share}% · {c.role}
                 </div>
               ),
             )}

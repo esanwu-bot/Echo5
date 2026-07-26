@@ -38,6 +38,7 @@ export default function Nav() {
           <a href="#templates">模板中心</a>
           <a href="#pricing">定价</a>
           <a href="#docs">文档</a>
+          <Link href="/download" className="nav-dl">下载</Link>
         </div>
         <div className="nav-right">
           <Link href="/workbench" className="btn btn-ghost">
@@ -78,6 +79,9 @@ export default function Nav() {
         <a href="#docs" onClick={closeMenu}>
           文档
         </a>
+        <Link href="/download" onClick={closeMenu}>
+          下载
+        </Link>
         <Link href="/workbench" onClick={closeMenu}>
           进入工作台
         </Link>

@@ -12,7 +12,7 @@
   - `apps/web/` — Next.js 15(官网 SSG + 工作台客户端渲染)
   - `apps/agent-bridge/` — 常驻 SSE 桥接服务
   - `packages/agent-protocol/` — 共享 AgentEvent 契约
-  - `hutian-seo-plugin/` — grok-build 插件(MCP 工具 + 技能 + 命令 + 子代理)
+  - `hutian-seo-plugin/` — MCP 工具 + 技能/命令/子代理（自建 loop 复用）
 - `docs/qwen交接.md` — PRD、技术方案与开发计划(交接文档)
 
 详见 `docs/qwen交接.md`。

@@ -1,0 +1,156 @@
+{
+  "run_diagnosis": {
+    "url": "https://example.com",
+    "scores": {
+      "traditional_seo": 40,
+      "generative_geo": 0
+    },
+    "performance": null,
+    "conclusions": {
+      "entity_clarity": false,
+      "semantic_links": false,
+      "structured_data_missing": true
+    },
+    "jsonld_types": [],
+    "issues": [
+      "robots.txt returned 404",
+      "sitemap.xml returned 404",
+      "No JSON-LD structured data found on page",
+      "JSON-LD blocks lack an @type — weak entity signal",
+      "No semantic entity links (sameAs / @id / url) in JSON-LD",
+      "Missing meta description"
+    ]
+  },
+  "check_schema": {
+    "url": "https://example.com",
+    "expected_type": "Product",
+    "found": false,
+    "missing_fields": [],
+    "valid": false,
+    "rich_result_eligible": false,
+    "block_count": 0,
+    "types": [],
+    "issues": [
+      "No JSON-LD blocks found",
+      "No JSON-LD block of @type Product found"
+    ]
+  },
+  "trace_citations": {
+    "brand": "壶天",
+    "window_days": 30,
+    "source": "mock",
+    "sources": [
+      {
+        "engine": "DeepSeek-V3",
+        "share": 42,
+        "role": "主要来源",
+        "tag": "ds"
+      },
+      {
+        "engine": "GPT-4o",
+        "share": 28,
+        "role": "次要权威",
+        "tag": "gpt"
+      },
+      {
+        "engine": "Kimi",
+        "share": 15,
+        "role": "提及",
+        "tag": "kimi"
+      },
+      {
+        "engine": "其他",
+        "share": 15,
+        "role": "长尾",
+        "tag": "oth"
+      }
+    ],
+    "total_citations": 2410,
+    "sentiment": "正面 87%",
+    "growth": "+12.5%"
+  },
+  "submit_sitemap": {
+    "host": "this-host-does-not-exist-xyz.invalid",
+    "submitted": 1,
+    "key_location": "https://this-host-does-not-exist-xyz.invalid/test-key-not-real.txt",
+    "targets": {
+      "bing": {
+        "status": 202,
+        "accepted": true,
+        "verified": "unknown"
+      },
+      "google": {
+        "status": 404,
+        "accepted": false,
+        "verified": "unknown"
+      }
+    },
+    "status": "partial",
+    "ok": true,
+    "note": "202/200 仅表示通知已被接收；host 所有权经 https://this-host-does-not-exist-xyz.invalid/test-key-not-real.txt 异步验证，请稍后确认该文件可达。"
+  },
+  "entity_rename": {
+    "dry_run": true,
+    "root": "E:\\workspace\\hutianSEOGEOAGent\\hutian-seo-geo-agent",
+    "old_names": [
+      "Tikchip",
+      "天启芯"
+    ],
+    "new_name": "壶天",
+    "total_matches": 17,
+    "files_affected": 5,
+    "files_code": [
+      {
+        "path": "apps\\agent-bridge\\src\\server.ts",
+        "matches": 3
+      },
+      {
+        "path": "apps\\web\\components\\marketing\\Footer.tsx",
+        "matches": 2
+      },
+      {
+        "path": "apps\\web\\lib\\demo-events.ts",
+        "matches": 5
+      },
+      {
+        "path": "apps\\web\\lib\\inbox-data.ts",
+        "matches": 3
+      },
+      {
+        "path": "hutian-seo-plugin\\mcp-server\\generate_fixtures.py",
+        "matches": 4
+      }
+    ],
+    "files_code_count": 5,
+    "files_doc": [],
+    "files_doc_count": 0,
+    "files": [
+      {
+        "path": "apps\\agent-bridge\\src\\server.ts",
+        "matches": 3
+      },
+      {
+        "path": "apps\\web\\components\\marketing\\Footer.tsx",
+        "matches": 2
+      },
+      {
+        "path": "apps\\web\\lib\\demo-events.ts",
+        "matches": 5
+      },
+      {
+        "path": "apps\\web\\lib\\inbox-data.ts",
+        "matches": 3
+      },
+      {
+        "path": "hutian-seo-plugin\\mcp-server\\generate_fixtures.py",
+        "matches": 4
+      }
+    ],
+    "skipped_files": [],
+    "skipped_count": 0,
+    "next": "set dry_run=false to write changes; review files_doc before writing — docs may contain historical mentions that should be preserved"
+  },
+  "entity_rename_error": {
+    "error": "root is not a directory: E:\\workspace\\hutianSEOGEOAGent\\hutian-seo-geo-agent\\nonexistent-dir-xyz"
+  }
+}

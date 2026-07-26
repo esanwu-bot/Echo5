@@ -141,7 +141,7 @@
 | FR-W07 | 终端与产物 | 作为用户，我想看命令与产出文件 | 终端追加日志含光标；产物列表随事件增长，可下载/回滚 |
 | FR-W08 | 输入与模式 | 作为用户，我想追加指令并控制自主度 | 首轮 done 后可编辑；Enter 发送；Auto/Manual 模式切换 |
 | FR-W09 | 主题切换 | 作为用户，我想在深/浅间切换 | 顶栏或左下切换，整页平滑过渡，**不污染官网配色** |
-| FR-W10 | 模型路由 | 作为进阶用户，我想选择底层模型 | 下拉切换 DeepSeek-V3/GPT-4o/Kimi-K2，带 toast 反馈 |
+| FR-W10 | 模型路由 | 作为进阶用户，我想选择底层模型 | 下拉切换 DeepSeek V4 Flash/Hunyuan Turbo/Kimi 2.5，带 toast 反馈 |
 
 ### 6.3 能力层（Agent 工具与知识）
 
@@ -266,6 +266,56 @@
 1. 引用监测后端（DATA-05）自建方案的采集频率与合规边界，需法务确认对各引擎的调用方式。
 2. 企业版私有部署的 SSO 与数据驻留要求，待首个企业客户输入。
 3. 多语言（NFR-07）排期取决于出海计划，暂列 v1.x。
+
+---
+
+## 16. 桌面版（本地优先线）
+
+> **战略定位**：桌面版是"本地优先"的第二条产品腿，不是 SaaS 的替代品。
+> 桌面版（本地、单用户、免费体验+买断）与 SaaS（云端、多租户、订阅）**共享 100% 前端代码**，
+> 差异只在部署拓扑。两条线并行，服务 PRD §3 的不同画像。
+
+### 16.1 画像分流
+
+| 形态 | 服务谁（§3） | 部署 | 变现 | 接 grok |
+|---|---|---|---|---|
+| 桌面版（Tauri） | 独立开发者/小团队、技术 SEO/前端 | 本地单体 | 免费体验 + 专业版买断 | ✅ 本地 spawn，自然 |
+| SaaS（Web） | 增长/SEO 负责人、品牌/电商运营 | 云端多租户 | 订阅 + 运营后台 | 远程 bridge，较重 |
+
+### 16.2 功能需求
+
+| ID | 名称 | 描述 | 优先级 |
+|---|---|---|---|
+| FR-D01 | 下载入口 | 官网 /download 页提供 Windows 安装包下载，含版本号、changelog、文件大小 | P0 |
+| FR-D02 | 离线 mock 体验 | 桌面版启动后自动播 mock 时间线，零后端依赖，双击即用 | P0 |
+| FR-D03 | 本地工具闭环 | v2 起 sidecar 模式内嵌 bridge+MCP，五工具本地真跑 | P1 |
+| FR-D04 | 自动更新 | Tauri updater，官网静态服务放更新清单，用户无感升级 | P1 |
+| FR-D05 | 代码签名 | Windows 代码签名证书，避免 SmartScreen 拦截 | P1 |
+| FR-D06 | WebView2 降级 | Win10 老版本检测 + bootstrapper 引导安装 | P2 |
+
+### 16.3 三档演进
+
+| 档 | 主题 | 包含 | 后端依赖 |
+|---|---|---|---|
+| v1 | 体验/获客 | Tauri 壳 + workbench 前端 mode="mock" | 零后端 |
+| v2 | 真干活 | + bridge sidecar (Node SEA) + MCP sidecar (PyInstaller) | 本地 sidecar |
+| v3 | 满血 | + grok sidecar (Rust 二进制)，本地 spawn | 本地全栈 |
+
+### 16.4 安全模型
+
+桌面版用户是机主，安全重点从"防不可信用户输入"转向"**防工具误操作用户本地文件**"：
+- `entity_rename` 的 `dry_run` 在桌面版**默认 true**，用户确认后才写盘
+- 所有文件操作工具须经用户显式授权（Tauri fs scope）
+- 本地数据不外传（除非用户主动提交 sitemap）
+
+### 16.5 版本规划（桌面线，与 SaaS 线并行）
+
+| 里程碑 | 主题 | 对应 FR |
+|---|---|---|
+| MD1 | 纯前端 mock 打包 | FR-D01, FR-D02 |
+| MD2 | sidecar（bridge+MCP） | FR-D03 |
+| MD3 | grok sidecar | 接 Phase3 |
+
 
 ---
 ---
@@ -421,13 +471,18 @@ export type AgentEvent =
 |---|---|---|---|
 | `run_diagnosis(url)` | url | `{scores:{traditional_seo,generative_geo}, performance, conclusions:{entity_clarity,semantic_links,structured_data_missing}, issues[]}` | 爬虫+PageSpeed / 中性占位 ← FR-A01, DATA-01/02/03 |
 | `check_schema(url, expected_type)` | url, type | `{found, missing_fields[], valid, rich_result_eligible}` | 页面 JSON-LD 解析 ← FR-A02 |
-| `trace_citations(brand, window_days)` | brand, days | `{sources[{engine,share,role}], total_citations, sentiment, growth}` | `HUTIAN_CITATION_API` / 基线表示意 ← FR-A03, DATA-05 |
-| `submit_sitemap(host, urls, indexnow_key)` | host, urls, key | `{status, ok, submitted, targets}` | IndexNow API ← FR-A04, DATA-06 |
-| `entity_rename(root, old_names, new_name, dry_run=true)` | 路径/旧名/新名/空跑 | `{dry_run, total_matches, files_affected, files[], next}` | 本地文件系统 ← FR-A05 |
+| `trace_citations(brand, window_days)` | brand, days | `{sources[{engine,share,role}], total_citations, sentiment, growth}`；`tag`(ds/gpt/kimi/oth) 为渲染样式 key，额外保留 | `HUTIAN_CITATION_API` / 基线表示意 ← FR-A03, DATA-05 |
+| `submit_sitemap(host, urls, indexnow_key)` | host, urls, key | `{status, ok, submitted, targets, note}`；`targets[].accepted`(HTTP 层) 与 `targets[].verified`(业务层，v0.2 标 `unknown`) | IndexNow API ← FR-A04, DATA-06 |
+| `entity_rename(root, old_names, new_name, dry_run=true)` | 路径/旧名/新名/空跑 | `{dry_run, total_matches, files_affected, files_code[], files_doc[], files[], skipped_files[], next}`；`files[] = files_code[] ∪ files_doc[]`（全集，向后兼容旧消费者） | 本地文件系统 ← FR-A05 |
 
-**错误模型**：工具不抛异常给模型，统一返回 `{error: "..."}` JSON，保证编排不中断；`ok` 字段在 `tool_end` 反映。
+**`submit_sitemap.ok` 语义**：`ok = true` 当且仅当至少一个 target 的 `accepted === true` 且无 fatal 级网络错误；它**不代表** host 所有权已验证或内容已真被索引。是否"真生效"一律看 `targets[].verified`（v0.2 恒为 `unknown`）与顶层 `note`。
 
-**`entity_rename` 安全**：仅处理文本/标记扩展名；跳过 `.git/node_modules/dist/build/.next/__pycache__`；`dry_run=true` 只统计，`next` 字段提示二次确认。
+**错误模型（两层）**：工具不抛异常给模型，保证编排不中断。
+- **致命错误**（root 非目录 / fetch 全失败 / 参数非法）→ 返回 `{error: "..."}` JSON，该工具中断、`ok:false`；
+- **部分失败**（某步测不了但仍有部分结论，如 `run_diagnosis` 的 robots.txt/sitemap 不可达）→ 错误进 `issues[]`，工具仍返回已抓到的 `scores`/`conclusions`，`ok` 反映"是否有可用结论"。
+- `run_diagnosis` 走部分模型是对的——逼它包装成整工具 `{error}` 反而会丢掉已抓到的 SEO/GEO 结论。
+
+**`entity_rename` 安全**：仅处理文本/标记扩展名；跳过 `.git/node_modules/dist/build/.next/__pycache__/docs/test/fixtures`；跳过 `CHANGELOG.md`/`HISTORY.md` 等变更日志；`dry_run=true` 只统计，`next` 字段提示二次确认；`files_doc[]` 单独归类文档命中，提示用户这些可能是"仅作历史映射"的提及，需人工复核后再决定是否随 `dry_run=false` 写盘。
 
 **Product JSON-LD 基线（写入与校验参照）**：
 
@@ -557,6 +612,77 @@ export type AgentEvent =
 | NFR-02 | §9 心跳/时延 |
 | NFR-05 | §9 BFF + §12 |
 | NFR-08 | §5 artifact + 产物归档 |
+| FR-D01..D06 | §17 Tauri 桌面版 |
+
+---
+
+## 17. Tauri 桌面版部署拓扑
+
+> 实现 PRD §16 桌面版（本地优先线）。桌面版与 SaaS 共享前端代码，差异在部署。
+
+### 17.1 仓库结构
+
+```
+apps/
+  web/          ← Next.js 官网 + 工作台（SaaS 线）
+  desktop/      ← Tauri 桌面壳（本地优先线）
+    src/
+      main.tsx              ← Vite 入口，引用 web/ 工作台组件（零复制）
+      next-themes-shim.ts   ← next-themes 桌面端替换（localStorage 实现）
+    src-tauri/
+      Cargo.toml            ← Rust 依赖（tauri 2）
+      tauri.conf.json        ← 窗口/打包/图标配置
+      src/lib.rs             ← Tauri 主进程（v1 仅加载前端，无 sidecar）
+    vite.config.ts          ← alias @ → ../web，next-themes → shim
+    tailwind.config.js      ← content 扫描 web/workbench 组件
+```
+
+### 17.2 前端共享策略
+
+桌面端**不复制** web 代码，通过 Vite alias 直接引用：
+- `@/` → `apps/web/`（组件、lib 全部复用）
+- `next-themes` → `src/next-themes-shim.ts`（桌面无 Next.js 运行时）
+- `@hutian/agent-protocol` → `packages/agent-protocol/src/index.ts`
+
+工作台走 `useAgentSession("mock")`，内置 mockStream 播 demo-events，
+**零后端依赖**，双击即用。
+
+### 17.3 Tauri 配置要点
+
+| 项 | 值 | 说明 |
+|---|---|---|
+| `build.frontendDist` | `../dist` | Vite 构建产物 |
+| `build.devUrl` | `http://localhost:1420` | Vite dev server |
+| `app.windows[0]` | 1440×900, min 1024×680 | 桌面窗口尺寸 |
+| `bundle.targets` | `["nsis","msi"]` | Windows 安装包格式 |
+| `bundle.icon` | `icons/*` | `tauri icon` 命令生成全套 |
+
+### 17.4 工具链要求
+
+| 工具 | 版本 | 用途 |
+|---|---|---|
+| Rust | 1.97+ | Tauri 主进程编译 |
+| Rust 工具链 | `stable-x86_64-pc-windows-gnu`（v1）或 `msvc`（生产） | GNU 免装 VS；MSVC 需 Build Tools |
+| Node.js | 20+ | Vite 构建 + pnpm |
+| `@tauri-apps/cli` | 2.11+ | `tauri build` / `tauri icon` |
+
+### 17.5 v2 Sidecar 打包路线（未实现，备忘）
+
+v2 起需内嵌后端进程，Tauri sidecar 要求**独立可执行文件**：
+- **Node bridge** → `bun build --compile` 或 `pkg` 编译成无依赖 exe
+- **Python MCP** → `PyInstaller --onefile` 打成独立 exe
+- **grok**（v3）→ 本身是 Rust 二进制，天然 sidecar
+
+sidecar 配置在 `tauri.conf.json` 的 `bundle.externalBin`，运行时用 `tauri.shell.sidecar()` spawn。
+
+### 17.6 已知坑
+
+1. **WebView2**：Win10 1809 以下不带，需 bootstrapper；Win11 内置。
+2. **代码签名**：未签名 exe 被 SmartScreen 拦截，砍下载转化。证书需预算。
+3. **自动更新**：Tauri updater 需静态服务放 `latest.json` 清单，官网可托管。
+4. **ESM require**：Vite config 中 `require()` 在 ESM 下不可用，需用 `import`。
+5. **next-themes**：桌面端无 Next.js，需 shim（localStorage + documentElement.class）。
+6. **TS paths**：Vite alias 与 tsconfig paths 需对齐，跨目录 include 需注意相对层级。
 
 ---
 ---

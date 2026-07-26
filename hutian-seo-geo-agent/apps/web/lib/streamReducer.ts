@@ -186,12 +186,14 @@ export function streamReducer(
       };
 
     case "terminal":
+      // UX: submit 阶段输出部署日志时，右栏自动切到终端（原型节奏）
       return {
         ...state,
         terminalLines: [
           ...state.terminalLines,
           { id: uid(), html: event.line },
         ],
+        activePanel: "term",
       };
 
     case "artifact":

@@ -27,12 +27,16 @@ const MODEL_LABELS: Record<string, string> = {
 export default function WorkbenchPage() {
   // 真流默认不 auto-send —— 用户实测后再决定是否加开场示例（避免"自动烧钱"）
   // mock 模式照旧自动播 demo 时间线（demo 不计费、不入历史）
-  // 切 mock 走 ?mode=mock query 或环境变量（demo / 桌面壳）
-  const mode: "mock" | "sse" =
-    typeof window !== "undefined" &&
-    new URLSearchParams(window.location.search).get("mode") === "mock"
+  // 切 mock 走 ?mode=mock query 或桌面壳全局标记 window.__HUTIAN_DESKTOP_MODE__
+  const mode: "mock" | "sse" = (() => {
+    if (typeof window === "undefined") return "sse";
+    const desktopMode = (window as { __HUTIAN_DESKTOP_MODE__?: "mock" | "sse" })
+      .__HUTIAN_DESKTOP_MODE__;
+    if (desktopMode) return desktopMode;
+    return new URLSearchParams(window.location.search).get("mode") === "mock"
       ? "mock"
       : "sse";
+  })();
   const { state, send, setPanel, startMock } = useAgentSession(mode);
   const [model, setModel] = useState("deepseek-v4-flash");
   const [sidebarOpen, setSidebarOpen] = useState(false);

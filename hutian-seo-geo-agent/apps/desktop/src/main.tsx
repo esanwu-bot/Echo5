@@ -1,6 +1,11 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 
+// 桌面壳零后端：强制 mock 模式，自动播放 demo 时间线。
+// 该标记在 WorkbenchPage 渲染前写入，优先级高于 URL query。
+(window as { __HUTIAN_DESKTOP_MODE__?: "mock" | "sse" }).__HUTIAN_DESKTOP_MODE__ =
+  "mock";
+
 // 引用 web 应用的工作台源码 —— 零复制
 import WorkbenchPage from "../../web/app/(workbench)/workbench/page";
 import WorkbenchIcons from "../../web/components/workbench/Icons";

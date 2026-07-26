@@ -14,9 +14,14 @@
     "useDefineForClassFields": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["../../web/*"],
+      "@/*": ["../../apps/web/*"],
       "@hutian/agent-protocol": ["../../packages/agent-protocol/src/index.ts"]
     }
   },
-  "include": ["src", "../../web/components/workbench", "../../web/lib"]
+  "include": [
+    "src",
+    "../../web/app/(workbench)/workbench/page.tsx",
+    "../../web/components/workbench",
+    "../../web/lib"
+  ]
 }

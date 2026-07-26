@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { CodeBuddyClient } from "./llm/codebuddy-client.ts";
+import { GrokClient } from "./llm/grok-client.ts";
 import { MockLLMClient, seoDemoScript } from "./llm/mock-client.ts";
 import { StdioMcpClient } from "./mcp/client.ts";
 import { runAgentLoop } from "./loop/run-agent.ts";
@@ -15,14 +16,54 @@ function sseHead(res: ServerResponse) {
 }
 
 // ── T4.5 · Agent loop 接 SSE ──────────────────────────────────────────
-// 启动时构造 LLM + MCP client；缺 key 时回退 MockLLM（自建loop.md §验收）
-function buildLLM(): LLMClient {
+// 启动时构造 LLM + MCP client；按优先级尝试，全部失败则回退 MockLLM。
+//
+// 优先级（LLM_PROVIDER 环境变量控制）：
+//   - "grok"     : Grok → CodeBuddy → Mock（Grok 优先，需 CLIProxyAPI 活着）
+//   - "codebuddy": CodeBuddy → Mock（默认，不等待 Grok）
+//   - "auto"     : Grok → CodeBuddy → Mock（自动选，Grok 活着就用）
+//
+// 注意：Grok 只是 LLM 后端之一，loop 零改动；CLIProxyAPI 未启动时自动降级。
+async function buildLLM(): Promise<LLMClient> {
+  const provider = process.env.LLM_PROVIDER ?? "codebuddy";
+  const errors: string[] = [];
+
+  const tryGrok = async (timeoutMs = 3000): Promise<LLMClient | null> => {
+    try {
+      const client = GrokClient.fromEnv();
+      const alive = await client.ping(timeoutMs);
+      if (!alive) {
+        errors.push("GrokClient: CLIProxyAPI ping failed (not running?)");
+        return null;
+      }
+      return client;
+    } catch (e) {
+      errors.push(`GrokClient: ${(e as Error).message}`);
+      return null;
+    }
+  };
+
+  // Grok 优先路径
+  if (provider === "grok" || provider === "auto") {
+    const grok = await tryGrok(provider === "grok" ? 3000 : 1000);
+    if (grok) return grok;
+  }
+
+  // CodeBuddy 路径
   try {
     return CodeBuddyClient.fromEnv();
   } catch (e) {
-    console.warn(`[agent-bridge] CodeBuddyClient 初始化失败，回退 MockLLM: ${(e as Error).message}`);
-    return new MockLLMClient({ steps: seoDemoScript(), name: "mock-fallback" });
+    errors.push(`CodeBuddyClient: ${(e as Error).message}`);
   }
+
+  // Grok 兜底路径（仅 provider=grok 明确指定时，降级前再试一次）
+  if (provider === "grok") {
+    const grok = await tryGrok(3000);
+    if (grok) return grok;
+  }
+
+  console.warn(`[agent-bridge] 所有 LLM 初始化失败，回退 MockLLM:\n${errors.map((x) => "  - " + x).join("\n")}`);
+  return new MockLLMClient({ steps: seoDemoScript(), name: "mock-fallback" });
 }
 
 // 共享 MCP client（每个 session 复用，避免每次 spawn hutian-seo-mcp）
@@ -350,7 +391,7 @@ async function route(req: IncomingMessage, res: ServerResponse) {
 
 /** T4.5 · 启动 agent loop，把 AgentEvent 推到 session 的 SSE 订阅者 */
 async function startAgentLoop(sessionId: string, prompt: string) {
-  const llm = buildLLM();
+  const llm = await buildLLM();
   const mcp = getMcp();
   console.log(`[agent-bridge] session ${sessionId} start loop (llm=${llm.name})`);
 

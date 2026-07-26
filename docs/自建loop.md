@@ -1,4 +1,4 @@
-方向已按上一轮推荐定：**自建 agent loop 为主线，MCP 工具层保留**。grok 对接路线已彻底放弃（v0.3 探针阶段验证不通过，headless 输出阻塞无解）。这份清单接开发计划 Phase 4——v0.3 的 M4 即「自建 loop MVP」。转交即可。
+方向已定：**自建 agent loop 为主线，MCP 工具层保留**。grok 不再作为 agent host（直接 stdio/TUI 控制 loop 的前方案已放弃），但可作为 OpenAI 兼容 LLM 后端经本地 CLIProxyAPI 接入。默认首发 LLM 仍是 CodeBuddy；grok 优先级需本地探针 GREEN 后通过 `LLM_PROVIDER=grok` 显式启用。这份清单接开发计划 Phase 4——v0.3 的 M4 即「自建 loop MVP」。
 
 ---
 
@@ -6,8 +6,9 @@
 
 | 决策点 | 默认值 | 为什么 |
 |---|---|---|
-| 主路线 | 自建 loop（单一） | 已论证，grok 路线已清零 |
+| 主路线 | 自建 loop（单一） | grok 不再作为 agent host |
 | 首发 LLM | **CodeBuddy**（腾讯云 TokenHub，`deepseek-v4-flash`，OpenAI 兼容格式） | 已通过 T4.1 探针验证 tool_calls 结构化输出 |
+| 可选 LLM | **Grok**（本地 CLIProxyAPI，OpenAI 兼容格式） | 需通过 `probe:grok-derived` + `probe:grok-loop` 后显式启用 |
 | loop 语言/位置 | **TS，写在 bridge 里**，经 MCP client 调 Python 工具 | bridge 本就持有会话+推 SSE，loop 放这最顺，事件直推不跨语言 |
 | MCP 层 | **保留**，loop 作 MCP client 调 `hutian-seo-mcp` | 工具仍可被 Cursor 复用 |
 | 成本/key | MVP 用**一个测试 key**（放 bridge env `CODEBUDDY_API_KEY`） | BYOK/代理计费放 v2.0，现在不碰 |
@@ -184,4 +185,4 @@ export interface AgentRuntime {
 
 需要你（产品）现在拍的，别拖到 T4.5 之后：① **CodeBuddy key**（没有就先用 MockLLM 做 T4.1–T4.4）；② 确认 **MVP 是否要 edit_file 的 Diff 联动**（要，则 T4.4/T4.5 多一块；不要，则 LLM 先输出 JSON-LD 文本，Diff 放 v1.0）。这两个定了，Trae 就能一路推到真闭环。
 
-grok 路线已彻底放弃——上一轮卡的 headless 输出/TUI/Free 档无解，自建 loop 是唯一可行路径。
+grok 作为 agent host 的路线已放弃（headless 输出/TUI/Free 档无解），但 GrokClient 已保留为可选 LLM 后端。经本地 CLIProxyAPI 接入后，loop 零改动即可切换。默认仍走 CodeBuddy；grok 优先需本地探针 GREEN 后设置 `LLM_PROVIDER=grok`。

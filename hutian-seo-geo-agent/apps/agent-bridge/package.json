@@ -12,6 +12,8 @@
     "verify:sanitize": "node --import tsx src/mcp/verify-sanitize.ts",
     "verify:loop": "node --import tsx src/loop/verify-loop.ts",
     "probe:realloop": "node --env-file=../../.env --import tsx src/loop/probe-real-loop.ts",
+    "probe:grok-derived": "node --env-file=../../.env --import tsx src/llm/probe-grok-derived.ts",
+    "probe:grok-loop": "node --env-file=../../.env --import tsx src/loop/probe-grok-loop.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -1,0 +1,47 @@
+-- 商品表
+CREATE TABLE `products` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '商品ID',
+    `sku` VARCHAR(50) NOT NULL DEFAULT '' COMMENT 'SKU编码',
+    `name` VARCHAR(200) NOT NULL DEFAULT '' COMMENT '商品名称',
+    `category_id` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '分类ID',
+    `brand` VARCHAR(50) NOT NULL DEFAULT '' COMMENT '品牌',
+    `description` TEXT COMMENT '商品描述',
+    `main_image` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '主图',
+    `price` DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '销售价格',
+    `original_price` DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '原价',
+    `cost_price` DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '成本价',
+    `stock` INT NOT NULL DEFAULT 0 COMMENT '库存数量',
+    `min_stock` INT NOT NULL DEFAULT 0 COMMENT '最小库存',
+    `sales_count` INT NOT NULL DEFAULT 0 COMMENT '销量',
+    `view_count` INT NOT NULL DEFAULT 0 COMMENT '浏览量',
+    `weight` DECIMAL(8,3) NOT NULL DEFAULT 0.000 COMMENT '重量(kg)',
+    `volume` DECIMAL(8,3) NOT NULL DEFAULT 0.000 COMMENT '体积(L)',
+    `alcohol_content` DECIMAL(4,2) NOT NULL DEFAULT 0.00 COMMENT '酒精度',
+    `origin` VARCHAR(100) NOT NULL DEFAULT '' COMMENT '产地',
+    `vintage` INT NOT NULL DEFAULT 0 COMMENT '年份',
+    `storage_temp_min` DECIMAL(4,1) NOT NULL DEFAULT 0.0 COMMENT '最低储存温度',
+    `storage_temp_max` DECIMAL(4,1) NOT NULL DEFAULT 0.0 COMMENT '最高储存温度',
+    `shelf_life` INT NOT NULL DEFAULT 0 COMMENT '保质期(天)',
+    `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态：0-禁用，1-正常，2-售罄',
+    `sort` INT NOT NULL DEFAULT 0 COMMENT '排序',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `deleted_at` DATETIME NULL COMMENT '删除时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_sku` (`sku`),
+    KEY `idx_category_id` (`category_id`),
+    KEY `idx_brand` (`brand`),
+    KEY `idx_status` (`status`),
+    KEY `idx_price` (`price`),
+    KEY `idx_sales_count` (`sales_count`),
+    KEY `idx_created_at` (`created_at`),
+    FULLTEXT KEY `ft_name_brand` (`name`, `brand`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='商品表';
+
+-- 插入测试数据
+INSERT INTO `products` (`sku`, `name`, `category_id`, `brand`, `description`, `main_image`, `price`, `original_price`, `cost_price`, `stock`, `min_stock`, `alcohol_content`, `origin`, `vintage`, `storage_temp_min`, `storage_temp_max`, `shelf_life`, `status`) VALUES
+('MT001', '茅台飞天53°', 6, '茅台', '贵州茅台酒股份有限公司出品，采用传统工艺酿造，口感醇厚，香气浓郁', '/static/products/maotai.jpg', 2680.00, 2980.00, 2200.00, 50, 10, 53.00, '贵州茅台镇', 2023, 15.0, 25.0, 3650, 1),
+('WLY001', '五粮液普五52°', 7, '五粮液', '五粮液股份有限公司出品，五种粮食酿造，口感绵甜', '/static/products/wuliangye.jpg', 1280.00, 1480.00, 1000.00, 30, 5, 52.00, '四川宜宾', 2023, 15.0, 25.0, 3650, 1),
+('JNC001', '剑南春水晶剑52°', 8, '剑南春', '四川剑南春集团有限责任公司出品，历史悠久，工艺精湛', '/static/products/jiannanchun.jpg', 680.00, 780.00, 500.00, 80, 15, 52.00, '四川绵竹', 2023, 15.0, 25.0, 3650, 1),
+('LF001', '拉菲传奇2018', 9, '拉菲', '法国拉菲酒庄出品，口感优雅，单宁柔顺', '/static/products/lafei.jpg', 680.00, 780.00, 450.00, 25, 5, 13.50, '法国波尔多', 2018, 12.0, 16.0, 3650, 1),
+('BW001', '百威啤酒24听装', 3, '百威', '百威英博出品，口感清爽，泡沫丰富', '/static/products/baiwei.jpg', 158.00, 180.00, 120.00, 100, 20, 5.00, '中国', 2024, 2.0, 8.0, 365, 1);

@@ -1,0 +1,6 @@
+# nginx.htaccess - 只保留rewrite规则
+# 该文件被include进location /块内，不要再定义location块
+
+if (!-e $request_filename) {
+    rewrite ^(.*)$ /index.php?s=$1 last;
+}

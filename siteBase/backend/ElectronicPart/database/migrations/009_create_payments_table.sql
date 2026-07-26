@@ -1,0 +1,27 @@
+-- 支付记录表
+CREATE TABLE `payments` (
+  `id` int(11) unsigned NOT NULL AUTO_INCREMENT COMMENT '支付ID',
+  `order_id` int(11) unsigned NOT NULL COMMENT '订单ID',
+  `order_no` varchar(50) NOT NULL COMMENT '订单号',
+  `payment_no` varchar(50) NOT NULL COMMENT '支付单号',
+  `payment_method` tinyint(2) NOT NULL DEFAULT '1' COMMENT '支付方式：1微信，2支付宝，3余额',
+  `amount` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT '支付金额',
+  `status` tinyint(2) NOT NULL DEFAULT '1' COMMENT '支付状态：1待支付，2支付成功，3支付失败，4已取消，5已退款',
+  `third_party_no` varchar(100) DEFAULT NULL COMMENT '第三方交易号',
+  `response_data` json DEFAULT NULL COMMENT '支付响应数据',
+  `notify_data` json DEFAULT NULL COMMENT '回调通知数据',
+  `failed_reason` varchar(255) DEFAULT NULL COMMENT '失败原因',
+  `created_at` int(11) unsigned NOT NULL DEFAULT '0' COMMENT '创建时间',
+  `paid_at` int(11) unsigned DEFAULT NULL COMMENT '支付时间',
+  `failed_at` int(11) unsigned DEFAULT NULL COMMENT '失败时间',
+  `cancelled_at` int(11) unsigned DEFAULT NULL COMMENT '取消时间',
+  `deleted_at` int(11) unsigned DEFAULT NULL COMMENT '删除时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_payment_no` (`payment_no`),
+  KEY `idx_order_id` (`order_id`),
+  KEY `idx_order_no` (`order_no`),
+  KEY `idx_status` (`status`),
+  KEY `idx_payment_method` (`payment_method`),
+  KEY `idx_created_at` (`created_at`),
+  KEY `idx_paid_at` (`paid_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='支付记录表';

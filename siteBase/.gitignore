@@ -1,0 +1,16 @@
+/tianqixintechnology (1)/node_modules
+/tianqixin-frontend/node_modules
+/backend/ElectronicPart/.env
+/backend/ElectronicPart/.env.example
+/backend/ElectronicPart/.example.env
+/tianqixin-admin/.env.development
+/tianqixin-admin/.env.example
+/tianqixin-admin/.env.local
+/tianqixin-admin/.env.production
+/tianqixin-frontend/.env.development
+/tianqixin-frontend/.env
+/tianqixin-frontend/.env.example
+/tianqixin-frontend/.env.production
+/test/node_modules
+/backend/ElectronicPart/runtime
+/backend/ElectronicPart/runtime 

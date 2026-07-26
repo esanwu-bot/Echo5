@@ -1,0 +1,50 @@
+-- 订单表
+CREATE TABLE `orders` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '订单ID',
+    `order_no` VARCHAR(32) NOT NULL DEFAULT '' COMMENT '订单号',
+    `user_id` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '用户ID',
+    `status` VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT '订单状态',
+    `payment_status` VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT '支付状态',
+    `payment_method` TINYINT NOT NULL DEFAULT 1 COMMENT '支付方式：1-微信，2-支付宝，3-银行卡',
+    `goods_amount` DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '商品金额',
+    `delivery_fee` DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '运费',
+    `discount_amount` DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '优惠金额',
+    `total_amount` DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '订单总金额',
+    `address_id` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '收货地址ID',
+    `delivery_method` TINYINT NOT NULL DEFAULT 1 COMMENT '配送方式：1-标准，2-次日达，3-当日达',
+    `coupon_id` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '优惠券ID',
+    `remark` TEXT COMMENT '订单备注',
+    `paid_at` DATETIME NULL COMMENT '支付时间',
+    `shipped_at` DATETIME NULL COMMENT '发货时间',
+    `completed_at` DATETIME NULL COMMENT '完成时间',
+    `cancelled_at` DATETIME NULL COMMENT '取消时间',
+    `cancel_reason` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '取消原因',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `deleted_at` DATETIME NULL COMMENT '删除时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_order_no` (`order_no`),
+    KEY `idx_user_id` (`user_id`),
+    KEY `idx_status` (`status`),
+    KEY `idx_payment_status` (`payment_status`),
+    KEY `idx_created_at` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单表';
+
+-- 订单明细表
+CREATE TABLE `order_items` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '明细ID',
+    `order_id` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '订单ID',
+    `product_id` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '商品ID',
+    `spec_id` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '规格ID',
+    `product_name` VARCHAR(200) NOT NULL DEFAULT '' COMMENT '商品名称',
+    `product_image` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '商品图片',
+    `spec_name` VARCHAR(100) NOT NULL DEFAULT '' COMMENT '规格名称',
+    `price` DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '单价',
+    `quantity` INT NOT NULL DEFAULT 0 COMMENT '数量',
+    `total_amount` DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '小计金额',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_order_id` (`order_id`),
+    KEY `idx_product_id` (`product_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单明细表';

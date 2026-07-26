@@ -1,0 +1,27 @@
+User-agent: *
+Allow: /
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /member
+Disallow: /member/*
+Disallow: /guide
+Disallow: /guide/*
+Disallow: /admin
+Disallow: /api/
+
+# AI 爬虫允许访问
+User-agent: GPTBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+Sitemap: https://tikchip.cn/sitemap.xml

@@ -1,0 +1,63 @@
+# =====================================================================
+# Docker 构建忽略文件
+# =====================================================================
+# 避免将敏感文件、开发文件、构建产物复制进镜像
+# =====================================================================
+
+# ===== 敏感文件（绝不进镜像） =====
+.env
+.env.local
+.env.*.local
+backend/ElectronicPart/.env
+backend/ElectronicPart/.env.*
+deploy/.env
+deploy/backend.env
+
+# ===== Git =====
+.git
+.gitignore
+.gitattributes
+
+# ===== IDE =====
+.idea
+.vscode
+*.swp
+*.swo
+
+# ===== 依赖目录（构建时重新安装） =====
+backend/ElectronicPart/vendor
+tianqixin-frontend/node_modules
+tianqixin-admin/node_modules
+
+# ===== 构建产物（构建时重新生成） =====
+tianqixin-frontend/dist
+tianqixin-frontend/.vite
+tianqixin-admin/.next
+tianqixin-admin/out
+
+# ===== 日志和缓存 =====
+**/*.log
+**/runtime/
+**/.cache/
+
+# ===== 文档 =====
+*.md
+docs/
+
+# ===== Docker 自身（避免循环） =====
+deploy/docker-compose.yml
+deploy/init.sh
+
+# ===== 测试文件 =====
+**/tests/
+**/test/
+**/__tests__/
+**/*.test.js
+**/*.spec.js
+**/*.test.ts
+**/*.spec.ts
+
+# ===== 操作系统文件 =====
+.DS_Store
+Thumbs.db
+desktop.ini

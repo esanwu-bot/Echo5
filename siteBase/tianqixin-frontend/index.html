@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#D60011" />
+    <meta name="description" content="天启芯科技（Tianqixin / Tikchip）是专业的电子元器件采购平台，提供半导体、被动元件、连接器、电阻电容等产品搜索、库存查询、BOM配单与样品申请服务。" />
+
+    <!-- Favicon -->
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/icon-light-32x32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-icon.png" />
+
+    <!-- Open Graph 默认值（页面级 Helmet 会覆盖） -->
+    <meta property="og:title" content="天启芯科技 - 专业电子元器件采购平台" />
+    <meta property="og:description" content="天启芯科技（Tianqixin / Tikchip）是专业的电子元器件采购平台，提供半导体、被动元件、连接器、电阻电容等产品搜索、库存查询、BOM配单与样品申请服务。" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://tikchip.cn/" />
+    <meta property="og:image" content="https://tikchip.cn/logo.png" />
+    <meta property="og:site_name" content="天启芯科技" />
+    <meta property="og:locale" content="zh_CN" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="天启芯科技 - 专业电子元器件采购平台" />
+    <meta name="twitter:description" content="天启芯科技（Tianqixin / Tikchip）是专业的电子元器件采购平台，提供半导体、被动元件、连接器、电阻电容等产品搜索、库存查询、BOM配单与样品申请服务。" />
+    <meta name="twitter:image" content="https://tikchip.cn/logo.png" />
+
+    <!-- Canonical 默认值（页面级 Helmet 会覆盖） -->
+    <link rel="canonical" href="https://tikchip.cn/" />
+
+    <title>天启芯科技 - 专业电子元器件采购平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              brand: {
+                red: '#D60011',
+                dark: '#111827',
+                gray: '#F5F5F5'
+              }
+            },
+            fontFamily: {
+              sans: ['Inter', 'system-ui', 'sans-serif'],
+            }
+          }
+        }
+      }
+    </script>
+    <!-- Google Fonts 在国内不可用，回退到 system-ui -->
+    <!-- 如需 Inter 字体，可下载后放到 public/fonts/ 下本地加载 -->
+    <style>
+      body { font-family: 'Inter', sans-serif; }
+      .clip-slant {
+        clip-path: polygon(0 0, 100% 0, 100% 100%, 15% 100%);
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

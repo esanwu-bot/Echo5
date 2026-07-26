@@ -8,11 +8,7 @@
     "lint": "turbo run lint"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.11.4",
     "turbo": "^2.3.0",
     "typescript": "^5.6.0"
-  },
-  "dependencies": {
-    "@tauri-apps/api": "^2.11.1"
   }
 }

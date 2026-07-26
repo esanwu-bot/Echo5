@@ -37,3 +37,7 @@ tmp/
 
 # Tauri 编译产物
 **/src-tauri/target/
+
+# Wails 编译产物
+**/build/bin/
+**/package.json.md5

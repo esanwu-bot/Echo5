@@ -24,13 +24,13 @@ export default defineConfig({
       plugins: [tailwindcss(), autoprefixer()],
     },
   },
-  // Tauri dev server 端口，与 web 的 3000 错开
+  // Wails dev server 端口，与 web 的 3000 错开；wails.json 里 frontend:dev:serverUrl 同步
   server: { port: 1420, strictPort: true },
   build: {
     target: "es2022",
     outDir: "dist",
     emptyOutDir: true,
   },
-  // 静态资源base，Tauri 用相对路径
+  // 静态资源 base，Wails 用相对路径（//go:embed all:dist 后 assetserver 直接挂载）
   base: "./",
 });

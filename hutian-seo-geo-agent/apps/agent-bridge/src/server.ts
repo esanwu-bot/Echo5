@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { CodeBuddyClient } from "./llm/codebuddy-client.ts";
+import { GrokClient } from "./llm/grok-client.ts";  // 新增：Grok via CLIProxyAPI
 import { MockLLMClient, seoDemoScript } from "./llm/mock-client.ts";
 import { StdioMcpClient } from "./mcp/client.ts";
 import { runAgentLoop } from "./loop/run-agent.ts";
@@ -15,8 +16,19 @@ function sseHead(res: ServerResponse) {
 }
 
 // ── T4.5 · Agent loop 接 SSE ──────────────────────────────────────────
-// 启动时构造 LLM + MCP client；缺 key 时回退 MockLLM（自建loop.md §验收）
+// 启动时构造 LLM + MCP client；缺 key 时回退 MockLLM（自建 loop.md §验收）
+// 优先级：GROK (CLIProxyAPI) > CODEBUDDY (TokenHub) > MOCK
 function buildLLM(): LLMClient {
+  // 1. 优先尝试 Grok (如果配置了 GROK_PROXY_API_KEY)
+  if (process.env.GROK_PROXY_API_KEY) {
+    try {
+      return GrokClient.fromEnv();
+    } catch (e) {
+      console.warn(`[agent-bridge] GrokClient 初始化失败，回退 CodeBuddy: ${(e as Error).message}`);
+    }
+  }
+  
+  // 2. 尝试 CodeBuddy
   try {
     return CodeBuddyClient.fromEnv();
   } catch (e) {

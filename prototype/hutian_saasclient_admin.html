@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>芯联微电子 · 壶天控制台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#14161B; --ink2:#2A2E37; --ink3:#3A3F4A;
+  --paper:#F5F6F8; --white:#FFFFFF; --sink:#EEF0F3;
+  --line:#E6E8EC; --line2:#D5D8DE;
+  --text:#1A1D23; --dim:#565C66; --mut:#7C828C; --faint:#A4AAB3;
+  --teal:#0E9C92; --teal2:#14B8A6; --teal-d:#0B7C75; --teal-soft:#E1F4F2;
+  --green:#16A34A; --green-soft:#E7F6EC; --amber:#D97706; --amber-soft:#FCF1DD;
+  --red:#DC2626; --red-soft:#FCEAEA; --blue:#2563EB; --blue-soft:#E8F0FE; --violet:#7C3AED; --violet-soft:#F0EAFC;
+  --disp:'Space Grotesk','Noto Sans SC',sans-serif;
+  --body:'Noto Sans SC',system-ui,-apple-system,sans-serif;
+  --mono:'JetBrains Mono','Noto Sans SC',monospace;
+  --sh:0 1px 2px rgba(20,22,27,.05),0 8px 24px rgba(20,22,27,.06);
+  --sh-h:0 4px 12px rgba(20,22,27,.08),0 20px 48px rgba(20,22,27,.12);
+  --r:14px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{font-family:var(--body);background:var(--paper);color:var(--text);font-size:13.5px;overflow:hidden;-webkit-font-smoothing:antialiased}
+::selection{background:var(--teal-soft)}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:#D2D6DC;border-radius:8px;border:2px solid var(--paper)}
+.side ::-webkit-scrollbar-thumb{background:#2A2E37;border-color:var(--ink)}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit}
+@keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+@keyframes slidein{from{transform:translateX(100%)}to{transform:none}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(14,156,146,.5)}55%{box-shadow:0 0 0 5px rgba(14,156,146,0)}}
+@keyframes pulseR{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.5)}55%{box-shadow:0 0 0 5px rgba(220,38,38,0)}}
+@keyframes draw{to{stroke-dashoffset:0}}
+@keyframes fly{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:none}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.reveal{opacity:0;transform:translateY(16px);transition:opacity .6s cubic-bezier(.22,1,.36,1),transform .6s cubic-bezier(.22,1,.36,1)}
+.reveal.in{opacity:1;transform:none}
+
+.app{display:flex;height:100vh}
+
+/* ============ SIDEBAR ============ */
+.side{width:248px;flex:0 0 248px;background:var(--ink);color:#C2C7D0;display:flex;flex-direction:column;position:relative;overflow:hidden}
+.side::before{content:"";position:absolute;top:-80px;right:-60px;width:220px;height:220px;background:radial-gradient(circle,rgba(14,156,146,.16),transparent 70%);pointer-events:none}
+.side-top{position:relative;padding:18px 18px 16px;display:flex;align-items:center;gap:11px;border-bottom:1px solid rgba(255,255,255,.07)}
+.side-top .mk{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;background:linear-gradient(135deg,var(--teal),var(--teal2));color:#fff;font-weight:900;font-size:16px;box-shadow:0 4px 14px rgba(14,156,146,.4);flex:0 0 34px}
+.side-top .ti b{font-family:var(--disp);font-size:14.5px;color:#fff;display:block;letter-spacing:.01em}
+.side-top .ti span{font-family:var(--mono);font-size:9px;letter-spacing:.18em;color:#6B7280}
+.side-tenant{position:relative;margin:14px 12px 6px;padding:11px 12px;border-radius:11px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:10px;cursor:pointer;transition:.18s}
+.side-tenant:hover{background:rgba(255,255,255,.07)}
+.side-tenant .ta{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:linear-gradient(135deg,#475569,#334155);color:#fff;font-weight:700;font-size:12px;flex:0 0 30px}
+.side-tenant .tn b{font-size:12.5px;color:#fff;display:block}
+.side-tenant .tn span{font-size:10px;color:#7C828C;font-family:var(--mono)}
+.side-tenant svg{width:14px;height:14px;margin-left:auto;color:#7C828C}
+.nav{position:relative;flex:1;overflow-y:auto;padding:8px 10px}
+.nav-lab{font-size:9.5px;letter-spacing:.16em;color:#5A606B;font-weight:700;padding:14px 10px 7px}
+.nav-lab:first-child{padding-top:6px}
+.ni{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:9px;color:#A8AEB8;font-size:13px;transition:.15s;position:relative;margin-bottom:1px;border:none;background:none;width:100%;text-align:left}
+.ni:hover{background:rgba(255,255,255,.05);color:#fff}
+.ni.on{background:rgba(14,156,146,.14);color:#fff}
+.ni.on::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:3px;background:var(--teal2)}
+.ni svg{width:17px;height:17px;flex:0 0 17px;opacity:.75}
+.ni.on svg{opacity:1;color:var(--teal2)}
+.ni .bdg{margin-left:auto;font-family:var(--mono);font-size:10px;background:rgba(255,255,255,.08);color:#9CA3AF;padding:1px 7px;border-radius:999px}
+.ni .bdg.hot{background:var(--red);color:#fff}
+.ni .bdg.teal{background:rgba(14,156,146,.25);color:var(--teal2)}
+.side-foot{position:relative;border-top:1px solid rgba(255,255,255,.07);padding:13px 16px;font-size:11px;color:#6B7280;line-height:1.7}
+.side-foot b{color:#A8AEB8}
+.side-foot .plan{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;color:var(--teal2);background:rgba(14,156,146,.14);padding:2px 8px;border-radius:5px;margin-bottom:7px}
+
+/* ============ MAIN ============ */
+.main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative}
+.main::before{content:"";position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(rgba(20,22,27,.035) 1px,transparent 1px);background-size:22px 22px;opacity:.7}
+.topbar{position:relative;height:60px;flex:0 0 60px;background:rgba(255,255,255,.85);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:16px;padding:0 28px;z-index:20;transition:box-shadow .25s}
+.topbar.scrolled{box-shadow:0 2px 10px rgba(20,22,27,.06)}
+.crumb{font-size:13px;color:var(--mut);display:flex;align-items:center;gap:8px}
+.crumb b{color:var(--text);font-weight:600}
+.crumb svg{width:13px;height:13px;color:var(--faint)}
+.tb-spacer{flex:1}
+.tb-search{display:flex;align-items:center;gap:9px;width:300px;padding:8px 13px;border:1px solid var(--line);border-radius:10px;background:var(--paper);color:var(--mut);transition:.2s}
+.tb-search:focus-within{border-color:var(--teal);background:#fff;box-shadow:0 0 0 3px var(--teal-soft)}
+.tb-search input{flex:1;border:none;outline:none;background:none;font-size:13px;color:var(--text)}
+.tb-search svg{width:15px;height:15px;flex:0 0 15px}
+.kbd{font-family:var(--mono);font-size:10px;color:var(--faint);border:1px solid var(--line);border-radius:5px;padding:1px 6px}
+.ws-switch{position:relative;display:flex;align-items:center;gap:8px;padding:7px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--text);font-size:13px;font-weight:500;cursor:pointer;transition:.18s}
+.ws-switch:hover{border-color:var(--teal)}
+.ws-switch .wd{width:8px;height:8px;border-radius:50%;background:var(--teal);box-shadow:0 0 7px var(--teal)}
+.ws-switch svg{width:13px;height:13px;color:var(--mut)}
+.ws-menu{position:absolute;top:calc(100% + 8px);right:0;min-width:230px;background:#fff;border:1px solid var(--line2);border-radius:12px;padding:6px;box-shadow:var(--sh-h);display:none;z-index:40}
+.ws-menu.open{display:block;animation:rise .18s cubic-bezier(.34,1.4,.64,1)}
+.ws-menu .wm-lab{font-size:10px;letter-spacing:.12em;color:var(--faint);font-weight:700;padding:7px 10px 5px}
+.ws-menu .wm-i{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--dim);transition:.12s}
+.ws-menu .wm-i:hover{background:var(--paper);color:var(--text)}
+.ws-menu .wm-i.on{color:var(--text)}
+.ws-menu .wm-i .wm-mk{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;font-size:11px;font-weight:800;color:#fff;flex:0 0 24px}
+.ws-menu .wm-i .ck{margin-left:auto;color:var(--teal);opacity:0}
+.ws-menu .wm-i.on .ck{opacity:1}
+.ws-menu .wm-i .ck svg{width:14px;height:14px}
+.tb-ic{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;color:var(--mut);border:1px solid transparent;transition:.15s;position:relative;background:none}
+.tb-ic:hover{color:var(--text);background:var(--sink)}
+.tb-ic svg{width:18px;height:18px}
+.tb-ic .dot{position:absolute;top:8px;right:9px;width:7px;height:7px;border-radius:50%;background:var(--red);border:2px solid #fff}
+.tb-av{display:flex;align-items:center;gap:9px;padding:5px 10px 5px 5px;border-radius:11px;border:1px solid var(--line);background:#fff;cursor:pointer;transition:.18s}
+.tb-av:hover{border-color:var(--teal)}
+.tb-av .av{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:linear-gradient(135deg,var(--teal),var(--teal-d));color:#fff;font-weight:700;font-size:12px}
+.tb-av .an b{font-size:12.5px;display:block;line-height:1.2}
+.tb-av .an span{font-size:10px;color:var(--mut);font-family:var(--mono)}
+.tb-av svg{width:13px;height:13px;color:var(--mut)}
+
+.content{position:relative;flex:1;overflow-y:auto;padding:28px 32px 60px}
+.view{display:none;animation:fadein .3s}
+.view.on{display:block}
+.vh{display:flex;align-items:flex-end;gap:16px;margin-bottom:24px;flex-wrap:wrap}
+.vh h1{font-family:var(--disp);font-size:25px;font-weight:700;letter-spacing:-.015em;line-height:1.1}
+.vh p{font-size:13.5px;color:var(--dim);margin-top:5px;max-width:640px}
+.vh .right{margin-left:auto;display:flex;gap:9px;align-items:center}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;font-weight:600;font-size:13px;border-radius:10px;padding:9px 16px;border:1px solid var(--line2);background:#fff;color:var(--dim);transition:.18s;white-space:nowrap}
+.btn:hover{border-color:var(--teal);color:var(--teal);transform:translateY(-1px)}
+.btn svg{width:15px;height:15px}
+.btn.primary{background:var(--teal);border-color:var(--teal);color:#fff;box-shadow:0 4px 14px rgba(14,156,146,.28)}
+.btn.primary:hover{background:var(--teal2);color:#fff;box-shadow:0 8px 22px rgba(14,156,146,.38)}
+.btn.ink{background:var(--ink);border-color:var(--ink);color:#fff}
+.btn.ink:hover{background:var(--ink2);color:#fff}
+.btn.danger{color:var(--red);border-color:rgba(220,38,38,.3)}
+.btn.danger:hover{background:var(--red-soft);border-color:var(--red);color:var(--red)}
+.btn.ghost{border-color:transparent;background:transparent}
+.btn.sm{padding:6px 11px;font-size:12px}
+.btn[disabled]{opacity:.5;pointer-events:none}
+
+/* chips / tags */
+.chip{font-size:11px;font-weight:600;padding:3px 9px;border-radius:7px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.chip i{width:6px;height:6px;border-radius:50%}
+.chip.teal{color:var(--teal-d);background:var(--teal-soft)} .chip.teal i{background:var(--teal)}
+.chip.green{color:var(--green);background:var(--green-soft)} .chip.green i{background:var(--green)}
+.chip.amber{color:var(--amber);background:var(--amber-soft)} .chip.amber i{background:var(--amber)}
+.chip.red{color:var(--red);background:var(--red-soft)} .chip.red i{background:var(--red)}
+.chip.blue{color:var(--blue);background:var(--blue-soft)} .chip.blue i{background:var(--blue)}
+.chip.violet{color:var(--violet);background:var(--violet-soft)} .chip.violet i{background:var(--violet)}
+.chip.gray{color:var(--dim);background:var(--sink)} .chip.gray i{background:var(--faint)}
+.chip.outline{color:var(--dim);background:transparent;border:1px solid var(--line2)}
+
+/* cards / panels */
+.card{background:#fff;border:1px solid var(--line);border-radius:var(--r);transition:.2s}
+.card.pad{padding:22px 24px}
+.card-h{padding:16px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.card-h h3{font-family:var(--disp);font-size:15px;font-weight:600}
+.card-h .sub{font-size:11.5px;color:var(--mut);font-family:var(--mono)}
+.card-h .more{margin-left:auto;font-size:12px;color:var(--teal);font-weight:600;display:flex;align-items:center;gap:4px;cursor:pointer}
+.card-h .more svg{width:13px;height:13px}
+.card-b{padding:20px 22px}
+
+/* grids */
+.g-4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.g-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.g-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.g-2-1{display:grid;grid-template-columns:1.5fr 1fr;gap:16px}
+.mb{margin-bottom:16px}
+
+/* KPI */
+.kpi{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;position:relative;overflow:hidden;transition:.2s}
+.kpi:hover{transform:translateY(-3px);box-shadow:var(--sh)}
+.kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px}
+.kpi.k1::before{background:var(--teal)} .kpi.k2::before{background:var(--blue)} .kpi.k3::before{background:var(--amber)} .kpi.k4::before{background:var(--violet)}
+.kpi .kl{font-size:11.5px;color:var(--mut);display:flex;align-items:center;gap:6px}
+.kpi .kl svg{width:13px;height:13px;opacity:.7}
+.kpi .kv{font-family:var(--disp);font-size:30px;font-weight:700;margin-top:8px;letter-spacing:-.02em;line-height:1}
+.kpi .kv .u{font-size:14px;color:var(--mut);font-weight:500;margin-left:2px}
+.kpi .kv .frac{font-size:16px;color:var(--faint);font-weight:500}
+.kpi .kd{font-size:11.5px;font-family:var(--mono);margin-top:8px;display:flex;align-items:center;gap:5px}
+.kpi .kd.up{color:var(--green)} .kpi .kd.flat{color:var(--mut)} .kpi .kd.warn{color:var(--amber)}
+.kpi .spark{position:absolute;right:16px;bottom:16px;width:66px;height:26px;opacity:.85}
+.kpi .spark polyline{fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:150;stroke-dashoffset:150;animation:draw 1.4s .3s cubic-bezier(.22,1,.36,1) forwards}
+
+/* trend chart */
+.chart-wrap{position:relative}
+.chart-wrap svg{width:100%;height:170px;display:block}
+.chart-wrap .grid-l{stroke:var(--line);stroke-width:1}
+.chart-wrap .area{fill:url(#tgrad)}
+.chart-wrap .line{fill:none;stroke:var(--teal);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:900;stroke-dashoffset:900;animation:draw 1.6s .3s cubic-bezier(.22,1,.36,1) forwards}
+.chart-wrap .pt{fill:var(--teal)}
+.chart-x{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--faint);margin-top:8px;padding:0 2px}
+
+/* activity mini */
+.act{display:flex;gap:11px;padding:11px 0;border-bottom:1px solid var(--line);font-size:12.5px;align-items:flex-start}
+.act:last-child{border-bottom:none}
+.act .ad{width:7px;height:7px;border-radius:50%;margin-top:5px;flex:0 0 7px}
+.act .ad.teal{background:var(--teal)} .act .ad.green{background:var(--green)} .act .ad.amber{background:var(--amber)} .act .ad.blue{background:var(--blue)}
+.act .at{flex:1;color:var(--dim);line-height:1.5}
+.act .at b{color:var(--text);font-weight:600}
+.act .at code{font-family:var(--mono);font-size:11px;background:var(--sink);padding:1px 5px;border-radius:4px;color:var(--teal-d)}
+.act .aw{font-family:var(--mono);font-size:10.5px;color:var(--faint);flex:0 0 auto}
+
+/* todo list */
+.todo{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.todo:last-child{border-bottom:none}
+.todo .ti-ic{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;flex:0 0 32px}
+.todo .ti-ic svg{width:16px;height:16px}
+.todo .ti-ic.amber{background:var(--amber-soft);color:var(--amber)} .todo .ti-ic.red{background:var(--red-soft);color:var(--red)} .todo .ti-ic.blue{background:var(--blue-soft);color:var(--blue)}
+.todo .tt{flex:1;min-width:0}
+.todo .tt b{font-size:13px;display:block}
+.todo .tt span{font-size:11.5px;color:var(--mut)}
+
+/* table */
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl thead th{text-align:left;font-size:10.5px;letter-spacing:.06em;color:var(--mut);font-weight:700;text-transform:uppercase;padding:11px 22px;border-bottom:1px solid var(--line);background:var(--paper);white-space:nowrap}
+.tbl tbody td{padding:13px 22px;border-bottom:1px solid var(--line);color:var(--dim);vertical-align:middle}
+.tbl tbody tr{transition:background .12s}
+.tbl tbody tr:hover{background:var(--paper)}
+.tbl tbody tr:last-child td{border-bottom:none}
+.tbl .who{display:flex;align-items:center;gap:11px}
+.tbl .who .av{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;font-weight:700;font-size:12px;color:#fff;flex:0 0 32px}
+.tbl .who b{color:var(--text);font-weight:600;display:block}
+.tbl .who small{font-size:11px;color:var(--mut);font-family:var(--mono)}
+.mono{font-family:var(--mono);font-size:12px}
+.row-act{display:flex;gap:5px;opacity:0;transition:opacity .15s;justify-content:flex-end}
+.tbl tbody tr:hover .row-act{opacity:1}
+.ra{width:28px;height:28px;border-radius:7px;display:grid;place-items:center;color:var(--mut);border:1px solid transparent;transition:.12s;background:none}
+.ra:hover{color:var(--teal);background:var(--teal-soft)}
+.ra.danger:hover{color:var(--red);background:var(--red-soft)}
+.ra svg{width:14px;height:14px}
+
+/* filters */
+.filters{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.flt{font-size:12px;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--mut);transition:.15s}
+.flt:hover{border-color:var(--line2);color:var(--dim)}
+.flt.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.flt .c{font-family:var(--mono);opacity:.7;margin-left:4px}
+
+/* role matrix */
+.matrix{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px}
+.matrix th,.matrix td{padding:9px 12px;border-bottom:1px solid var(--line);text-align:center}
+.matrix th{font-size:11px;color:var(--mut);font-weight:700;background:var(--paper)}
+.matrix th:first-child,.matrix td:first-child{text-align:left;color:var(--text);font-weight:600}
+.matrix td:first-child{font-size:12px}
+.matrix .y{color:var(--teal);font-weight:700} .matrix .n{color:var(--faint)}
+.matrix .p{color:var(--amber);font-weight:700}
+
+/* workspace brand card */
+.ws-card{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:20px;transition:.22s;cursor:pointer;position:relative}
+.ws-card:hover{transform:translateY(-3px);box-shadow:var(--sh);border-color:var(--teal)}
+.ws-card .wc-top{display:flex;align-items:center;gap:12px}
+.ws-card .wc-mk{width:42px;height:42px;border-radius:11px;display:grid;place-items:center;font-weight:800;font-size:17px;color:#fff;flex:0 0 42px}
+.ws-card .wc-top h4{font-family:var(--disp);font-size:16px;font-weight:600}
+.ws-card .wc-top .own{font-size:11.5px;color:var(--mut);margin-top:1px}
+.ws-card .wc-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.ws-card .wc-meta div span{font-size:10.5px;color:var(--mut);display:block}
+.ws-card .wc-meta div b{font-family:var(--disp);font-size:18px;font-weight:600}
+.ws-card .wc-sites{margin-top:13px;display:flex;flex-wrap:wrap;gap:6px}
+.ws-card .wc-sites .e{font-family:var(--mono);font-size:10.5px;color:var(--dim);background:var(--sink);padding:2px 8px;border-radius:5px;display:flex;align-items:center;gap:5px}
+.ws-card .wc-sites .e .v{width:5px;height:5px;border-radius:50%;background:var(--green)}
+.ws-card .wc-sites .e .x{width:5px;height:5px;border-radius:50%;background:var(--amber)}
+
+/* BYOK provider card */
+.prov{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;transition:.2s}
+.prov:hover{border-color:var(--line2);box-shadow:var(--sh)}
+.prov.default{border-color:var(--teal);box-shadow:0 0 0 1px var(--teal) inset}
+.prov .pv-top{display:flex;align-items:center;gap:12px}
+.prov .pv-ic{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;font-weight:800;font-size:13px;color:#fff;flex:0 0 40px;font-family:var(--disp)}
+.prov .pv-nm{font-family:var(--disp);font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
+.prov .pv-st{margin-left:auto;display:flex;align-items:center;gap:7px;font-size:12px;font-family:var(--mono)}
+.prov .pv-st .sd{width:8px;height:8px;border-radius:50%}
+.prov .pv-st.ok{color:var(--green)} .prov .pv-st.ok .sd{background:var(--green);animation:pulse 2.2s infinite}
+.prov .pv-st.none{color:var(--faint)} .prov .pv-st.none .sd{background:var(--faint)}
+.prov .pv-st.bad{color:var(--red)} .prov .pv-st.bad .sd{background:var(--red);animation:pulseR 2.2s infinite}
+.prov .pv-body{margin-top:14px}
+.key-field{display:flex;align-items:center;gap:8px;border:1px solid var(--line2);border-radius:10px;padding:0 4px 0 12px;background:var(--paper);transition:.18s}
+.key-field:focus-within{border-color:var(--teal);background:#fff;box-shadow:0 0 0 3px var(--teal-soft)}
+.key-field input{flex:1;border:none;outline:none;background:none;font-family:var(--mono);font-size:12.5px;color:var(--text);padding:10px 0;letter-spacing:.03em}
+.key-field .kf-b{width:30px;height:30px;border-radius:7px;display:grid;place-items:center;color:var(--mut);background:none;border:none;transition:.12s}
+.key-field .kf-b:hover{color:var(--teal);background:var(--teal-soft)}
+.key-field .kf-b svg{width:15px;height:15px}
+.prov .pv-actions{display:flex;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap}
+.prov .pv-use{font-size:11.5px;color:var(--mut);margin-left:auto;font-family:var(--mono)}
+.test-msg{margin-top:11px;font-size:12px;display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:9px;animation:fly .3s both}
+.test-msg.ok{background:var(--green-soft);color:var(--green)}
+.test-msg.busy{background:var(--sink);color:var(--dim)}
+.test-msg.err{background:var(--red-soft);color:var(--red)}
+.test-msg .sp{width:13px;height:13px;border-radius:50%;border:2px solid currentColor;border-top-color:transparent;animation:spin .7s linear infinite;flex:0 0 13px}
+.test-msg svg{width:14px;height:14px;flex:0 0 14px}
+
+/* billing source toggle */
+.src-toggle{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.src-opt{border:1px solid var(--line);border-radius:12px;padding:16px 18px;cursor:pointer;transition:.2s;position:relative;background:#fff}
+.src-opt:hover{border-color:var(--line2)}
+.src-opt.on{border-color:var(--teal);background:var(--teal-soft)}
+.src-opt.on::after{content:"";position:absolute;top:14px;right:14px;width:18px;height:18px;border-radius:50%;background:var(--teal) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6L9 17l-5-5'/%3E%3C/svg%3E") center/11px no-repeat}
+.src-opt h4{font-family:var(--disp);font-size:14.5px;font-weight:600;display:flex;align-items:center;gap:8px}
+.src-opt h4 .rc{font-family:var(--mono);font-size:9.5px;font-weight:700;color:#fff;background:var(--teal);padding:2px 7px;border-radius:5px}
+.src-opt p{font-size:12px;color:var(--dim);margin-top:6px;line-height:1.6}
+
+/* save banner */
+.save-banner{display:flex;align-items:center;gap:14px;padding:16px 20px;background:linear-gradient(100deg,var(--teal-soft),#fff);border:1px solid rgba(14,156,146,.3);border-radius:12px}
+.save-banner .sb-ic{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:var(--teal);color:#fff;flex:0 0 44px}
+.save-banner .sb-ic svg{width:22px;height:22px}
+.save-banner .sb-t b{font-family:var(--disp);font-size:15px}
+.save-banner .sb-t span{font-size:12.5px;color:var(--dim);display:block;margin-top:2px}
+.save-banner .sb-amt{margin-left:auto;font-family:var(--disp);font-size:26px;font-weight:700;color:var(--teal-d)}
+.save-banner .sb-amt small{font-size:11px;color:var(--mut);font-weight:500;display:block;text-align:right;font-family:var(--mono)}
+
+/* log row */
+.logr{display:flex;gap:13px;padding:13px 22px;border-bottom:1px solid var(--line);font-size:12.5px;align-items:flex-start;transition:background .12s}
+.logr:hover{background:var(--paper)}
+.logr .ld{width:8px;height:8px;border-radius:50%;margin-top:5px;flex:0 0 8px}
+.logr .ld.teal{background:var(--teal)} .logr .ld.green{background:var(--green)} .logr .ld.amber{background:var(--amber)} .logr .ld.red{background:var(--red)} .logr .ld.blue{background:var(--blue)} .logr .ld.violet{background:var(--violet)}
+.logr .lb{flex:1;min-width:0}
+.logr .lb .lt-main{color:var(--text);line-height:1.55}
+.logr .lb .lt-main b{font-weight:600}
+.logr .lb .lt-main code{font-family:var(--mono);font-size:11px;background:var(--sink);padding:1px 5px;border-radius:4px;color:var(--teal-d)}
+.logr .lb .lt-meta{font-size:11px;color:var(--mut);margin-top:3px;display:flex;gap:10px;flex-wrap:wrap}
+.logr .lb .lt-meta .tag{font-family:var(--mono);font-size:10px;color:var(--dim);background:var(--sink);padding:1px 7px;border-radius:5px}
+.logr .lw{font-family:var(--mono);font-size:10.5px;color:var(--faint);flex:0 0 auto;white-space:nowrap}
+
+/* tickets */
+.tkt{display:flex;gap:14px;padding:16px 22px;border-bottom:1px solid var(--line);cursor:pointer;transition:background .12s;align-items:flex-start}
+.tkt:hover{background:var(--paper)}
+.tkt .tk-pri{width:3px;align-self:stretch;border-radius:3px;flex:0 0 3px}
+.tkt .tk-pri.high{background:var(--red)} .tkt .tk-pri.med{background:var(--amber)} .tkt .tk-pri.low{background:var(--blue)}
+.tkt .tk-b{flex:1;min-width:0}
+.tkt .tk-b .tk-t{font-size:14px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:9px}
+.tkt .tk-b .tk-t .tid{font-family:var(--mono);font-size:11px;color:var(--faint);font-weight:400}
+.tkt .tk-b .tk-snip{font-size:12.5px;color:var(--dim);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tkt .tk-b .tk-meta{font-size:11px;color:var(--mut);margin-top:8px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.tkt .tk-b .tk-meta .ws{font-family:var(--mono);font-size:10.5px;color:var(--dim);background:var(--sink);padding:1px 7px;border-radius:5px}
+.tkt .tk-r{flex:0 0 auto;text-align:right}
+.tkt .tk-r .tk-who{font-size:11.5px;color:var(--dim)}
+.tkt .tk-r .tk-time{font-size:10.5px;color:var(--faint);font-family:var(--mono);margin-top:3px}
+
+/* ticket detail thread */
+.tkt-detail{display:none}
+.tkt-detail.on{display:block;animation:fadein .25s}
+.tkt-back{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--mut);margin-bottom:16px;cursor:pointer;background:none;border:none}
+.tkt-back:hover{color:var(--teal)}
+.tkt-back svg{width:14px;height:14px}
+.thread{display:flex;flex-direction:column;gap:14px;margin-bottom:18px}
+.msg{display:flex;gap:12px;max-width:760px}
+.msg.me{flex-direction:row-reverse;margin-left:auto}
+.msg .m-av{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-weight:700;font-size:12px;color:#fff;flex:0 0 34px}
+.msg .m-av.sup{background:linear-gradient(135deg,#475569,#334155)}
+.msg .m-av.me{background:linear-gradient(135deg,var(--teal),var(--teal-d))}
+.msg .m-bub{background:#fff;border:1px solid var(--line);border-radius:4px 14px 14px 14px;padding:13px 16px;font-size:13px;line-height:1.7;color:var(--dim)}
+.msg.me .m-bub{background:var(--teal-soft);border-color:rgba(14,156,146,.25);border-radius:14px 4px 14px 14px;color:var(--text)}
+.msg .m-bub b{color:var(--text)}
+.msg .m-bub code{font-family:var(--mono);font-size:11.5px;background:var(--sink);padding:1px 6px;border-radius:5px;color:var(--teal-d)}
+.msg .m-meta{font-size:10.5px;color:var(--faint);margin-top:5px;font-family:var(--mono)}
+.msg.me .m-meta{text-align:right}
+.ctx-card{background:var(--paper);border:1px dashed var(--line2);border-radius:10px;padding:11px 14px;margin-top:10px;font-size:12px;color:var(--dim)}
+.ctx-card .cc-t{font-size:10px;letter-spacing:.1em;color:var(--mut);font-weight:700;margin-bottom:6px}
+.ctx-card code{font-family:var(--mono);font-size:11px;color:var(--teal-d)}
+.reply-box{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;max-width:760px}
+.reply-box textarea{width:100%;border:none;outline:none;resize:none;padding:14px 16px 6px;font-size:13px;line-height:1.6;color:var(--text);min-height:56px;background:transparent}
+.reply-box textarea::placeholder{color:var(--faint)}
+.reply-box .rb-f{display:flex;align-items:center;gap:8px;padding:8px 12px 12px}
+.reply-box .rb-f .hint{font-size:11px;color:var(--faint);font-family:var(--mono)}
+
+/* forms */
+.field{margin-bottom:16px}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--dim);margin-bottom:6px}
+.field input,.field select,.field textarea{width:100%;padding:10px 12px;border:1px solid var(--line2);border-radius:10px;font-size:13px;color:var(--text);background:#fff;outline:none;transition:.15s}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft)}
+.field .hint{font-size:11px;color:var(--mut);margin-top:5px}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.sec-t{font-size:10.5px;letter-spacing:.12em;color:var(--mut);font-weight:700;margin:4px 0 12px}
+.checks{display:flex;flex-direction:column;gap:8px}
+.check{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--dim);padding:8px 11px;border:1px solid var(--line);border-radius:9px;cursor:pointer;transition:.12s}
+.check:hover{border-color:var(--teal)}
+.check input{width:auto}
+.check.on{border-color:var(--teal);background:var(--teal-soft);color:var(--text)}
+
+/* usage bar */
+.ubar{height:8px;border-radius:5px;background:var(--sink);overflow:hidden}
+.ubar i{display:block;height:100%;border-radius:5px;background:var(--teal);transition:width 1s cubic-bezier(.22,1,.36,1)}
+.ubar i.warn{background:var(--amber)} .ubar i.over{background:var(--red)}
+
+/* danger zone */
+.danger{border:1px solid rgba(220,38,38,.3);border-radius:12px;padding:18px 20px;display:flex;align-items:center;gap:14px}
+.danger .dz-ic{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:var(--red-soft);color:var(--red);flex:0 0 40px}
+.danger .dz-ic svg{width:20px;height:20px}
+.danger .dz-t b{font-size:14px;color:var(--red);display:block}
+.danger .dz-t span{font-size:12px;color:var(--dim)}
+
+/* drawer */
+.scrim{position:fixed;inset:0;background:rgba(20,22,27,.42);backdrop-filter:blur(2px);z-index:80;opacity:0;pointer-events:none;transition:opacity .25s}
+.scrim.open{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:480px;max-width:92vw;background:#fff;z-index:90;box-shadow:-20px 0 60px rgba(20,22,27,.2);transform:translateX(100%);transition:transform .32s cubic-bezier(.22,1,.36,1);display:flex;flex-direction:column}
+.drawer.open{transform:none}
+.drawer-h{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+.drawer-h h3{font-family:var(--disp);font-size:17px;font-weight:700}
+.drawer-h .x{margin-left:auto;width:32px;height:32px;border-radius:8px;display:grid;place-items:center;color:var(--mut);border:1px solid var(--line);transition:.15s;background:none}
+.drawer-h .x:hover{color:var(--text);background:var(--sink)}
+.drawer-h .x svg{width:16px;height:16px}
+.drawer-b{flex:1;overflow-y:auto;padding:20px 22px}
+.drawer-f{padding:14px 22px;border-top:1px solid var(--line);display:flex;gap:9px;justify-content:flex-end}
+
+/* modal */
+.modal{position:fixed;inset:0;z-index:100;display:grid;place-items:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.modal.open{opacity:1;pointer-events:auto}
+.modal .scrim2{position:absolute;inset:0;background:rgba(20,22,27,.5)}
+.modal .box{position:relative;background:#fff;border-radius:16px;width:430px;max-width:92vw;padding:26px;box-shadow:var(--sh-h);animation:rise .25s both}
+.modal .box .mi{width:48px;height:48px;border-radius:13px;display:grid;place-items:center;background:var(--red-soft);color:var(--red);margin-bottom:14px}
+.modal .box .mi svg{width:24px;height:24px}
+.modal .box h3{font-family:var(--disp);font-size:18px;font-weight:700}
+.modal .box p{font-size:13.5px;color:var(--dim);margin-top:8px;line-height:1.7}
+.modal .box p code{font-family:var(--mono);font-size:12px;background:var(--sink);padding:1px 6px;border-radius:5px}
+.modal .box .acts{display:flex;gap:9px;justify-content:flex-end;margin-top:22px}
+
+/* toast */
+.toasts{position:fixed;right:22px;bottom:22px;z-index:120;display:flex;flex-direction:column;gap:9px;align-items:flex-end}
+.toast{display:flex;align-items:center;gap:10px;background:var(--ink);color:#fff;padding:12px 16px;border-radius:11px;font-size:13px;box-shadow:var(--sh-h);animation:fly .3s cubic-bezier(.34,1.4,.64,1) both;border-left:3px solid var(--teal)}
+.toast svg{width:16px;height:16px;flex:0 0 16px}
+.toast.ok svg{color:var(--green)} .toast.warn svg{color:var(--amber)} .toast.err svg{color:var(--red)} .toast svg{color:var(--teal2)}
+.toast.out{opacity:0;transform:translateX(20px);transition:.3s}
+
+@media (max-width:1180px){.g-4{grid-template-columns:repeat(2,1fr)}.g-2-1{grid-template-columns:1fr}}
+@media (max-width:980px){.side{display:none}.g-3{grid-template-columns:1fr}.g-2{grid-template-columns:1fr}.src-toggle{grid-template-columns:1fr}.tb-search{display:none}}
+</style>
+</head>
+<body>
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+<symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></symbol>
+<symbol id="i-box" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M21 8l-9-5-9 5v8l9 5 9-5V8z"/><path d="M3 8l9 5 9-5M12 13v8"/></symbol>
+<symbol id="i-key" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L20 3M16 7l3 3M14 9l2 2"/></symbol>
+<symbol id="i-log" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/><path d="M14 2v6h6M8 13h8M8 17h6"/></symbol>
+<symbol id="i-ticket" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8a2 2 0 012-2h14a2 2 0 012 2 2 2 0 000 4 2 2 0 01-2 2H5a2 2 0 01-2-2 2 2 0 000-4z"/><path d="M13 6v2M13 12v2M13 16v2" stroke-dasharray="1 3"/></symbol>
+<symbol id="i-card" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20M6 15h4"/></symbol>
+<symbol id="i-set" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.7 1.7 0 00-1.87-.34 1.7 1.7 0 00-1 1.55V21a2 2 0 11-4 0v-.09a1.7 1.7 0 00-1-1.55 1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.7 1.7 0 004.6 15a1.7 1.7 0 00-1.55-1H3a2 2 0 110-4h.09a1.7 1.7 0 001.55-1 1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06A1.7 1.7 0 009 4.6a1.7 1.7 0 001-1.55V3a2 2 0 114 0v.09a1.7 1.7 0 001 1.55 1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06a1.7 1.7 0 00-.34 1.87 1.7 1.7 0 001.55 1H21a2 2 0 110 4h-.09a1.7 1.7 0 00-1.55 1z"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></symbol>
+<symbol id="i-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></symbol>
+<symbol id="i-chevl" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 10-12 0c0 7-3 8-3 8h18s-3-1-3-8M10.3 21a2 2 0 003.4 0"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></symbol>
+<symbol id="i-eyeoff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18M10.6 10.6a2.6 2.6 0 003.7 3.7M9.4 5.2A9.6 9.6 0 0112 5c6.5 0 10 7 10 7a17 17 0 01-3.2 4M6.1 6.1A17 17 0 002 12s3.5 7 10 7a9.6 9.6 0 003-.5"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></symbol>
+<symbol id="i-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></symbol>
+<symbol id="i-bolt" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
+<symbol id="i-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 010 18 15 15 0 010-18z"/></symbol>
+<symbol id="i-plug" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6M15 2v6M7 8h10v3a5 5 0 01-10 0V8zM12 16v6"/></symbol>
+<symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+<symbol id="i-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+<symbol id="i-warn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3L2 20h20L12 3z"/><path d="M12 10v4M12 17.2v.1"/></symbol>
+<symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 11-2.6-6.4M21 3v6h-6"/></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.8 5.4L19 9l-5.2 1.6L12 16l-1.8-5.4L5 9l5.2-1.6L12 2z"/></symbol>
+<symbol id="i-send" viewBox="0 0 24 24" fill="currentColor"><path d="M3 11l19-8-8 19-2.5-8.5L3 11z"/></symbol>
+<symbol id="i-zap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></symbol>
+</svg>
+
+<div class="app">
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="side">
+    <div class="side-top">
+      <div class="mk">壶</div>
+      <div class="ti"><b>壶天</b><span>CUSTOMER CONSOLE</span></div>
+    </div>
+    <div class="side-tenant" onclick="toast('切换组织：仅 owner 可见其它组织','')">
+      <div class="ta">芯</div>
+      <div class="tn"><b>芯联微电子</b><span>T-1088 · 企业版</span></div>
+      <svg><use href="#i-chev"/></svg>
+    </div>
+    <nav class="nav">
+      <div class="nav-lab">管理</div>
+      <button class="ni on" data-view="overview"><svg><use href="#i-grid"/></svg>概览</button>
+      <button class="ni" data-view="members"><svg><use href="#i-users"/></svg>团队成员<span class="bdg">6</span></button>
+      <button class="ni" data-view="workspaces"><svg><use href="#i-box"/></svg>工作空间 · 品牌<span class="bdg">2</span></button>
+      <button class="ni" data-view="keys"><svg><use href="#i-key"/></svg>API 密钥 · BYOK<span class="bdg teal">BYOK</span></button>
+      <div class="nav-lab">记录</div>
+      <button class="ni" data-view="activity"><svg><use href="#i-log"/></svg>工作日志</button>
+      <button class="ni" data-view="tickets"><svg><use href="#i-ticket"/></svg>工单<span class="bdg hot">2</span></button>
+      <div class="nav-lab">账户</div>
+      <button class="ni" data-view="billing"><svg><use href="#i-card"/></svg>账单与订阅</button>
+      <button class="ni" data-view="settings"><svg><use href="#i-set"/></svg>设置</button>
+    </nav>
+    <div class="side-foot">
+      <span class="plan">● 企业版 · 15 席位</span><br>
+      本期 2026-08-07 续约<br>由 <b>壶天</b> 提供 · v2.0
+    </div>
+  </aside>
+
+  <!-- ===== MAIN ===== -->
+  <div class="main">
+    <header class="topbar" id="topbar">
+      <div class="crumb"><span>控制台</span><svg><use href="#i-chevl"/></svg><b id="crumbView">概览</b></div>
+      <div class="tb-spacer"></div>
+      <div class="tb-search"><svg><use href="#i-search"/></svg><input placeholder="搜索成员 / 品牌 / 工单 / 日志…"><span class="kbd">⌘K</span></div>
+      <div class="ws-switch" id="wsSwitch">
+        <span class="wd"></span><span id="wsLabel">芯联 X-Link</span><svg><use href="#i-chev"/></svg>
+        <div class="ws-menu" id="wsMenu">
+          <div class="wm-lab">切换工作空间（品牌）</div>
+          <div class="wm-i on" data-ws="芯联 X-Link"><span class="wm-mk" style="background:linear-gradient(135deg,#0E9C92,#0B7C75)">芯</span>芯联 X-Link<span class="ck"><svg><use href="#i-check"/></svg></span></div>
+          <div class="wm-i" data-ws="X-Link 车规线"><span class="wm-mk" style="background:linear-gradient(135deg,#D97706,#B45309)">车</span>X-Link 车规线<span class="ck"><svg><use href="#i-check"/></svg></span></div>
+          <div class="wm-i" data-ws="全部工作空间"><span class="wm-mk" style="background:#475569">全</span>全部工作空间<span class="ck"><svg><use href="#i-check"/></svg></span></div>
+        </div>
+      </div>
+      <button class="tb-ic" title="通知"><svg><use href="#i-bell"/></svg><span class="dot"></span></button>
+      <div class="tb-av"><div class="av">王</div><div class="an"><b>王建国</b><span>owner</span></div><svg><use href="#i-chev"/></svg></div>
+    </header>
+
+    <div class="content" id="content">
+
+      <!-- ============ OVERVIEW ============ -->
+      <section class="view on" data-view="overview">
+        <div class="vh">
+          <div><h1>下午好，建国 👋</h1><p>这是 <b>芯联微电子</b> 在壶天的控制台。管理你的团队、品牌工作空间、模型密钥，并查看团队的工作记录。</p></div>
+          <div class="right"><button class="btn" onclick="switchView('keys')"><svg><use href="#i-key"/></svg>管理密钥</button><button class="btn primary" onclick="openDrawer('invite')"><svg><use href="#i-plus"/></svg>邀请成员</button></div>
+        </div>
+
+        <div class="g-4 mb">
+          <div class="kpi k1 reveal"><div class="kl"><svg><use href="#i-users"/></svg>团队成员</div><div class="kv"><span class="cnt" data-to="6">0</span><span class="frac"> / 15</span></div><div class="kd flat">席位余 9</div></div>
+          <div class="kpi k2 reveal" style="transition-delay:.05s"><div class="kl"><svg><use href="#i-bolt"/></svg>本月诊断调用</div><div class="kv"><span class="cnt" data-to="3820">0</span></div><div class="kd up"><svg width="12" height="12"><use href="#i-up"/></svg>配额 8,000</div><svg class="spark" viewBox="0 0 66 26"><polyline points="2,20 12,17 22,18 32,12 42,14 52,8 62,6" stroke="var(--blue)"/></svg></div>
+          <div class="kpi k3 reveal" style="transition-delay:.1s"><div class="kl"><svg><use href="#i-box"/></svg>品牌 / 站点</div><div class="kv"><span class="cnt" data-to="2">0</span><span class="frac"> / 4</span></div><div class="kd flat">2 品牌 · 4 站点</div></div>
+          <div class="kpi k4 reveal" style="transition-delay:.15s"><div class="kl"><svg><use href="#i-key"/></svg>LLM 来源</div><div class="kv" style="font-size:21px;line-height:1.3">BYOK<span class="frac" style="font-size:13px"> 优先</span></div><div class="kd up">本月省 ¥1,284</div></div>
+        </div>
+
+        <div class="g-2-1 mb">
+          <div class="card reveal">
+            <div class="card-h"><h3>近 7 日 Agent 调用</h3><span class="sub">run_diagnosis · check_schema · submit_sitemap</span><span class="more">明细<svg><use href="#i-arrow"/></svg></span></div>
+            <div class="card-b">
+              <div class="chart-wrap">
+                <svg viewBox="0 0 600 170" preserveAspectRatio="none">
+                  <defs><linearGradient id="tgrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgba(14,156,146,.2)"/><stop offset="1" stop-color="rgba(14,156,146,0)"/></linearGradient></defs>
+                  <line class="grid-l" x1="0" y1="42" x2="600" y2="42"/><line class="grid-l" x1="0" y1="85" x2="600" y2="85"/><line class="grid-l" x1="0" y1="128" x2="600" y2="128"/>
+                  <polygon class="area" points="0,140 86,112 172,120 258,78 344,90 430,48 516,58 600,26 600,170 0,170"/>
+                  <polyline class="line" points="0,140 86,112 172,120 258,78 344,90 430,48 516,58 600,26"/>
+                  <g class="pt"><circle cx="258" cy="78" r="3.5"/><circle cx="430" cy="48" r="3.5"/><circle cx="600" cy="26" r="3.5"/></g>
+                </svg>
+              </div>
+              <div class="chart-x"><span>周一</span><span>周二</span><span>周三</span><span>周四</span><span>周五</span><span>周六</span><span>周日</span></div>
+            </div>
+          </div>
+          <div class="card reveal" style="transition-delay:.08s">
+            <div class="card-h"><h3>需你处理</h3></div>
+            <div class="card-b" style="padding:8px 22px 16px">
+              <div class="todo"><div class="ti-ic red"><svg><use href="#i-warn"/></svg></div><div class="tt"><b>车规线站点配额将超额</b><span>本月已用 92%，预计 3 日后触顶</span></div><button class="btn sm" onclick="switchView('billing')">查看</button></div>
+              <div class="todo"><div class="ti-ic amber"><svg><use href="#i-globe"/></svg></div><div class="tt"><b>1 个站点待验证所有权</b><span>auto.xinlian-semi.cn · DNS TXT</span></div><button class="btn sm" onclick="switchView('workspaces')">验证</button></div>
+              <div class="todo"><div class="ti-ic blue"><svg><use href="#i-ticket"/></svg></div><div class="tt"><b>2 条工单待你回复</b><span>壶天支持团队已留言</span></div><button class="btn sm" onclick="switchView('tickets')">打开</button></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card reveal">
+          <div class="card-h"><h3>团队最近活动</h3><span class="sub">本租户 · 实时</span><span class="more" onclick="switchView('activity')">全部日志<svg><use href="#i-arrow"/></svg></span></div>
+          <div class="card-b" style="padding:6px 22px 14px">
+            <div class="act"><span class="ad green"></span><div class="at"><b>李婷</b> 批准 <code>entity_rename</code> 写盘 · 芯联 X-Link · 替换 428 处</div><span class="aw">14:52</span></div>
+            <div class="act"><span class="ad teal"></span><div class="at"><b>陈工</b> 运行 <code>run_diagnosis</code> · auto.xinlian-semi.cn · GEO 78→84</div><span class="aw">13:10</span></div>
+            <div class="act"><span class="ad blue"></span><div class="at"><b>王建国</b> 轮换 DeepSeek API 密钥 · BYOK</div><span class="aw">11:48</span></div>
+            <div class="act"><span class="ad amber"></span><div class="at"><b>赵敏</b> 提交工单 <code>#T-2207</code> · 关联会话 S-041</div><span class="aw">10:02</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ MEMBERS ============ -->
+      <section class="view" data-view="members">
+        <div class="vh">
+          <div><h1>团队成员</h1><p>邀请同事加入芯联微电子，分配角色，并限定每人可操作的品牌工作空间。子账户的权限粒度到品牌。</p></div>
+          <div class="right"><span class="chip gray">6 / 15 席位</span><button class="btn primary" onclick="openDrawer('invite')"><svg><use href="#i-plus"/></svg>邀请成员</button></div>
+        </div>
+
+        <div class="card mb">
+          <div class="card-h" style="border-bottom:1px solid var(--line)">
+            <div class="filters" id="memFilters">
+              <button class="flt on" data-role="all">全部</button>
+              <button class="flt" data-role="owner">owner</button>
+              <button class="flt" data-role="admin">admin</button>
+              <button class="flt" data-role="operator">operator</button>
+              <button class="flt" data-role="viewer">viewer</button>
+            </div>
+            <button class="btn sm ghost" style="margin-left:auto" onclick="document.getElementById('matrixWrap').style.display=document.getElementById('matrixWrap').style.display==='none'?'block':'none'">角色权限说明</button>
+          </div>
+          <div id="matrixWrap" style="display:none;padding:18px 22px;border-bottom:1px solid var(--line);background:var(--paper)">
+            <table class="matrix">
+              <thead><tr><th>能力 ＼ 角色</th><th>owner</th><th>admin</th><th>operator</th><th>viewer</th></tr></thead>
+              <tbody>
+                <tr><td>运行诊断 / 修补 / 提交</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="n">—</td></tr>
+                <tr><td>批准写盘类操作（entity_rename 等）</td><td class="y">✓</td><td class="y">✓</td><td class="p">限作用域</td><td class="n">—</td></tr>
+                <tr><td>管理成员 / 角色</td><td class="y">✓</td><td class="y">✓</td><td class="n">—</td><td class="n">—</td></tr>
+                <tr><td>管理 BYOK 密钥 / 账单</td><td class="y">✓</td><td class="p">仅查看</td><td class="n">—</td><td class="n">—</td></tr>
+                <tr><td>查看工作日志 / 工单</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="tbl-wrap" style="overflow-x:auto">
+            <table class="tbl">
+              <thead><tr><th>成员</th><th>角色</th><th>可访问品牌</th><th>状态</th><th>加入</th><th style="text-align:right">操作</th></tr></thead>
+              <tbody id="memBody">
+                <tr data-role="owner"><td><div class="who"><span class="av" style="background:linear-gradient(135deg,#0E9C92,#0B7C75)">王</span><div><b>王建国</b><small>jianguo@xinlian-semi.cn · 你</small></div></div></td><td><span class="chip teal"><i></i>owner</span></td><td><span class="chip outline">全部</span></td><td><span class="chip green"><i></i>活跃</span></td><td class="mono" style="color:var(--mut)">2025-03-04</td><td><div class="row-act"><span class="ra" style="opacity:.4;pointer-events:none"><svg><use href="#i-edit"/></svg></span></div></td></tr>
+                <tr data-role="admin"><td><div class="who"><span class="av" style="background:linear-gradient(135deg,#7C3AED,#6D28D9)">李</span><div><b>李婷</b><small>ting.li@xinlian-semi.cn</small></div></div></td><td><span class="chip violet"><i></i>admin</span></td><td><span class="chip outline">全部</span></td><td><span class="chip green"><i></i>活跃</span></td><td class="mono" style="color:var(--mut)">2025-03-11</td><td><div class="row-act"><button class="ra" title="编辑" onclick="toast('编辑成员：李婷','')"><svg><use href="#i-edit"/></svg></button><button class="ra danger" title="移除" onclick="openModal('移除成员','确认将 李婷 移出芯联微电子？其所有会话与 BYOK 视图权限将立即失效。','移除')"><svg><use href="#i-trash"/></svg></button></div></td></tr>
+                <tr data-role="operator"><td><div class="who"><span class="av" style="background:linear-gradient(135deg,#2563EB,#1D4ED8)">陈</span><div><b>陈工</b><small>gong.chen@xinlian-semi.cn</small></div></div></td><td><span class="chip blue"><i></i>operator</span></td><td><span class="chip outline">芯联 X-Link</span> <span class="chip outline">车规线</span></td><td><span class="chip green"><i></i>活跃</span></td><td class="mono" style="color:var(--mut)">2025-05-19</td><td><div class="row-act"><button class="ra" title="编辑" onclick="toast('编辑成员：陈工','')"><svg><use href="#i-edit"/></svg></button><button class="ra danger" title="移除" onclick="openModal('移除成员','确认将 陈工 移出芯联微电子？','移除')"><svg><use href="#i-trash"/></svg></button></div></td></tr>
+                <tr data-role="operator"><td><div class="who"><span class="av" style="background:linear-gradient(135deg,#D97706,#B45309)">赵</span><div><b>赵敏</b><small>min.zhao@xinlian-semi.cn</small></div></div></td><td><span class="chip blue"><i></i>operator</span></td><td><span class="chip outline">芯联 X-Link</span></td><td><span class="chip green"><i></i>活跃</span></td><td class="mono" style="color:var(--mut)">2025-06-30</td><td><div class="row-act"><button class="ra" title="编辑" onclick="toast('编辑成员：赵敏','')"><svg><use href="#i-edit"/></svg></button><button class="ra danger" title="移除" onclick="openModal('移除成员','确认将 赵敏 移出芯联微电子？','移除')"><svg><use href="#i-trash"/></svg></button></div></td></tr>
+                <tr data-role="viewer"><td><div class="who"><span class="av" style="background:linear-gradient(135deg,#475569,#334155)">周</span><div><b>周蕾</b><small>lei.zhou@xinlian-semi.cn</small></div></div></td><td><span class="chip gray"><i></i>viewer</span></td><td><span class="chip outline">芯联 X-Link</span></td><td><span class="chip green"><i></i>活跃</span></td><td class="mono" style="color:var(--mut)">2026-01-15</td><td><div class="row-act"><button class="ra" title="编辑" onclick="toast('编辑成员：周蕾','')"><svg><use href="#i-edit"/></svg></button><button class="ra danger" title="移除" onclick="openModal('移除成员','确认将 周蕾 移出芯联微电子？','移除')"><svg><use href="#i-trash"/></svg></button></div></td></tr>
+                <tr data-role="operator"><td><div class="who"><span class="av" style="background:linear-gradient(135deg,#9CA3AF,#6B7280)">孙</span><div><b>孙浩</b><small>hao.sun@xinlian-semi.cn</small></div></div></td><td><span class="chip blue"><i></i>operator</span></td><td><span class="chip outline">车规线</span></td><td><span class="chip amber"><i></i>待接受邀请</span></td><td class="mono" style="color:var(--mut)">2026-07-24</td><td><div class="row-act"><button class="ra" title="重发邀请" onclick="toast('邀请已重发给 孙浩','ok')"><svg><use href="#i-refresh"/></svg></button><button class="ra danger" title="撤销" onclick="toast('已撤销 孙浩 的邀请','')"><svg><use href="#i-x"/></svg></button></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ WORKSPACES ============ -->
+      <section class="view" data-view="workspaces">
+        <div class="vh">
+          <div><h1>工作空间 · 品牌</h1><p>每个工作空间 = 一个品牌实体，旗下挂多个站点。成员权限、会话、产物都归属到工作空间。workspace 是 Agent 的工作上下文与安全边界。</p></div>
+          <div class="right"><button class="btn primary" onclick="toast('新建品牌工作空间向导（演示）','ok')"><svg><use href="#i-plus"/></svg>新建品牌</button></div>
+        </div>
+        <div class="g-3">
+          <div class="ws-card reveal" onclick="toast('打开 芯联 X-Link 详情：编辑 brand_entity / 加站点 / 成员作用域','')">
+            <div class="wc-top"><div class="wc-mk" style="background:linear-gradient(135deg,#0E9C92,#0B7C75)">芯</div><div><h4>芯联 X-Link</h4><div class="own">brand_entity · wikidata:Q99210</div></div><span class="chip green" style="margin-left:auto"><i></i>健康</span></div>
+            <div class="wc-meta"><div><span>旗下站点</span><b>2</b></div><div><span>sameAs 锚点</span><b>3</b></div><div><span>本月会话</span><b>188</b></div></div>
+            <div class="wc-sites"><span class="e"><span class="v"></span>xinlian-semi.cn</span><span class="e"><span class="v"></span>shop.xinlian-semi.cn</span></div>
+          </div>
+          <div class="ws-card reveal" style="transition-delay:.07s" onclick="toast('打开 X-Link 车规线 详情','')">
+            <div class="wc-top"><div class="wc-mk" style="background:linear-gradient(135deg,#D97706,#B45309)">车</div><div><h4>X-Link 车规线</h4><div class="own">brand_entity · 待锚定 wikidata</div></div><span class="chip amber" style="margin-left:auto"><i></i>待验证</span></div>
+            <div class="wc-meta"><div><span>旗下站点</span><b>2</b></div><div><span>sameAs 锚点</span><b>2</b></div><div><span>本月会话</span><b>64</b></div></div>
+            <div class="wc-sites"><span class="e"><span class="x"></span>auto.xinlian-semi.cn</span><span class="e"><span class="v"></span>cdn.xinlian-semi.cn</span></div>
+          </div>
+          <div class="ws-card reveal" style="transition-delay:.14s;border-style:dashed;display:grid;place-items:center;min-height:200px;color:var(--mut)" onclick="toast('新建品牌工作空间向导（演示）','ok')">
+            <div style="text-align:center"><svg width="26" height="26" style="opacity:.5"><use href="#i-plus"/></svg><div style="margin-top:8px;font-size:13px">新建品牌工作空间</div></div>
+          </div>
+        </div>
+        <div class="card reveal" style="margin-top:16px">
+          <div class="card-b" style="display:flex;align-items:center;gap:14px">
+            <div style="width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:var(--teal-soft);color:var(--teal-d);flex:0 0 40px"><svg width="20" height="20"><use href="#i-shield"/></svg></div>
+            <div style="flex:1"><b style="font-size:13.5px">品牌实体 = 资产，站点 = 载体</b><span style="display:block;font-size:12.5px;color:var(--dim);margin-top:3px">更名、引用追踪等品牌级操作作用于整个工作空间；诊断、提交等站点级操作作用于旗下站点。删除工作空间需 owner 二次确认，且会归档其全部会话与产物。</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ KEYS / BYOK ============ -->
+      <section class="view" data-view="keys">
+        <div class="vh">
+          <div><h1>API 密钥 · BYOK</h1><p>自带你的 LLM 密钥（Bring Your Own Key），壶天的 Agent loop 用它跑推理；也可让壶天托管密钥按量计费。密钥由壶天服务端加密存储，任何接口永不回显明文，日志自动脱敏。</p></div>
+          <div class="right"><span class="chip green"><i></i><svg width="11" height="11" style="margin-right:2px"><use href="#i-lock"/></svg>端到端加密</span></div>
+        </div>
+
+        <div class="save-banner mb reveal">
+          <div class="sb-ic"><svg><use href="#i-spark"/></svg></div>
+          <div class="sb-t"><b>本月 BYOK 为你节省 ¥1,284</b><span>BYOK 调用 3,140 次 · 若用壶天托管约 ¥1,520 · 你的 key 自付成本约 ¥236</span></div>
+          <div class="sb-amt">−¥1,284<small>vs 托管</small></div>
+        </div>
+
+        <div class="card mb reveal">
+          <div class="card-h"><h3>计费来源</h3><span class="sub">loop 推理用谁的 key</span></div>
+          <div class="card-b">
+            <div class="src-toggle">
+              <div class="src-opt on" onclick="pickSrc(this)"><h4>BYOK 优先 <span class="rc">推荐</span></h4><p>优先用你配置的密钥跑推理，成本自付、数据直连厂商；某 provider 失效时自动降级。</p></div>
+              <div class="src-opt" onclick="pickSrc(this)"><h4>壶天托管</h4><p>由壶天垫付密钥、按调用量计入账单，开箱即用，适合不想自管 key 的团队。</p></div>
+            </div>
+            <div style="margin-top:12px;font-size:12px;color:var(--mut);display:flex;align-items:center;gap:7px"><svg width="13" height="13" style="color:var(--teal)"><use href="#i-shield"/></svg>无论哪种来源，密钥均加密存储；壶天无法读取你的明文 key。</div>
+          </div>
+        </div>
+
+        <div class="g-2" id="provGrid">
+          <!-- DeepSeek -->
+          <div class="prov default reveal">
+            <div class="pv-top"><div class="pv-ic" style="background:linear-gradient(135deg,#0E9C92,#0B7C75)">DS</div><div><div class="pv-nm">DeepSeek <span class="chip teal" style="font-size:9.5px"><i></i>默认</span></div></div><div class="pv-st ok" data-st><span class="sd"></span>已连接</div></div>
+            <div class="pv-body">
+              <div class="key-field"><input type="password" value="sk-7f3a9c2e4d6b8a0c1e3f5d7b9a2c4e6f3f7a" data-key readonly><button class="kf-b" title="显示/隐藏" onclick="toggleKey(this)"><svg><use href="#i-eye"/></svg></button><button class="kf-b" title="复制" onclick="toast('密钥已复制（脱敏）','ok')"><svg><use href="#i-copy"/></svg></button></div>
+              <div class="pv-actions"><button class="btn sm" onclick="testKey(this,'DeepSeek','deepseek-chat')">测试连通性</button><button class="btn sm ghost" onclick="toast('轮换密钥：请粘贴新 key','')">轮换</button><span class="pv-use">本月 2,180 调用 · 1.4M tokens</span></div>
+            </div>
+          </div>
+          <!-- OpenAI -->
+          <div class="prov reveal" style="transition-delay:.05s">
+            <div class="pv-top"><div class="pv-ic" style="background:linear-gradient(135deg,#10A37F,#0B7C61)">OA</div><div><div class="pv-nm">OpenAI</div></div><div class="pv-st none" data-st><span class="sd"></span>未配置</div></div>
+            <div class="pv-body">
+              <div class="key-field"><input type="password" placeholder="sk-… 粘贴你的 OpenAI 密钥" data-key><button class="kf-b" title="显示/隐藏" onclick="toggleKey(this)"><svg><use href="#i-eye"/></svg></button></div>
+              <div class="pv-actions"><button class="btn sm primary" onclick="testKey(this,'OpenAI','gpt-4o')">保存并测试</button><button class="btn sm ghost" onclick="setDefault(this)">设为默认</button></div>
+            </div>
+          </div>
+          <!-- Anthropic -->
+          <div class="prov reveal" style="transition-delay:.1s">
+            <div class="pv-top"><div class="pv-ic" style="background:linear-gradient(135deg,#D97706,#B45309)">AN</div><div><div class="pv-nm">Anthropic</div></div><div class="pv-st none" data-st><span class="sd"></span>未配置</div></div>
+            <div class="pv-body">
+              <div class="key-field"><input type="password" placeholder="sk-ant-… 粘贴你的 Anthropic 密钥" data-key><button class="kf-b" title="显示/隐藏" onclick="toggleKey(this)"><svg><use href="#i-eye"/></svg></button></div>
+              <div class="pv-actions"><button class="btn sm primary" onclick="testKey(this,'Anthropic','claude-sonnet')">保存并测试</button><button class="btn sm ghost" onclick="setDefault(this)">设为默认</button></div>
+            </div>
+          </div>
+          <!-- Qwen -->
+          <div class="prov reveal" style="transition-delay:.15s">
+            <div class="pv-top"><div class="pv-ic" style="background:linear-gradient(135deg,#2563EB,#1D4ED8)">QW</div><div><div class="pv-nm">Qwen</div></div><div class="pv-st ok" data-st><span class="sd"></span>已连接</div></div>
+            <div class="pv-body">
+              <div class="key-field"><input type="password" value="sk-qwen-9a2c4e6f8d0b1a3c5e7f9d2b4a6c8e0f" data-key readonly><button class="kf-b" title="显示/隐藏" onclick="toggleKey(this)"><svg><use href="#i-eye"/></svg></button><button class="kf-b" title="复制" onclick="toast('密钥已复制（脱敏）','ok')"><svg><use href="#i-copy"/></svg></button></div>
+              <div class="pv-actions"><button class="btn sm" onclick="testKey(this,'Qwen','qwen-max')">测试连通性</button><button class="btn sm ghost" onclick="setDefault(this)">设为默认</button><span class="pv-use">本月 960 调用 · 备用</span></div>
+            </div>
+          </div>
+          <!-- Gemini -->
+          <div class="prov reveal" style="transition-delay:.2s">
+            <div class="pv-top"><div class="pv-ic" style="background:linear-gradient(135deg,#7C3AED,#6D28D9)">GE</div><div><div class="pv-nm">Gemini</div></div><div class="pv-st bad" data-st><span class="sd"></span>无效</div></div>
+            <div class="pv-body">
+              <div class="key-field"><input type="password" value="AIza-invalid-expired-key-demo-xxxx" data-key readonly><button class="kf-b" title="显示/隐藏" onclick="toggleKey(this)"><svg><use href="#i-eye"/></svg></button></div>
+              <div class="pv-actions"><button class="btn sm primary" onclick="testKey(this,'Gemini',null)">重新测试</button><button class="btn sm danger" onclick="toast('已删除 Gemini 密钥','')">删除</button></div>
+              <div class="test-msg err" style="margin-top:11px"><svg><use href="#i-x"/></svg>401 Unauthorized · 密钥已过期或被吊销，请轮换</div>
+            </div>
+          </div>
+          <div class="card reveal" style="transition-delay:.25s;display:grid;place-items:center;padding:24px;text-align:center;color:var(--mut)">
+            <div><svg width="24" height="24" style="opacity:.5"><use href="#i-plug"/></svg><div style="margin-top:8px;font-size:13px;color:var(--dim)">需要其它 provider？</div><div style="font-size:12px;margin-top:3px">支持任意 OpenAI 兼容端点<br><code style="font-family:var(--mono);font-size:11px;color:var(--teal-d)">自定义 base_url</code></div><button class="btn sm" style="margin-top:12px" onclick="toast('添加自定义 OpenAI 兼容端点（演示）','ok')"><svg><use href="#i-plus"/></svg>自定义端点</button></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ ACTIVITY ============ -->
+      <section class="view" data-view="activity">
+        <div class="vh">
+          <div><h1>工作日志</h1><p>你团队在壶天上的操作记录，按业务语义呈现。此处为本租户可见视图；不可篡改的合规审计链由壶天保留，用于安全取证。</p></div>
+          <div class="right"><button class="btn"><svg><use href="#i-refresh"/></svg>导出 CSV</button></div>
+        </div>
+        <div class="card">
+          <div class="card-h" style="border-bottom:1px solid var(--line)">
+            <div class="filters" id="logFilters">
+              <button class="flt on" data-type="all">全部</button>
+              <button class="flt" data-type="approve">批准写盘</button>
+              <button class="flt" data-type="diag">诊断</button>
+              <button class="flt" data-type="key">密钥</button>
+              <button class="flt" data-type="member">成员</button>
+              <button class="flt" data-type="ticket">工单</button>
+            </div>
+          </div>
+          <div id="logBody">
+            <div class="logr" data-type="approve"><span class="ld green"></span><div class="lb"><div class="lt-main"><b>李婷</b> 批准 <code>entity_rename</code> 写盘（dry_run=false）· 替换 428 处</div><div class="lt-meta"><span class="tag">芯联 X-Link</span><span>结果 成功</span><span>IP 10.2.4.18</span></div></div><span class="lw">07-25 14:52</span></div>
+            <div class="logr" data-type="diag"><span class="ld teal"></span><div class="lb"><div class="lt-main"><b>陈工</b> 运行 <code>run_diagnosis</code> · auto.xinlian-semi.cn · GEO 78→84</div><div class="lt-meta"><span class="tag">X-Link 车规线</span><span>结果 成功</span><span>耗时 1.6s</span></div></div><span class="lw">07-25 13:10</span></div>
+            <div class="logr" data-type="key"><span class="ld blue"></span><div class="lb"><div class="lt-main"><b>王建国</b> 轮换 DeepSeek API 密钥 · BYOK · 连通测试通过</div><div class="lt-meta"><span class="tag">密钥管理</span><span>脱敏 sk-••••3f7a</span></div></div><span class="lw">07-25 11:48</span></div>
+            <div class="logr" data-type="ticket"><span class="ld amber"></span><div class="lb"><div class="lt-main"><b>赵敏</b> 提交工单 <code>#T-2207</code> · 关联会话 S-041</div><div class="lt-meta"><span class="tag">芯联 X-Link</span><span>优先级 中</span></div></div><span class="lw">07-25 10:02</span></div>
+            <div class="logr" data-type="diag"><span class="ld teal"></span><div class="lb"><div class="lt-main"><b>陈工</b> 运行 <code>check_schema</code> · 补齐 gtin/price/sameAs · valid:true</div><div class="lt-meta"><span class="tag">芯联 X-Link</span><span>结果 成功</span></div></div><span class="lw">07-24 16:40</span></div>
+            <div class="logr" data-type="member"><span class="ld violet"></span><div class="lb"><div class="lt-main"><b>王建国</b> 邀请 孙浩 为 operator · 作用域 车规线</div><div class="lt-meta"><span class="tag">成员管理</span><span>待接受</span></div></div><span class="lw">07-24 09:15</span></div>
+            <div class="logr" data-type="approve"><span class="ld green"></span><div class="lb"><div class="lt-main"><b>李婷</b> 批准 <code>submit_sitemap</code> · 1,284 URL · IndexNow 200 OK</div><div class="lt-meta"><span class="tag">芯联 X-Link</span><span>结果 成功</span></div></div><span class="lw">07-23 17:30</span></div>
+            <div class="logr" data-type="key"><span class="ld blue"></span><div class="lb"><div class="lt-main"><b>王建国</b> 切换计费来源为 BYOK 优先</div><div class="lt-meta"><span class="tag">密钥管理</span></div></div><span class="lw">07-22 14:08</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ TICKETS ============ -->
+      <section class="view" data-view="tickets">
+        <div class="vh">
+          <div><h1>工单</h1><p>向壶天支持团队求助。提工单时可关联工作空间、会话或工具报错，帮我们更快定位。这里是你对壶天运营的通道。</p></div>
+          <div class="right"><button class="btn primary" onclick="openDrawer('ticket')"><svg><use href="#i-plus"/></svg>新建工单</button></div>
+        </div>
+
+        <!-- list -->
+        <div class="card" id="tktList">
+          <div class="card-h" style="border-bottom:1px solid var(--line)">
+            <div class="filters" id="tktFilters">
+              <button class="flt on" data-st="all">全部</button>
+              <button class="flt" data-st="open">待处理</button>
+              <button class="flt" data-st="progress">处理中</button>
+              <button class="flt" data-st="wait">待你确认</button>
+              <button class="flt" data-st="closed">已关闭</button>
+            </div>
+          </div>
+          <div id="tktBody">
+            <div class="tkt" data-st="wait" onclick="openTicket(0)"><div class="tk-pri med"></div><div class="tk-b"><div class="tk-t">entity_rename 写盘前，docs 里的旧称要不要一起改？<span class="tid">#T-2207</span></div><div class="tk-snip">壶天支持：建议保留 docs 中的历史提及，仅改代码与 schema，已为你预生成排除清单…</div><div class="tk-meta"><span class="chip amber"><i></i>待你确认</span><span class="ws">芯联 X-Link</span><span>关联 S-041</span></div></div><div class="tk-r"><div class="tk-who">壶天支持 · 林</div><div class="tk-time">2 小时前</div></div></div>
+            <div class="tkt" data-st="progress" onclick="openTicket(1)"><div class="tk-pri high"></div><div class="tk-b"><div class="tk-t">车规线 run_diagnosis 偶发超时<span class="tid">#T-2201</span></div><div class="tk-snip">壶天支持：已定位到 PageSpeed 配额限流，正在为该租户切换独立通道…</div><div class="tk-meta"><span class="chip blue"><i></i>处理中</span><span class="ws">X-Link 车规线</span><span>优先级 高</span></div></div><div class="tk-r"><div class="tk-who">壶天支持 · 林</div><div class="tk-time">昨天</div></div></div>
+            <div class="tkt" data-st="open" onclick="openTicket(2)"><div class="tk-pri low"></div><div class="tk-b"><div class="tk-t">能否把周报改成每周一 08:30 推送？<span class="tid">#T-2198</span></div><div class="tk-snip">已收到，等待支持团队排期…</div><div class="tk-meta"><span class="chip teal"><i></i>待处理</span><span class="ws">全部</span></div></div><div class="tk-r"><div class="tk-who">赵敏</div><div class="tk-time">07-23</div></div></div>
+            <div class="tkt" data-st="closed" onclick="openTicket(3)"><div class="tk-pri low"></div><div class="tk-b"><div class="tk-t">如何为子账户限定单个品牌？<span class="tid">#T-2150</span></div><div class="tk-snip">已解决：在成员编辑里设置"可访问品牌"作用域即可。</div><div class="tk-meta"><span class="chip gray"><i></i>已关闭</span><span class="ws">芯联 X-Link</span></div></div><div class="tk-r"><div class="tk-who">壶天支持 · 周</div><div class="tk-time">07-18</div></div></div>
+          </div>
+        </div>
+
+        <!-- detail -->
+        <div class="tkt-detail" id="tktDetail">
+          <button class="tkt-back" onclick="closeTicket()"><svg><use href="#i-chevl"/></svg>返回工单列表</button>
+          <div class="card pad" style="margin-bottom:16px">
+            <div style="display:flex;align-items:flex-start;gap:12px">
+              <div style="flex:1"><div style="font-family:var(--disp);font-size:18px;font-weight:700" id="dtTitle">entity_rename 写盘前，docs 里的旧称要不要一起改？</div><div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><span class="chip amber" id="dtStatus"><i></i>待你确认</span><span class="chip gray" id="dtId">#T-2207</span><span class="chip outline" id="dtWs">芯联 X-Link</span></div></div>
+              <select style="padding:7px 10px;border:1px solid var(--line2);border-radius:9px;font-size:12px;color:var(--dim)" onchange="toast('状态已更新为：'+this.value,'ok')"><option>待处理</option><option>处理中</option><option selected>待你确认</option><option>已关闭</option></select>
+            </div>
+          </div>
+          <div class="thread" id="dtThread">
+            <div class="msg"><div class="m-av me">赵</div><div><div class="m-bub">我们要把品牌从 <b>天启芯/Tikchip</b> 改成 <b>芯联</b>，但 <code>docs/</code> 和变更日志里也有一堆旧称，<code>entity_rename</code> 干跑显示命中 434 处。这些文档里的旧称要一起改吗？怕改坏了历史记录。</div><div class="m-meta">赵敏 · 07-25 10:02</div></div></div>
+            <div class="msg"><div class="m-av sup">支</div><div><div class="m-bub">好问题。建议<b>不要</b>改 docs 与 CHANGELOG 里的历史提及——它们是"仅作历史映射"的记录，按品牌约束应当保留。壶天已为 <code>entity_rename</code> 默认排除 <code>docs/ test/ fixtures/ CHANGELOG.md</code>，所以干跑的 434 处里，真正会写盘的是 <b>428 处</b>（代码/schema/OG/sitemap），其余 6 处被智能排除。</div><div class="ctx-card"><div class="cc-t">关联上下文 · 自动附带</div>工作空间 <code>芯联 X-Link</code> · 会话 <code>S-041</code> · 工具 <code>entity_rename(dry_run=true)</code> · 命中 434 / 排除 6</div><div class="m-meta">壶天支持 · 林 · 07-25 11:20</div></div></div>
+            <div class="msg"><div class="m-av sup">支</div><div><div class="m-bub">我已把排除清单预生成在右侧产物里。你确认无误后，回复"确认写盘"，或在工作台对 <code>entity_rename</code> 点批准即可。写盘后建议立刻跑一次 <code>check_schema</code> 复验。</div><div class="m-meta">壶天支持 · 林 · 07-25 11:21</div></div></div>
+          </div>
+          <div class="reply-box">
+            <textarea id="dtReply" placeholder="回复壶天支持团队… 例如：确认写盘，排除清单没问题。"></textarea>
+            <div class="rb-f"><span class="hint">⌘Enter 发送 · 回复会通知支持团队</span><button class="btn primary sm" style="margin-left:auto" onclick="sendTicketReply()"><svg><use href="#i-send"/></svg>回复</button></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ BILLING ============ -->
+      <section class="view" data-view="billing">
+        <div class="vh">
+          <div><h1>账单与订阅</h1><p>当前套餐、席位、用量与发票。BYOK 调用不计入壶天推理用量，直接体现在你的节省额里。</p></div>
+          <div class="right"><button class="btn">下载发票</button><button class="btn primary" onclick="toast('联系销售调整套餐（演示）','ok')"><svg><use href="#i-arrow"/></svg>调整套餐</button></div>
+        </div>
+        <div class="g-3 mb">
+          <div class="kpi k1 reveal"><div class="kl"><svg><use href="#i-card"/></svg>当前套餐</div><div class="kv" style="font-size:22px">企业版</div><div class="kd flat">term-license · 年付</div></div>
+          <div class="kpi k2 reveal" style="transition-delay:.05s"><div class="kl"><svg><use href="#i-users"/></svg>席位</div><div class="kv"><span class="cnt" data-to="6">0</span><span class="frac"> / 15</span></div><div class="kd flat">余 9 席</div></div>
+          <div class="kpi k3 reveal" style="transition-delay:.1s"><div class="kl"><svg><use href="#i-clock"/></svg>续约日</div><div class="kv" style="font-size:20px">08-07</div><div class="kd flat">2026 · 自动提醒</div></div>
+        </div>
+        <div class="g-2 mb">
+          <div class="card reveal">
+            <div class="card-h"><h3>本月用量</h3><span class="sub">2026-07</span></div>
+            <div class="card-b">
+              <div style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:7px"><span>诊断调用</span><span class="mono" style="color:var(--dim)">3,820 / 8,000</span></div><div class="ubar"><i style="width:0" data-w="48"></i></div></div>
+              <div style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:7px"><span>引用监测</span><span class="mono" style="color:var(--dim)">24 / 40 每日</span></div><div class="ubar"><i style="width:0" data-w="60"></i></div></div>
+              <div><div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:7px"><span>车规线站点调用</span><span class="mono" style="color:var(--red)">7,360 / 8,000 · 92%</span></div><div class="ubar"><i class="warn" style="width:0" data-w="92"></i></div><div style="font-size:11px;color:var(--amber);margin-top:6px">⚠ 预计 3 日后触顶，触顶后该站点调用将排队</div></div>
+            </div>
+          </div>
+          <div class="card reveal" style="transition-delay:.08s">
+            <div class="card-h"><h3>BYOK 节省</h3><span class="sub">本月</span></div>
+            <div class="card-b">
+              <div style="font-family:var(--disp);font-size:34px;font-weight:700;color:var(--teal-d)">¥1,284</div>
+              <div style="font-size:12.5px;color:var(--dim);margin-top:4px">相比全部使用壶天托管密钥</div>
+              <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:9px;font-size:12.5px">
+                <div style="display:flex;justify-content:space-between"><span style="color:var(--dim)">BYOK 调用</span><span class="mono">3,140 次</span></div>
+                <div style="display:flex;justify-content:space-between"><span style="color:var(--dim)">托管等价成本</span><span class="mono">¥1,520</span></div>
+                <div style="display:flex;justify-content:space-between"><span style="color:var(--dim)">你的 key 自付</span><span class="mono">¥236</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card reveal">
+          <div class="card-h"><h3>发票历史</h3></div>
+          <div class="tbl-wrap" style="overflow-x:auto"><table class="tbl">
+            <thead><tr><th>周期</th><th>类型</th><th>金额</th><th>状态</th><th style="text-align:right">操作</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">2026-07</td><td>企业版 · 月分摊</td><td class="mono">¥26,583</td><td><span class="chip green"><i></i>已付</span></td><td><div class="row-act" style="opacity:1"><button class="ra" onclick="toast('下载发票 2026-07','ok')"><svg><use href="#i-copy"/></svg></button></div></td></tr>
+              <tr><td class="mono">2026-06</td><td>企业版 · 月分摊</td><td class="mono">¥26,583</td><td><span class="chip green"><i></i>已付</span></td><td><div class="row-act" style="opacity:1"><button class="ra" onclick="toast('下载发票 2026-06','ok')"><svg><use href="#i-copy"/></svg></button></div></td></tr>
+              <tr><td class="mono">2025-08</td><td>企业版 · 年付合同</td><td class="mono">¥319,000</td><td><span class="chip green"><i></i>已付</span></td><td><div class="row-act" style="opacity:1"><button class="ra" onclick="toast('下载合同发票','ok')"><svg><use href="#i-copy"/></svg></button></div></td></tr>
+            </tbody>
+          </table></div>
+        </div>
+      </section>
+
+      <!-- ============ SETTINGS ============ -->
+      <section class="view" data-view="settings">
+        <div class="vh"><div><h1>设置</h1><p>芯联微电子 的租户级设置。仅 owner 可修改。</p></div></div>
+        <div class="g-2-1">
+          <div class="card pad reveal">
+            <div class="sec-t">组织信息</div>
+            <div class="field"><label>组织名称</label><input value="芯联微电子"></div>
+            <div class="field-row">
+              <div class="field"><label>Owner</label><input value="王建国 · jianguo@xinlian-semi.cn" disabled></div>
+              <div class="field"><label>租户 ID</label><input value="T-1088" disabled class="mono"></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label>时区</label><select><option>Asia/Shanghai (UTC+8)</option><option>UTC</option></select></div>
+              <div class="field"><label>默认工作空间</label><select><option>芯联 X-Link</option><option>X-Link 车规线</option></select></div>
+            </div>
+            <button class="btn primary" onclick="toast('组织信息已保存','ok')">保存更改</button>
+          </div>
+          <div class="card pad reveal" style="transition-delay:.08s">
+            <div class="sec-t">安全</div>
+            <div style="display:flex;flex-direction:column;gap:12px;font-size:12.5px;color:var(--dim)">
+              <div style="display:flex;align-items:center;gap:9px"><svg width="15" height="15" style="color:var(--green)"><use href="#i-check"/></svg>SSO（SAML）已启用</div>
+              <div style="display:flex;align-items:center;gap:9px"><svg width="15" height="15" style="color:var(--green)"><use href="#i-check"/></svg>成员操作二次确认 已开启</div>
+              <div style="display:flex;align-items:center;gap:9px"><svg width="15" height="15" style="color:var(--green)"><use href="#i-check"/></svg>BYOK 密钥 服务端加密</div>
+            </div>
+          </div>
+        </div>
+        <div class="card pad reveal" style="margin-top:16px">
+          <div class="sec-t" style="color:var(--red)">危险区</div>
+          <div class="danger">
+            <div class="dz-ic"><svg><use href="#i-trash"/></svg></div>
+            <div class="dz-t"><b>删除租户 芯联微电子</b><span>永久删除全部工作空间、会话、产物与成员关系，不可恢复。需 owner 输入组织名确认。</span></div>
+            <button class="btn danger" style="margin-left:auto" onclick="openModal('删除租户','此操作不可逆。删除后芯联微电子的全部数据将被永久清除，且需输入 <code>芯联微电子</code> 确认。','永久删除')"><svg><use href="#i-trash"/></svg>删除租户</button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<!-- ===== DRAWER: INVITE ===== -->
+<div class="scrim" id="scrim" onclick="closeDrawer()"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-h"><h3 id="drawerTitle">邀请成员</h3><button class="x" onclick="closeDrawer()"><svg><use href="#i-x"/></svg></button></div>
+  <div class="drawer-b" id="drawerBody"></div>
+  <div class="drawer-f" id="drawerFoot"></div>
+</aside>
+
+<!-- ===== MODAL ===== -->
+<div class="modal" id="modal">
+  <div class="scrim2" onclick="closeModal()"></div>
+  <div class="box">
+    <div class="mi"><svg><use href="#i-warn"/></svg></div>
+    <h3 id="modalTitle">确认？</h3>
+    <p id="modalText"></p>
+    <div class="acts"><button class="btn" onclick="closeModal()">取消</button><button class="btn danger" id="modalConfirm">确认</button></div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script>
+const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
+
+/* ---------- view switch ---------- */
+const TITLES={overview:'概览',members:'团队成员',workspaces:'工作空间 · 品牌',keys:'API 密钥 · BYOK',activity:'工作日志',tickets:'工单',billing:'账单与订阅',settings:'设置'};
+function switchView(v){
+  $$('.ni').forEach(n=>n.classList.toggle('on',n.dataset.view===v));
+  $$('.view').forEach(s=>s.classList.toggle('on',s.dataset.view===v));
+  $('#crumbView').textContent=TITLES[v]||v;
+  $('#content').scrollTo({top:0});
+  if(v==='overview'){runReveal();runCount();}
+  if(v==='billing')setTimeout(()=>$$('.ubar i').forEach(i=>i.style.width=i.dataset.w+'%'),120);
+  if(v==='tickets')closeTicket();
+}
+$$('.ni').forEach(n=>n.addEventListener('click',()=>switchView(n.dataset.view)));
+
+/* ---------- topbar scroll ---------- */
+$('#content').addEventListener('scroll',()=>$('#topbar').classList.toggle('scrolled',$('#content').scrollTop>10));
+
+/* ---------- workspace switch ---------- */
+$('#wsSwitch').addEventListener('click',e=>{e.stopPropagation();$('#wsMenu').classList.toggle('open');});
+document.addEventListener('click',()=>$('#wsMenu').classList.remove('open'));
+$('#wsMenu').addEventListener('click',e=>e.stopPropagation());
+$$('.ws-menu .wm-i').forEach(i=>i.addEventListener('click',()=>{
+  $$('.ws-menu .wm-i').forEach(x=>x.classList.remove('on'));i.classList.add('on');
+  $('#wsLabel').textContent=i.dataset.ws;$('#wsMenu').classList.remove('open');
+  toast('已切换工作空间：'+i.dataset.ws,'ok');
+}));
+
+/* ---------- reveal ---------- */
+let io;
+function runReveal(){
+  if(io)io.disconnect();
+  io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}}),{threshold:.12});
+  $$('.view.on .reveal').forEach(el=>{el.classList.remove('in');io.observe(el);});
+}
+/* ---------- count up ---------- */
+function runCount(){
+  $$('.view.on .cnt').forEach(el=>{
+    const to=+el.dataset.to,t0=performance.now();
+    (function f(t){const p=Math.min((t-t0)/1100,1);el.textContent=Math.round(to*(1-Math.pow(1-p,3))).toLocaleString();if(p<1)requestAnimationFrame(f);})(t0);
+  });
+}
+
+/* ---------- toast ---------- */
+function toast(msg,kind){
+  const ic=kind==='ok'?'i-check':kind==='err'?'i-x':kind==='warn'?'i-warn':'i-spark';
+  const t=document.createElement('div');t.className='toast '+(kind||'');
+  t.innerHTML='<svg><use href="#'+ic+'"/></svg>'+msg;
+  $('#toasts').appendChild(t);
+  setTimeout(()=>{t.classList.add('out');setTimeout(()=>t.remove(),320);},2600);
+}
+
+/* ---------- filters (members / logs / tickets) ---------- */
+function wireFilters(containerId,bodyId,attr){
+  const c=$('#'+containerId);if(!c)return;
+  c.addEventListener('click',e=>{
+    const b=e.target.closest('.flt');if(!b)return;
+    c.querySelectorAll('.flt').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+    const v=b.dataset[attr==='role'?'role':attr==='type'?'type':'st'];
+    $$('#'+bodyId+' > *').forEach(row=>{
+      row.style.display=(v==='all'||row.dataset[attr]===v)?'':'none';
+    });
+  });
+}
+wireFilters('memFilters','memBody','role');
+wireFilters('logFilters','logBody','type');
+wireFilters('tktFilters','tktBody','st');
+
+/* ---------- BYOK ---------- */
+function pickSrc(el){el.parentNode.querySelectorAll('.src-opt').forEach(x=>x.classList.remove('on'));el.classList.add('on');toast('计费来源已更新','ok');}
+function toggleKey(btn){
+  const inp=btn.parentNode.querySelector('input');
+  const showing=inp.dataset.show==='1';
+  if(showing){inp.type='password';inp.dataset.show='0';btn.innerHTML='<svg><use href="#i-eye"/></svg>';}
+  else{
+    // 安全演示：即使"显示"也只露后 4 位
+    const real=inp.value;const tail=real.slice(-4);
+    inp.dataset.full=real;inp.type='text';inp.value='sk-••••••••'+tail;inp.dataset.show='1';
+    btn.innerHTML='<svg><use href="#i-eyeoff"/></svg>';
+  }
+}
+function setDefault(btn){
+  $$('.prov').forEach(p=>{p.classList.remove('default');const c=p.querySelector('.pv-nm .chip');if(c)c.remove();const st=p.querySelector('.pv-st');});
+  const prov=btn.closest('.prov');prov.classList.add('default');
+  const nm=prov.querySelector('.pv-nm');nm.insertAdjacentHTML('beforeend',' <span class="chip teal" style="font-size:9.5px"><i></i>默认</span>');
+  toast('已设为默认推理 provider','ok');
+}
+function testKey(btn,provider,model){
+  const prov=btn.closest('.prov');const st=prov.querySelector('[data-st]');
+  let msg=prov.querySelector('.test-msg');
+  if(!msg){msg=document.createElement('div');msg.className='test-msg';prov.querySelector('.pv-body').appendChild(msg);}
+  msg.className='test-msg busy';msg.innerHTML='<span class="sp"></span>正在连接 '+provider+'…';
+  btn.disabled=true;
+  setTimeout(()=>{
+    btn.disabled=false;
+    if(model){
+      msg.className='test-msg ok';msg.innerHTML='<svg><use href="#i-check"/></svg>已连接 · 模型 '+model+' · 支持 tool calling';
+      st.className='pv-st ok';st.innerHTML='<span class="sd"></span>已连接';
+      toast(provider+' 连通测试通过','ok');
+    }else{
+      msg.className='test-msg err';msg.innerHTML='<svg><use href="#i-x"/></svg>401 Unauthorized · 密钥无效或过期';
+      st.className='pv-st bad';st.innerHTML='<span class="sd"></span>无效';
+    }
+  },1400);
+}
+
+/* ---------- tickets detail ---------- */
+const TKTS=[
+ {t:'entity_rename 写盘前，docs 里的旧称要不要一起改？',id:'#T-2207',st:'待你确认',stc:'amber',ws:'芯联 X-Link'},
+ {t:'车规线 run_diagnosis 偶发超时',id:'#T-2201',st:'处理中',stc:'blue',ws:'X-Link 车规线'},
+ {t:'能否把周报改成每周一 08:30 推送？',id:'#T-2198',st:'待处理',stc:'teal',ws:'全部'},
+ {t:'如何为子账户限定单个品牌？',id:'#T-2150',st:'已关闭',stc:'gray',ws:'芯联 X-Link'}
+];
+function openTicket(i){
+  const d=TKTS[i];
+  $('#dtTitle').textContent=d.t;$('#dtId').textContent=d.id;$('#dtWs').textContent=d.ws;
+  $('#dtStatus').className='chip '+d.stc;$('#dtStatus').innerHTML='<i></i>'+d.st;
+  $('#tktList').style.display='none';$('#tktDetail').classList.add('on');
+  $('#content').scrollTo({top:0});
+}
+function closeTicket(){$('#tktDetail').classList.remove('on');$('#tktList').style.display='';}
+function sendTicketReply(){
+  const v=$('#dtReply').value.trim();if(!v)return;
+  const th=$('#dtThread');
+  const me=document.createElement('div');me.className='msg me';
+  me.innerHTML='<div class="m-av me">王</div><div><div class="m-bub">'+v.replace(/</g,'&lt;')+'</div><div class="m-meta">王建国 · 刚刚</div></div>';
+  th.appendChild(me);$('#dtReply').value='';
+  $('#content').scrollTo({top:$('#content').scrollHeight,behavior:'smooth'});
+  setTimeout(()=>{
+    const sup=document.createElement('div');sup.className='msg';
+    sup.innerHTML='<div class="m-av sup">支</div><div><div class="m-bub">收到，壶天支持团队正在处理你的回复，稍后跟进。</div><div class="m-meta">壶天支持 · 自动回执 · 刚刚</div></div>';
+    th.appendChild(sup);$('#content').scrollTo({top:$('#content').scrollHeight,behavior:'smooth'});
+  },1200);
+}
+$('#dtReply')&&$('#dtReply').addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='Enter')sendTicketReply();});
+
+/* ---------- drawer ---------- */
+const DRAWERS={
+ invite:{title:'邀请成员',body:`
+   <div class="field"><label>邮箱</label><input id="invEmail" placeholder="colleague@xinlian-semi.cn"></div>
+   <div class="field"><label>角色</label><select id="invRole"><option value="operator">operator · 可运行诊断/修补</option><option value="viewer">viewer · 仅查看</option><option value="admin">admin · 管理成员</option></select><div class="hint">owner 角色只能在成员列表里转让。</div></div>
+   <div class="sec-t">可访问品牌工作空间（作用域）</div>
+   <div class="checks" id="invScope">
+     <label class="check on"><input type="checkbox" checked onchange="this.parentNode.classList.toggle('on',this.checked)"> 芯联 X-Link</label>
+     <label class="check"><input type="checkbox" onchange="this.parentNode.classList.toggle('on',this.checked)"> X-Link 车规线</label>
+   </div>
+   <div style="margin-top:14px;font-size:11.5px;color:var(--mut);line-height:1.7">被邀请者将收到邮件，接受后按其角色与作用域加入。权限粒度到品牌——限定后该成员无法操作未勾选的工作空间。</div>`,
+  foot:`<button class="btn" onclick="closeDrawer()">取消</button><button class="btn primary" onclick="doInvite()"><svg><use href="#i-send"/></svg>发送邀请</button>`},
+ ticket:{title:'新建工单',body:`
+   <div class="field"><label>标题</label><input placeholder="简述你遇到的问题"></div>
+   <div class="field-row">
+     <div class="field"><label>优先级</label><select><option>低</option><option selected>中</option><option>高</option></select></div>
+     <div class="field"><label>关联工作空间</label><select><option>芯联 X-Link</option><option>X-Link 车规线</option><option>全部</option></select></div>
+   </div>
+   <div class="field"><label>关联会话 / 工具报错（可选）</label><input placeholder="如 S-041 或 run_diagnosis 超时" class="mono"><div class="hint">附带上下文能让支持团队更快定位。</div></div>
+   <div class="field"><label>描述</label><textarea rows="4" placeholder="详细描述…"></textarea></div>`,
+  foot:`<button class="btn" onclick="closeDrawer()">取消</button><button class="btn primary" onclick="doTicket()"><svg><use href="#i-send"/></svg>提交工单</button>`}
+};
+function openDrawer(k){const d=DRAWERS[k];$('#drawerTitle').textContent=d.title;$('#drawerBody').innerHTML=d.body;$('#drawerFoot').innerHTML=d.foot;$('#scrim').classList.add('open');$('#drawer').classList.add('open');}
+function closeDrawer(){$('#scrim').classList.remove('open');$('#drawer').classList.remove('open');}
+function doInvite(){const e=$('#invEmail').value.trim();closeDrawer();toast('邀请已发送给 '+(e||'新成员'),'ok');}
+function doTicket(){closeDrawer();toast('工单已提交 · 壶天支持团队将尽快响应','ok');}
+
+/* ---------- modal ---------- */
+let modalAct=null;
+function openModal(title,text,act){$('#modalTitle').textContent=title;$('#modalText').innerHTML=text;$('#modalConfirm').textContent=act;$('#modal').classList.add('open');modalAct=act;}
+function closeModal(){$('#modal').classList.remove('open');}
+$('#modalConfirm').addEventListener('click',()=>{closeModal();toast((modalAct||'操作')+' 已执行','warn');});
+
+/* ---------- init ---------- */
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeDrawer();closeModal();}});
+runReveal();runCount();
+setTimeout(()=>$$('.ubar i').forEach(i=>i.style.width=i.dataset.w+'%'),400);
+</script>
+</body>
+</html>

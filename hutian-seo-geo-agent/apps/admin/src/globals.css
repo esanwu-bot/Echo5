@@ -1,0 +1,82 @@
+/* 全局重置 + 后台基础样式（原型深色侧边栏 + 浅色主区） */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body {
+  font-family: -apple-system, "Noto Sans SC", system-ui, "Segoe UI", Roboto, sans-serif;
+  font-size: 13.5px;
+  background: #F3F5F8;
+  color: #161B26;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 侧边栏 logo 区 */
+.admin-logo {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 16px 18px;
+  border-bottom: 1px solid #222A38;
+}
+.admin-logo .mk {
+  width: 34px; height: 34px; border-radius: 9px;
+  display: grid; place-items: center;
+  background: linear-gradient(135deg, #3B5BDB, #5470E6);
+  color: #fff; font-weight: 800; font-size: 16px;
+  box-shadow: 0 4px 14px rgba(59,91,219,.4);
+}
+.admin-logo b { color: #fff; font-size: 15px; display: block; letter-spacing: .01em; }
+.admin-logo span { color: #7E8AA0; font-size: 9px; letter-spacing: .22em; font-family: ui-monospace, monospace; }
+
+/* 侧边栏用户区 */
+.admin-side-foot {
+  border-top: 1px solid #222A38;
+  padding: 12px 14px;
+}
+.admin-side-foot .av {
+  width: 32px; height: 32px; border-radius: 8px;
+  display: grid; place-items: center;
+  background: linear-gradient(135deg, #475569, #334155);
+  color: #fff; font-weight: 700; font-size: 12px;
+}
+
+/* 主区 topbar */
+.admin-topbar {
+  height: 58px;
+  background: #fff;
+  border-bottom: 1px solid #E3E8EF;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 26px;
+}
+.admin-topbar h1 {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -.01em;
+  margin: 0;
+}
+.admin-topbar h1 small {
+  font-size: 12px; font-weight: 400; color: #828DA2; margin-left: 9px;
+}
+
+/* KPI 卡片色条 */
+.kpi-card { position: relative; overflow: hidden; }
+.kpi-card::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+}
+.kpi-card.k1::before { background: #16A34A; }
+.kpi-card.k2::before { background: #2563EB; }
+.kpi-card.k3::before { background: #D97706; }
+.kpi-card.k4::before { background: #3B5BDB; }
+.kpi-card.k5::before { background: #7C3AED; }
+
+/* 凭证明文泄露防护提示 */
+.cred-safe-tag {
+  font-size: 11px;
+  color: #16A34A;
+  background: #E7F6EC;
+  border: 1px solid rgba(22,163,74,.25);
+  padding: 2px 8px;
+  border-radius: 5px;
+  font-family: ui-monospace, monospace;
+}

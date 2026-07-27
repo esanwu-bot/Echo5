@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>壶天 · 运营管理后台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --side:#10141C; --side2:#161B26; --side-line:#222A38; --side-mut:#7E8AA0; --side-txt:#C4CCDB;
+  --bg:#F3F5F8; --surf:#FFFFFF; --surf2:#F8FAFC; --sink:#EDF0F4;
+  --line:#E3E8EF; --line2:#D3DAE4;
+  --ink:#161B26; --ink2:#465064; --mut:#828DA2; --faint:#AEB7C7;
+  --steel:#3B5BDB; --steel2:#5470E6; --steel-soft:#EAEFFD;
+  --green:#16A34A; --green-soft:#E7F6EC; --amber:#D97706; --amber-soft:#FCF1DD;
+  --red:#DC2626; --red-soft:#FCEAEA; --blue:#2563EB; --blue-soft:#E8F0FE; --violet:#7C3AED; --violet-soft:#F0EAFC;
+  --disp:'Space Grotesk','Noto Sans SC',sans-serif;
+  --body:'Noto Sans SC',system-ui,-apple-system,sans-serif;
+  --mono:'JetBrains Mono','Noto Sans SC',monospace;
+  --sh:0 1px 2px rgba(16,20,28,.05),0 10px 30px rgba(16,20,28,.07);
+  --sh-h:0 4px 10px rgba(16,20,28,.08),0 18px 44px rgba(16,20,28,.12);
+  --r:13px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{font-family:var(--body);background:var(--bg);color:var(--ink);font-size:13.5px;overflow:hidden;-webkit-font-smoothing:antialiased}
+::selection{background:var(--steel-soft)}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:#CDD5E0;border-radius:8px;border:2px solid var(--bg)}
+.side ::-webkit-scrollbar-thumb{background:#2A3344;border-color:var(--side)}
+button{font-family:inherit;cursor:pointer}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes fly{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(22,163,74,.5)}55%{box-shadow:0 0 0 5px rgba(22,163,74,0)}}
+@keyframes draw{to{stroke-dashoffset:0}}
+@keyframes slidein{from{transform:translateX(100%)}to{transform:none}}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+.rise{animation:rise .45s cubic-bezier(.22,1,.36,1) both}
+
+.app{display:flex;height:100vh}
+
+/* ============ SIDEBAR ============ */
+.side{width:236px;flex:0 0 236px;background:var(--side);color:var(--side-txt);display:flex;flex-direction:column;position:relative;overflow:hidden}
+.side::before{content:"";position:absolute;top:-90px;left:-40px;width:240px;height:240px;background:radial-gradient(circle,rgba(84,112,230,.22),transparent 70%);pointer-events:none}
+.side-top{position:relative;padding:18px 18px 14px;display:flex;align-items:center;gap:11px;border-bottom:1px solid var(--side-line)}
+.side-top .mk{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;background:linear-gradient(135deg,var(--steel),var(--steel2));color:#fff;font-weight:800;font-size:16px;box-shadow:0 4px 14px rgba(59,91,219,.4)}
+.side-top b{font-family:var(--disp);font-size:15px;color:#fff;display:block;letter-spacing:.01em}
+.side-top span{font-family:var(--mono);font-size:9px;letter-spacing:.22em;color:var(--side-mut)}
+.env{margin-left:auto;font-family:var(--mono);font-size:9.5px;font-weight:600;color:var(--green);border:1px solid rgba(22,163,74,.4);background:rgba(22,163,74,.12);padding:2px 7px;border-radius:5px;display:flex;align-items:center;gap:5px}
+.env i{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+.nav{position:relative;flex:1;overflow-y:auto;padding:12px 10px}
+.nav-lab{font-size:10px;letter-spacing:.16em;color:var(--side-mut);font-weight:700;padding:14px 10px 7px}
+.nav-lab:first-child{padding-top:4px}
+.ni{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:9px;color:var(--side-txt);font-size:13px;transition:.15s;position:relative;margin-bottom:1px}
+.ni:hover{background:var(--side2);color:#fff}
+.ni.on{background:var(--side2);color:#fff}
+.ni.on::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:3px;background:var(--steel2)}
+.ni svg{width:17px;height:17px;flex:0 0 17px;opacity:.8}
+.ni.on svg{opacity:1;color:var(--steel2)}
+.ni .bdg{margin-left:auto;font-family:var(--mono);font-size:10px;background:#222A38;color:var(--side-mut);padding:1px 7px;border-radius:999px}
+.ni .bdg.hot{background:var(--red);color:#fff}
+.ni .bdg.warn{background:var(--amber);color:#1a1206}
+.side-foot{position:relative;border-top:1px solid var(--side-line);padding:13px 14px;display:flex;align-items:center;gap:10px}
+.side-foot .av{width:32px;height:32px;border-radius:8px;display:grid;place-items:center;background:linear-gradient(135deg,#475569,#334155);color:#fff;font-weight:700;font-size:12px}
+.side-foot b{font-size:12.5px;color:#fff;display:block}
+.side-foot span{font-size:10.5px;color:var(--side-mut);font-family:var(--mono)}
+
+/* ============ MAIN ============ */
+.main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative}
+.main::before{content:"";position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(rgba(16,20,28,.04) 1px,transparent 1px);background-size:22px 22px;opacity:.6}
+.topbar{position:relative;height:58px;flex:0 0 58px;background:var(--surf);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:16px;padding:0 26px;z-index:5}
+.topbar h1{font-family:var(--disp);font-size:18px;font-weight:700;letter-spacing:-.01em}
+.topbar h1 small{font-family:var(--body);font-size:12px;font-weight:400;color:var(--mut);margin-left:9px}
+.tb-search{margin-left:24px;display:flex;align-items:center;gap:9px;width:340px;padding:8px 13px;border:1px solid var(--line);border-radius:10px;background:var(--surf2);color:var(--mut);transition:.2s}
+.tb-search:focus-within{border-color:var(--steel);background:#fff;box-shadow:0 0 0 3px var(--steel-soft)}
+.tb-search input{flex:1;border:none;outline:none;background:none;font-size:13px;color:var(--ink)}
+.tb-search svg{width:15px;height:15px;flex:0 0 15px}
+.kbd{font-family:var(--mono);font-size:10px;color:var(--faint);border:1px solid var(--line);border-radius:5px;padding:1px 6px}
+.spacer{flex:1}
+.live{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--mut);font-family:var(--mono)}
+.live i{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+.tb-ic{width:36px;height:36px;border-radius:9px;display:grid;place-items:center;color:var(--mut);border:1px solid transparent;transition:.15s;position:relative}
+.tb-ic:hover{color:var(--ink);background:var(--sink)}
+.tb-ic svg{width:17px;height:17px}
+.tb-ic .dot{position:absolute;top:7px;right:8px;width:7px;height:7px;border-radius:50%;background:var(--red);border:2px solid var(--surf)}
+.tb-av{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;background:linear-gradient(135deg,var(--steel),var(--steel2));color:#fff;font-weight:700;font-size:13px}
+
+.content{position:relative;flex:1;overflow-y:auto;padding:26px}
+.view{display:none}
+.view.on{display:block;animation:fadein .3s}
+.vh{display:flex;align-items:flex-end;gap:16px;margin-bottom:22px;flex-wrap:wrap}
+.vh h2{font-family:var(--disp);font-size:24px;font-weight:700;letter-spacing:-.01em}
+.vh p{font-size:13px;color:var(--mut);margin-top:3px}
+.vh .right{margin-left:auto;display:flex;gap:9px;align-items:center}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;gap:7px;font-weight:600;font-size:13px;border-radius:9px;padding:9px 15px;border:1px solid var(--line2);background:var(--surf);color:var(--ink2);transition:.18s}
+.btn:hover{border-color:var(--steel);color:var(--steel);transform:translateY(-1px)}
+.btn svg{width:15px;height:15px}
+.btn.primary{background:var(--steel);border-color:var(--steel);color:#fff;box-shadow:0 4px 14px rgba(59,91,219,.28)}
+.btn.primary:hover{background:var(--steel2);color:#fff;box-shadow:0 8px 22px rgba(59,91,219,.38)}
+.btn.danger{color:var(--red);border-color:rgba(220,38,38,.3)}
+.btn.danger:hover{background:var(--red-soft);border-color:var(--red);color:var(--red)}
+.btn.sm{padding:6px 11px;font-size:12px}
+.btn.ghost{border-color:transparent;background:transparent}
+
+/* KPI */
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:22px}
+.kpi{background:var(--surf);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;position:relative;overflow:hidden;transition:.2s}
+.kpi:hover{transform:translateY(-2px);box-shadow:var(--sh)}
+.kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px}
+.kpi.k1::before{background:var(--green)} .kpi.k2::before{background:var(--blue)} .kpi.k3::before{background:var(--amber)} .kpi.k4::before{background:var(--steel)} .kpi.k5::before{background:var(--violet)}
+.kpi .lab{font-size:11.5px;color:var(--mut);display:flex;align-items:center;gap:6px}
+.kpi .lab svg{width:13px;height:13px;opacity:.7}
+.kpi .val{font-family:var(--disp);font-size:30px;font-weight:700;margin-top:7px;letter-spacing:-.02em;line-height:1}
+.kpi .val .u{font-size:15px;color:var(--mut);font-weight:500;margin-left:2px}
+.kpi .delta{font-size:11.5px;font-family:var(--mono);margin-top:7px;display:flex;align-items:center;gap:5px}
+.kpi .delta.up{color:var(--green)} .kpi .delta.down{color:var(--red)} .kpi .delta.flat{color:var(--mut)}
+.kpi .spark{position:absolute;right:14px;bottom:14px;width:64px;height:26px;opacity:.85}
+.kpi .spark polyline{fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:140;stroke-dashoffset:140;animation:draw 1.4s .3s cubic-bezier(.22,1,.36,1) forwards}
+
+/* grids */
+.grid-2{display:grid;grid-template-columns:1.5fr 1fr;gap:16px;margin-bottom:16px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.panel{background:var(--surf);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.panel-h{padding:15px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:9px}
+.panel-h h3{font-family:var(--disp);font-size:14.5px;font-weight:600}
+.panel-h .sub{font-size:11.5px;color:var(--mut);font-family:var(--mono)}
+.panel-h .more{margin-left:auto;font-size:12px;color:var(--steel);font-weight:600;display:flex;align-items:center;gap:4px}
+.panel-h .more svg{width:13px;height:13px}
+.panel-b{padding:16px 18px}
+
+/* donut */
+.donut-wrap{display:flex;align-items:center;gap:22px}
+.donut{width:128px;height:128px;flex:0 0 128px;position:relative}
+.donut svg{transform:rotate(-90deg)}
+.donut circle{fill:none;stroke-width:13;stroke-linecap:round}
+.donut .bg{stroke:var(--sink)}
+.donut .seg{transition:stroke-dashoffset 1.2s cubic-bezier(.22,1,.36,1)}
+.donut .ctr{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
+.donut .ctr b{font-family:var(--disp);font-size:26px;font-weight:700;display:block;line-height:1}
+.donut .ctr span{font-size:10.5px;color:var(--mut)}
+.legend{flex:1;display:flex;flex-direction:column;gap:10px}
+.legend .lg{display:flex;align-items:center;gap:9px;font-size:12.5px}
+.legend .lg i{width:9px;height:9px;border-radius:3px;flex:0 0 9px}
+.legend .lg b{margin-left:auto;font-family:var(--disp);font-weight:600}
+
+/* live feed */
+.feed{display:flex;flex-direction:column;max-height:330px;overflow-y:auto}
+.fe{display:flex;gap:11px;padding:10px 18px;border-bottom:1px solid var(--line);font-size:12.5px;align-items:flex-start}
+.fe:last-child{border-bottom:none}
+.fe.new{animation:fly .4s both}
+.fe .fd{width:7px;height:7px;border-radius:50%;margin-top:5px;flex:0 0 7px}
+.fe .fd.green{background:var(--green)} .fe .fd.amber{background:var(--amber)} .fe .fd.red{background:var(--red)} .fe .fd.blue{background:var(--blue)} .fe .fd.steel{background:var(--steel)}
+.fe .ft{flex:1;color:var(--ink2);line-height:1.5}
+.fe .ft b{color:var(--ink);font-weight:600}
+.fe .ft code{font-family:var(--mono);font-size:11px;background:var(--sink);padding:1px 5px;border-radius:4px;color:var(--steel)}
+.fe .fw{font-family:var(--mono);font-size:10.5px;color:var(--faint);flex:0 0 auto;margin-top:1px}
+
+/* alert list */
+.alert{display:flex;align-items:center;gap:12px;padding:11px 18px;border-bottom:1px solid var(--line)}
+.alert:last-child{border-bottom:none}
+.alert .ai{width:32px;height:32px;border-radius:8px;display:grid;place-items:center;flex:0 0 32px}
+.alert .ai.amber{background:var(--amber-soft);color:var(--amber)} .alert .ai.red{background:var(--red-soft);color:var(--red)}
+.alert .ai svg{width:16px;height:16px}
+.alert .at{flex:1;min-width:0}
+.alert .at b{font-size:13px;display:block}
+.alert .at span{font-size:11.5px;color:var(--mut)}
+.alert .ab{margin-left:auto}
+
+/* chips */
+.chip{font-size:11px;font-weight:600;padding:3px 9px;border-radius:6px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.chip i{width:6px;height:6px;border-radius:50%}
+.chip.trial{color:var(--blue);background:var(--blue-soft)} .chip.trial i{background:var(--blue)}
+.chip.active{color:var(--green);background:var(--green-soft)} .chip.active i{background:var(--green)}
+.chip.grace{color:var(--amber);background:var(--amber-soft)} .chip.grace i{background:var(--amber)}
+.chip.suspended{color:var(--red);background:var(--red-soft)} .chip.suspended i{background:var(--red)}
+.chip.plan{color:var(--ink2);background:var(--sink)} .chip.plan.pro{color:var(--steel);background:var(--steel-soft)} .chip.plan.ent{color:var(--violet);background:var(--violet-soft)}
+.chip.mode{color:var(--mut);background:transparent;border:1px solid var(--line2)}
+
+/* table */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{text-align:left;font-size:11px;letter-spacing:.06em;color:var(--mut);font-weight:600;text-transform:uppercase;padding:11px 18px;border-bottom:1px solid var(--line);background:var(--surf2);white-space:nowrap}
+tbody td{padding:13px 18px;border-bottom:1px solid var(--line);color:var(--ink2);vertical-align:middle}
+tbody tr{transition:background .12s;position:relative}
+tbody tr:hover{background:var(--surf2)}
+tbody tr:last-child td{border-bottom:none}
+.t-name{font-weight:600;color:var(--ink);display:flex;align-items:center;gap:10px}
+.t-name .ta{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;font-weight:700;font-size:12px;color:#fff;flex:0 0 30px}
+.t-name small{display:block;font-weight:400;font-size:11px;color:var(--mut);font-family:var(--mono)}
+.mono{font-family:var(--mono);font-size:12px}
+.num{font-family:var(--disp);font-weight:600}
+.row-act{display:flex;gap:5px;opacity:0;transition:opacity .15s}
+tbody tr:hover .row-act{opacity:1}
+.ra{width:28px;height:28px;border-radius:7px;display:grid;place-items:center;color:var(--mut);border:1px solid transparent;transition:.12s}
+.ra:hover{color:var(--steel);background:var(--steel-soft);border-color:rgba(59,91,219,.2)}
+.ra.danger:hover{color:var(--red);background:var(--red-soft);border-color:rgba(220,38,38,.2)}
+.ra svg{width:14px;height:14px}
+.filters{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.flt{font-size:12px;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--surf);color:var(--mut);transition:.15s}
+.flt:hover{border-color:var(--line2);color:var(--ink2)}
+.flt.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.flt .c{font-family:var(--mono);opacity:.7;margin-left:4px}
+
+/* progress / quota */
+.qrow{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--line)}
+.qrow:last-child{border-bottom:none}
+.qrow .qn{width:150px;flex:0 0 150px}
+.qrow .qn b{font-size:13px;display:block}
+.qrow .qn span{font-size:11px;color:var(--mut)}
+.qbar{flex:1;height:8px;border-radius:5px;background:var(--sink);overflow:hidden}
+.qbar i{display:block;height:100%;border-radius:5px;background:var(--steel);transition:width 1s cubic-bezier(.22,1,.36,1)}
+.qbar i.warn{background:var(--amber)} .qbar i.over{background:var(--red)}
+.qrow .qv{font-family:var(--mono);font-size:12px;width:78px;text-align:right;flex:0 0 78px;color:var(--ink2)}
+.qrow .qv.over{color:var(--red);font-weight:600}
+
+/* meter banner */
+.meter-banner{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--green-soft);border:1px solid rgba(22,163,74,.25);border-radius:11px;margin-bottom:18px;font-size:12.5px;color:#15803d}
+.meter-banner svg{width:17px;height:17px;flex:0 0 17px}
+.meter-banner b{font-family:var(--mono)}
+.meter-banner .x{margin-left:auto;font-family:var(--mono);font-size:11px;opacity:.8}
+
+/* workspace brand card */
+.brand-card{background:var(--surf);border:1px solid var(--line);border-radius:var(--r);padding:18px;transition:.2s}
+.brand-card:hover{transform:translateY(-2px);box-shadow:var(--sh)}
+.brand-card .bc-top{display:flex;align-items:center;gap:12px}
+.brand-card .bc-mk{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;font-weight:800;font-size:17px;color:#fff;flex:0 0 40px}
+.brand-card .bc-top h4{font-family:var(--disp);font-size:16px;font-weight:600}
+.brand-card .bc-top .own{font-size:11.5px;color:var(--mut);margin-top:1px}
+.brand-card .bc-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.brand-card .bc-meta div span{font-size:10.5px;color:var(--mut);display:block}
+.brand-card .bc-meta div b{font-family:var(--disp);font-size:18px;font-weight:600}
+.brand-card .bc-ent{margin-top:13px;display:flex;flex-wrap:wrap;gap:6px}
+.brand-card .bc-ent .e{font-family:var(--mono);font-size:10.5px;color:var(--steel);background:var(--steel-soft);padding:2px 8px;border-radius:5px}
+
+/* audit hash */
+.hash{font-family:var(--mono);font-size:10.5px;color:var(--faint);display:flex;align-items:center;gap:5px}
+.hash svg{width:11px;height:11px;color:var(--green)}
+.append-tag{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;color:var(--green);background:var(--green-soft);border:1px solid rgba(22,163,74,.25);padding:3px 9px;border-radius:6px}
+.append-tag svg{width:12px;height:12px}
+
+/* drawer */
+.scrim{position:fixed;inset:0;background:rgba(16,20,28,.42);backdrop-filter:blur(2px);z-index:80;opacity:0;pointer-events:none;transition:opacity .25s}
+.scrim.open{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:480px;max-width:92vw;background:var(--surf);z-index:90;box-shadow:-20px 0 60px rgba(16,20,28,.2);transform:translateX(100%);transition:transform .32s cubic-bezier(.22,1,.36,1);display:flex;flex-direction:column}
+.drawer.open{transform:none}
+.drawer-h{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+.drawer-h h3{font-family:var(--disp);font-size:17px;font-weight:700}
+.drawer-h .x{margin-left:auto;width:32px;height:32px;border-radius:8px;display:grid;place-items:center;color:var(--mut);border:1px solid var(--line);transition:.15s}
+.drawer-h .x:hover{color:var(--ink);background:var(--sink)}
+.drawer-h .x svg{width:16px;height:16px}
+.drawer-b{flex:1;overflow-y:auto;padding:20px 22px}
+.drawer-f{padding:14px 22px;border-top:1px solid var(--line);display:flex;gap:9px;justify-content:flex-end}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:6px}
+.field input,.field select{width:100%;padding:9px 12px;border:1px solid var(--line2);border-radius:9px;font-size:13px;font-family:var(--body);color:var(--ink);background:var(--surf);outline:none;transition:.15s}
+.field input:focus,.field select:focus{border-color:var(--steel);box-shadow:0 0 0 3px var(--steel-soft)}
+.field .hint{font-size:11px;color:var(--mut);margin-top:5px}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.sec-t{font-size:11px;letter-spacing:.12em;color:var(--mut);font-weight:700;margin:6px 0 12px}
+
+/* detail drawer blocks */
+.dd-block{margin-bottom:20px}
+.dd-block h4{font-size:12px;letter-spacing:.08em;color:var(--mut);font-weight:700;margin-bottom:10px;text-transform:uppercase}
+.dd-ws{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:9px}
+.dd-ws b{font-size:13.5px;display:flex;align-items:center;gap:8px}
+.dd-ws b .wm{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font-size:11px;font-weight:800;color:#fff}
+.dd-ws .sites{font-size:11.5px;color:var(--mut);margin-top:6px;display:flex;flex-wrap:wrap;gap:5px}
+.dd-ws .sites code{font-family:var(--mono);font-size:10.5px;background:var(--sink);padding:1px 6px;border-radius:4px;color:var(--ink2)}
+.mini-rings{display:flex;gap:18px}
+.mini-ring{text-align:center}
+.mini-ring svg{transform:rotate(-90deg)}
+.mini-ring circle{fill:none;stroke-width:5}
+.mini-ring .bg{stroke:var(--sink)}
+.mini-ring span{display:block;font-size:10.5px;color:var(--mut);margin-top:5px}
+.mini-ring .pct{font-family:var(--disp);font-size:13px;font-weight:600;fill:var(--ink)}
+
+/* modal */
+.modal{position:fixed;inset:0;z-index:100;display:grid;place-items:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.modal.open{opacity:1;pointer-events:auto}
+.modal .scrim2{position:absolute;inset:0;background:rgba(16,20,28,.5)}
+.modal .box{position:relative;background:var(--surf);border-radius:16px;width:420px;max-width:92vw;padding:26px;box-shadow:var(--sh-h);animation:rise .25s both}
+.modal .box .mi{width:48px;height:48px;border-radius:13px;display:grid;place-items:center;background:var(--red-soft);color:var(--red);margin-bottom:14px}
+.modal .box .mi svg{width:24px;height:24px}
+.modal .box h3{font-family:var(--disp);font-size:18px;font-weight:700}
+.modal .box p{font-size:13.5px;color:var(--ink2);margin-top:8px;line-height:1.7}
+.modal .box p code{font-family:var(--mono);font-size:12px;background:var(--sink);padding:1px 6px;border-radius:5px}
+.modal .box .acts{display:flex;gap:9px;justify-content:flex-end;margin-top:22px}
+
+/* toast */
+.toasts{position:fixed;right:22px;bottom:22px;z-index:120;display:flex;flex-direction:column;gap:9px;align-items:flex-end}
+.toast{display:flex;align-items:center;gap:10px;background:var(--ink);color:#fff;padding:12px 16px;border-radius:11px;font-size:13px;box-shadow:var(--sh-h);animation:fly .3s cubic-bezier(.34,1.4,.64,1) both;border-left:3px solid var(--steel)}
+.toast.ok{border-left-color:var(--green)} .toast.warn{border-left-color:var(--amber)} .toast.err{border-left-color:var(--red)}
+.toast svg{width:16px;height:16px;flex:0 0 16px}
+.toast.ok svg{color:var(--green)} .toast.warn svg{color:var(--amber)} .toast.err svg{color:var(--red)} .toast svg{color:var(--steel2)}
+.toast.out{opacity:0;transform:translateX(20px);transition:.3s}
+
+@media (max-width:1280px){.kpis{grid-template-columns:repeat(3,1fr)}.grid-2{grid-template-columns:1fr}}
+@media (max-width:980px){.side{display:none}.kpis{grid-template-columns:repeat(2,1fr)}.grid-3{grid-template-columns:1fr}.tb-search{display:none}}
+</style>
+</head>
+<body>
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+<symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></symbol>
+<symbol id="i-card" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20M6 15h4"/></symbol>
+<symbol id="i-gauge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 14l4-4"/><path d="M3.5 18a9 9 0 1117 0"/></symbol>
+<symbol id="i-box" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M21 8l-9-5-9 5v8l9 5 9-5V8z"/><path d="M3 8l9 5 9-5M12 13v8"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
+<symbol id="i-set" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.7 1.7 0 00-1.87.34 1.7 1.7 0 00-1 1.55V21a2 2 0 11-4 0v-.09a1.7 1.7 0 00-1-1.55 1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.7 1.7 0 004.6 15a1.7 1.7 0 00-1.55-1H3a2 2 0 110-4h.09a1.7 1.7 0 001.55-1 1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06A1.7 1.7 0 009 4.6a1.7 1.7 0 001-1.55V3a2 2 0 114 0v.09a1.7 1.7 0 001 1.55 1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06a1.7 1.7 0 00-.34 1.87 1.7 1.7 0 001.55 1H21a2 2 0 110 4h-.09a1.7 1.7 0 00-1.55 1z"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 10-12 0c0 7-3 8-3 8h18s-3-1-3-8M10.3 21a2 2 0 003.4 0"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></symbol>
+<symbol id="i-ban" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></symbol>
+<symbol id="i-warn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3L2 20h20L12 3z"/><path d="M12 10v4M12 17.2v.1"/></symbol>
+<symbol id="i-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></symbol>
+<symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+<symbol id="i-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></symbol>
+<symbol id="i-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1.5-1.5"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+<symbol id="i-zap" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/></symbol>
+<symbol id="i-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 010 18 15 15 0 010-18z"/></symbol>
+<symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 11-2.6-6.4M21 3v6h-6"/></symbol>
+<symbol id="i-filter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18l-7 8v6l-4-2v-4L3 5z"/></symbol>
+</svg>
+
+<div class="app">
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="side">
+    <div class="side-top">
+      <div class="mk">壶</div>
+      <div><b>壶天 OPS</b><span>OPERATIONS CONSOLE</span></div>
+      <span class="env"><i></i>PROD</span>
+    </div>
+    <nav class="nav">
+      <div class="nav-lab">经营</div>
+      <button class="ni on" data-view="overview"><svg><use href="#i-grid"/></svg>总览</button>
+      <button class="ni" data-view="tenants"><svg><use href="#i-users"/></svg>租户管理<span class="bdg" id="bdgTenants">8</span></button>
+      <button class="ni" data-view="subs"><svg><use href="#i-card"/></svg>订阅与计费</button>
+      <button class="ni" data-view="quotas"><svg><use href="#i-gauge"/></svg>额度与计量</button>
+      <div class="nav-lab">资产</div>
+      <button class="ni" data-view="workspaces"><svg><use href="#i-box"/></svg>工作空间 · 品牌</button>
+      <div class="nav-lab">治理</div>
+      <button class="ni" data-view="audit"><svg><use href="#i-shield"/></svg>审计日志</button>
+      <button class="ni"><svg><use href="#i-set"/></svg>系统设置</button>
+    </nav>
+    <div class="side-foot">
+      <div class="av">运</div>
+      <div><b>ops-admin</b><span>SUPER · 运营</span></div>
+    </div>
+  </aside>
+
+  <!-- ===== MAIN ===== -->
+  <div class="main">
+    <header class="topbar">
+      <h1 id="topTitle">总览<small id="topSub">全部租户的实时经营视图</small></h1>
+      <div class="tb-search"><svg><use href="#i-search"/></svg><input placeholder="搜索租户 / 域名 / 工单 / 审计动作…"><span class="kbd">⌘K</span></div>
+      <div class="spacer"></div>
+      <div class="live"><i></i><span id="clock">--:--:--</span></div>
+      <button class="tb-ic" title="刷新"><svg><use href="#i-refresh"/></svg></button>
+      <button class="tb-ic" title="通知"><svg><use href="#i-bell"/></svg><span class="dot"></span></button>
+      <div class="tb-av">运</div>
+    </header>
+
+    <div class="content">
+
+      <!-- ============ OVERVIEW ============ -->
+      <section class="view on" data-view="overview">
+        <div class="kpis">
+          <div class="kpi k1 rise"><div class="lab"><svg><use href="#i-users"/></svg>活跃租户</div><div class="val"><span class="cnt" data-to="142">0</span></div><div class="delta up"><svg width="12" height="12"><use href="#i-up"/></svg>+6 本月</div><svg class="spark" viewBox="0 0 64 26"><polyline points="2,20 12,18 22,19 32,13 42,14 52,8 62,5" stroke="var(--green)"/></svg></div>
+          <div class="kpi k2 rise" style="animation-delay:.05s"><div class="lab"><svg><use href="#i-clock"/></svg>试用中</div><div class="val"><span class="cnt" data-to="23">0</span></div><div class="delta flat">转化漏斗 31%</div><svg class="spark" viewBox="0 0 64 26"><polyline points="2,16 12,14 22,17 32,12 42,15 52,11 62,9" stroke="var(--blue)"/></svg></div>
+          <div class="kpi k3 rise" style="animation-delay:.1s"><div class="lab"><svg><use href="#i-warn"/></svg>将到期 / grace</div><div class="val"><span class="cnt" data-to="7">0</span></div><div class="delta down"><svg width="12" height="12"><use href="#i-down"/></svg>需跟进</div></div>
+          <div class="kpi k4 rise" style="animation-delay:.15s"><div class="lab"><svg><use href="#i-zap"/></svg>本月诊断调用</div><div class="val"><span class="cnt" data-to="48210">0</span></div><div class="delta up"><svg width="12" height="12"><use href="#i-up"/></svg>+18.4%</div><svg class="spark" viewBox="0 0 64 26"><polyline points="2,22 12,19 22,20 32,14 42,12 52,9 62,4" stroke="var(--steel)"/></svg></div>
+          <div class="kpi k5 rise" style="animation-delay:.2s"><div class="lab"><svg><use href="#i-card"/></svg>MRR</div><div class="val">¥<span class="cnt" data-to="386">0</span><span class="u">K</span></div><div class="delta up"><svg width="12" height="12"><use href="#i-up"/></svg>+9.2%</div></div>
+        </div>
+
+        <div class="grid-2">
+          <div class="panel rise">
+            <div class="panel-h"><h3>近 7 日工具调用趋势</h3><span class="sub">run_diagnosis · check_schema · submit_sitemap</span><span class="more">明细<svg><use href="#i-arrow"/></svg></span></div>
+            <div class="panel-b">
+              <svg viewBox="0 0 600 180" width="100%" height="180" preserveAspectRatio="none">
+                <defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgba(59,91,219,.22)"/><stop offset="1" stop-color="rgba(59,91,219,0)"/></linearGradient></defs>
+                <g stroke="var(--line)" stroke-width="1">
+                  <line x1="0" y1="40" x2="600" y2="40"/><line x1="0" y1="90" x2="600" y2="90"/><line x1="0" y1="140" x2="600" y2="140"/>
+                </g>
+                <polygon points="0,150 86,120 172,128 258,86 344,96 430,52 516,60 600,28 600,180 0,180" fill="url(#ag)"/>
+                <polyline points="0,150 86,120 172,128 258,86 344,96 430,52 516,60 600,28" fill="none" stroke="var(--steel)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="900" stroke-dashoffset="900" style="animation:draw 1.6s .3s cubic-bezier(.22,1,.36,1) forwards"/>
+                <g fill="var(--steel)"><circle cx="86" cy="120" r="3.5"/><circle cx="258" cy="86" r="3.5"/><circle cx="430" cy="52" r="3.5"/><circle cx="600" cy="28" r="3.5"/></g>
+              </svg>
+              <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;color:var(--faint);margin-top:6px"><span>周一</span><span>周二</span><span>周三</span><span>周四</span><span>周五</span><span>周六</span><span>周日</span></div>
+            </div>
+          </div>
+          <div class="panel rise" style="animation-delay:.08s">
+            <div class="panel-h"><h3>租户健康分布</h3><span class="sub">按状态</span></div>
+            <div class="panel-b">
+              <div class="donut-wrap">
+                <div class="donut">
+                  <svg viewBox="0 0 120 120" width="128" height="128">
+                    <circle class="bg" cx="60" cy="60" r="46"/>
+                    <circle class="seg" cx="60" cy="60" r="46" stroke="var(--green)" stroke-dasharray="289" stroke-dashoffset="289" data-off="72"/>
+                    <circle class="seg" cx="60" cy="60" r="46" stroke="var(--blue)" stroke-dasharray="289" stroke-dashoffset="289" data-off="217" transform="rotate(270 60 60)"/>
+                    <circle class="seg" cx="60" cy="60" r="46" stroke="var(--amber)" stroke-dasharray="289" stroke-dashoffset="289" data-off="248" transform="rotate(325 60 60)"/>
+                    <circle class="seg" cx="60" cy="60" r="46" stroke="var(--red)" stroke-dasharray="289" stroke-dashoffset="289" data-off="271" transform="rotate(343 60 60)"/>
+                  </svg>
+                  <div class="ctr"><b>172</b><span>租户总数</span></div>
+                </div>
+                <div class="legend">
+                  <div class="lg"><i style="background:var(--green)"></i>Active 正常付费<b>142</b></div>
+                  <div class="lg"><i style="background:var(--blue)"></i>Trial 试用中<b>23</b></div>
+                  <div class="lg"><i style="background:var(--amber)"></i>Grace 宽限期<b>5</b></div>
+                  <div class="lg"><i style="background:var(--red)"></i>Suspended 已封停<b>2</b></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="panel rise">
+            <div class="panel-h"><h3>实时活动流</h3><span class="sub" id="feedSub">live</span><span class="more" style="color:var(--green)"><i style="width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;animation:pulse 2s infinite"></i>在线</span></div>
+            <div class="feed" id="feed"></div>
+          </div>
+          <div class="panel rise" style="animation-delay:.08s">
+            <div class="panel-h"><h3>需运营跟进</h3><span class="sub">到期 / 超额 / 封停</span></div>
+            <div>
+              <div class="alert"><div class="ai amber"><svg><use href="#i-clock"/></svg></div><div class="at"><b>芯联微电子 · term-license 将于 6 天后到期</b><span>企业版 · 年付合同 · 上次续约 2025-08-01</span></div><div class="ab"><button class="btn sm" onclick="toast('已通知客户成功经理','ok')">提醒续约</button></div></div>
+              <div class="alert"><div class="ai red"><svg><use href="#i-gauge"/></svg></div><div class="at"><b>云栖数据 · 本月诊断调用已超额 112%</b><span>专业版 · 配额 5,000 / 已用 5,610 · 已降级为排队</span></div><div class="ab"><button class="btn sm" onclick="switchView('quotas')">查看</button></div></div>
+              <div class="alert"><div class="ai amber"><svg><use href="#i-warn"/></svg></div><div class="at"><b>拓邦半导体 · 进入 grace 第 9 天</b><span>专业版 · 续费失败 2 次 · 14 天后封停</span></div><div class="ab"><button class="btn sm danger" onclick="openSuspend('拓邦半导体')">处理</button></div></div>
+              <div class="alert"><div class="ai red"><svg><use href="#i-ban"/></svg></div><div class="at"><b>灰产测试号 · 已封停（违反 ToS）</b><span>审计 #A-8841 · 操作人 ops-admin · 不可自助恢复</span></div><div class="ab"><button class="btn sm" onclick="switchView('audit')">审计</button></div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ TENANTS ============ -->
+      <section class="view" data-view="tenants">
+        <div class="vh">
+          <div><h2>租户管理</h2><p>客户账号的全生命周期：开号、状态机、封号与解封</p></div>
+          <div class="right"><button class="btn"><svg><use href="#i-filter"/></svg>导出 CSV</button><button class="btn primary" onclick="openNewTenant()"><svg><use href="#i-plus"/></svg>新建租户</button></div>
+        </div>
+        <div class="panel">
+          <div class="panel-h" style="border-bottom:1px solid var(--line)">
+            <div class="tb-search" style="margin:0;width:280px;box-shadow:none"><svg><use href="#i-search"/></svg><input id="tenantSearch" placeholder="按租户名 / owner / 域名过滤…"></div>
+            <div class="filters" id="statusFilters" style="margin-left:auto">
+              <button class="flt on" data-st="all">全部</button>
+              <button class="flt" data-st="active">Active</button>
+              <button class="flt" data-st="trial">Trial</button>
+              <button class="flt" data-st="grace">Grace</button>
+              <button class="flt" data-st="suspended">Suspended</button>
+            </div>
+          </div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>租户</th><th>Owner</th><th>套餐</th><th>状态</th><th>工作空间</th><th>站点</th><th>创建时间</th><th style="text-align:right">操作</th></tr></thead>
+              <tbody id="tenantBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SUBSCRIPTIONS ============ -->
+      <section class="view" data-view="subs">
+        <div class="vh"><div><h2>订阅与计费</h2><p>自助订阅与按期限合同授权并存 · 续费 / 到期 / 升降级</p></div>
+          <div class="right"><button class="btn"><svg><use href="#i-card"/></svg>对账报表</button></div></div>
+        <div class="panel"><div class="tbl-wrap">
+          <table>
+            <thead><tr><th>租户</th><th>档位</th><th>授权模式</th><th>周期</th><th>续费 / 到期</th><th>席位</th><th>MRR</th><th style="text-align:right">操作</th></tr></thead>
+            <tbody id="subBody"></tbody>
+          </table>
+        </div></div>
+      </section>
+
+      <!-- ============ QUOTAS ============ -->
+      <section class="view" data-view="quotas">
+        <div class="vh"><div><h2>额度与计量</h2><p>每租户配额用量 · 服务端计量正本</p></div></div>
+        <div class="meter-banner"><svg><use href="#i-check"/></svg><div>计量正本 = <b>服务端</b>，前端展示为缓存；与计费对账任务最近一次运行 <b>2 分钟前</b>，<b>误差 0</b>（NFR-10）。</div><span class="x">append-only metering log</span></div>
+        <div class="grid-3" id="quotaGrid"></div>
+      </section>
+
+      <!-- ============ WORKSPACES ============ -->
+      <section class="view" data-view="workspaces">
+        <div class="vh"><div><h2>工作空间 · 品牌实体</h2><p>workspace = 品牌实体（宪法级）· 站点是其载体 · 跨租户视图</p></div>
+          <div class="right"><span class="chip mode">12 个品牌 · 19 个站点</span></div></div>
+        <div class="grid-3" id="wsGrid"></div>
+      </section>
+
+      <!-- ============ AUDIT ============ -->
+      <section class="view" data-view="audit">
+        <div class="vh"><div><h2>审计日志</h2><p>append-only · 不可篡改 · 跨租户操作取证</p></div>
+          <div class="right"><span class="append-tag"><svg><use href="#i-lock"/></svg>哈希链完整 · 不可篡改</span></div></div>
+        <div class="panel"><div class="tbl-wrap">
+          <table>
+            <thead><tr><th>时间</th><th>操作人</th><th>租户 / 工作空间</th><th>动作</th><th>目标</th><th>prev_hash</th></tr></thead>
+            <tbody id="auditBody"></tbody>
+          </table>
+        </div></div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<!-- ===== DRAWER ===== -->
+<div class="scrim" id="scrim" onclick="closeDrawer()"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-h"><h3 id="drawerTitle">—</h3><button class="x" onclick="closeDrawer()"><svg><use href="#i-x"/></svg></button></div>
+  <div class="drawer-b" id="drawerBody"></div>
+  <div class="drawer-f" id="drawerFoot"></div>
+</aside>
+
+<!-- ===== MODAL ===== -->
+<div class="modal" id="modal">
+  <div class="scrim2" onclick="closeModal()"></div>
+  <div class="box">
+    <div class="mi"><svg><use href="#i-ban"/></svg></div>
+    <h3 id="modalTitle">确认封停租户？</h3>
+    <p id="modalText"></p>
+    <div class="acts"><button class="btn" onclick="closeModal()">取消</button><button class="btn danger" id="modalConfirm">确认封停</button></div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script>
+const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+/* ---------- 数据（运营视角的客户；平台品牌=壶天） ---------- */
+const AV=['#3B5BDB','#16A34A','#D97706','#7C3AED','#2563EB','#DC2626','#0EA5A4','#475569'];
+const avOf=s=>AV[[...s].reduce((a,c)=>a+c.charCodeAt(0),0)%AV.length];
+let TENANTS=[
+ {id:'T-1042',name:'壶天科技（dogfood）',owner:'ops@hutian.com',plan:'ent',status:'active',ws:2,sites:3,mrr:0,created:'2025-01-12',
+   sub:{mode:'subscription',tier:'企业版',period:'yearly',renew:'2026-12-31',seats:20},
+   quotas:{sites:[3,50],diag:[1240,99999],cite:[30,99999]},
+   workspaces:[{brand:'壶天',mk:'壶',sameAs:4,wiki:'Q128888',sites:['hutian.com','docs.hutian.com','status.hutian.com'],sessions:312}]},
+ {id:'T-1088',name:'芯联微电子',owner:'seo@xinlian-semi.cn',plan:'ent',status:'active',ws:2,sites:4,mrr:31900,created:'2025-03-04',
+   sub:{mode:'term-license',tier:'企业版',period:'年付合同',renew:'2026-08-07',seats:15},
+   quotas:{sites:[4,30],diag:[3820,8000],cite:[24,40]},
+   workspaces:[{brand:'芯联 X-Link',mk:'芯',sameAs:3,wiki:'Q99210',sites:['xinlian-semi.cn','shop.xinlian-semi.cn'],sessions:188},{brand:'X-Link 车规线',mk:'车',sameAs:2,wiki:'—',sites:['auto.xinlian-semi.cn','cdn.xinlian-semi.cn'],sessions:64}]},
+ {id:'T-1130',name:'云栖数据',owner:'growth@yunqi-data.io',plan:'pro',status:'active',ws:1,sites:2,mrr:9900,created:'2025-05-19',
+   sub:{mode:'subscription',tier:'专业版',period:'monthly',renew:'2026-08-02',seats:5},
+   quotas:{sites:[2,10],diag:[5610,5000],cite:[18,20]},
+   workspaces:[{brand:'云栖 YunQi',mk:'云',sameAs:2,wiki:'Q77431',sites:['yunqi-data.io','app.yunqi-data.io'],sessions:241}]},
+ {id:'T-1156',name:'拓邦半导体',owner:'mkt@tuobang.com',plan:'pro',status:'grace',ws:1,sites:2,mrr:9900,created:'2025-06-30',
+   sub:{mode:'subscription',tier:'专业版',period:'monthly',renew:'续费失败 · grace D9',seats:5},
+   quotas:{sites:[2,10],diag:[2100,5000],cite:[9,20]},
+   workspaces:[{brand:'拓邦 TopBand',mk:'拓',sameAs:1,wiki:'—',sites:['tuobang.com','b2b.tuobang.com'],sessions:97}]},
+ {id:'T-1171',name:'光年 SaaS',owner:'founder@lightyear.dev',plan:'pro',status:'trial',ws:1,sites:1,mrr:0,created:'2026-07-18',
+   sub:{mode:'subscription',tier:'专业版试用',period:'14-day trial',renew:'试用剩 9 天',seats:3},
+   quotas:{sites:[1,3],diag:[420,1000],cite:[3,5]},
+   workspaces:[{brand:'光年 LightYear',mk:'光',sameAs:1,wiki:'—',sites:['lightyear.dev'],sessions:38}]},
+ {id:'T-1180',name:'锐石射频',owner:'web@ruishi-rf.com',plan:'pro',status:'active',ws:1,sites:2,mrr:7900,created:'2025-09-11',
+   sub:{mode:'subscription',tier:'专业版',period:'yearly',renew:'2026-09-11',seats:4},
+   quotas:{sites:[2,10],diag:[1880,5000],cite:[11,20]},
+   workspaces:[{brand:'锐石 RuiShi',mk:'锐',sameAs:2,wiki:'Q55120',sites:['ruishi-rf.com','support.ruishi-rf.com'],sessions:132}]},
+ {id:'T-1193',name:'灰产测试号',owner:'abuse@redacted',plan:'free',status:'suspended',ws:1,sites:1,mrr:0,created:'2026-07-02',
+   sub:{mode:'subscription',tier:'免费版',period:'—',renew:'已封停',seats:1},
+   quotas:{sites:[1,1],diag:[0,100],cite:[0,2]},
+   workspaces:[{brand:'[redacted]',mk:'?',sameAs:0,wiki:'—',sites:['redacted.xyz'],sessions:3}]},
+ {id:'T-1205',name:'瀚海物联网',owner:'ops@hanhai-iot.com',plan:'ent',status:'trial',ws:1,sites:1,mrr:0,created:'2026-07-22',
+   sub:{mode:'term-license',tier:'企业版 POC',period:'30-day POC',renew:'POC 剩 23 天',seats:8},
+   quotas:{sites:[1,20],diag:[610,99999],cite:[6,99999]},
+   workspaces:[{brand:'瀚海 HanHai',mk:'瀚',sameAs:1,wiki:'—',sites:['hanhai-iot.com'],sessions:51}]}
+];
+
+const STATUS_LABEL={active:'Active',trial:'Trial',grace:'Grace',suspended:'Suspended'};
+const PLAN_LABEL={free:'免费版',pro:'专业版',ent:'企业版'};
+
+/* ---------- 渲染：租户表 ---------- */
+let curStatus='all',curSearch='';
+function tenantRows(){
+  return TENANTS.filter(t=>(curStatus==='all'||t.status===curStatus)&&(curSearch===''||(t.name+t.owner+t.id).toLowerCase().includes(curSearch)));
+}
+function renderTenants(){
+  $('#tenantBody').innerHTML=tenantRows().map(t=>{
+    const susp=t.status==='suspended';
+    return `<tr data-id="${t.id}">
+      <td><div class="t-name"><span class="ta" style="background:${avOf(t.name)}">${t.name[0]}</span><div>${t.name}<small>${t.id}</small></div></div></td>
+      <td class="mono" style="color:var(--ink2)">${t.owner}</td>
+      <td><span class="chip plan ${t.plan}">${PLAN_LABEL[t.plan]}</span></td>
+      <td><span class="chip ${t.status}"><i></i>${STATUS_LABEL[t.status]}</span></td>
+      <td class="num">${t.ws}</td>
+      <td class="num">${t.sites}</td>
+      <td class="mono" style="color:var(--mut)">${t.created}</td>
+      <td><div class="row-act" style="justify-content:flex-end">
+        <button class="ra" title="查看详情" onclick="openTenant('${t.id}')"><svg><use href="#i-eye"/></svg></button>
+        <button class="ra" title="编辑" onclick="toast('打开编辑：${t.name}','')"><svg><use href="#i-edit"/></svg></button>
+        ${susp
+          ? `<button class="ra" title="解封" onclick="setStatus('${t.id}','active')"><svg><use href="#i-check"/></svg></button>`
+          : `<button class="ra danger" title="封停" onclick="openSuspend('${t.name}','${t.id}')"><svg><use href="#i-ban"/></svg></button>`}
+      </div></td>
+    </tr>`;
+  }).join('')||`<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--mut)">无匹配租户</td></tr>`;
+}
+$('#tenantSearch').addEventListener('input',e=>{curSearch=e.target.value.trim().toLowerCase();renderTenants();});
+$('#statusFilters').addEventListener('click',e=>{const b=e.target.closest('.flt');if(!b)return;$$('.flt').forEach(x=>x.classList.remove('on'));b.classList.add('on');curStatus=b.dataset.st;renderTenants();});
+
+/* ---------- 渲染：订阅表 ---------- */
+function renderSubs(){
+  $('#subBody').innerHTML=TENANTS.map(t=>{
+    const term=t.sub.mode==='term-license';
+    const expSoon=term&&/6 天后/.test(t.sub.renew);
+    return `<tr>
+      <td><div class="t-name"><span class="ta" style="background:${avOf(t.name)}">${t.name[0]}</span><div>${t.name}<small>${t.id}</small></div></div></td>
+      <td><span class="chip plan ${t.plan}">${t.sub.tier}</span></td>
+      <td><span class="chip mode">${term?'term-license 按期限':'subscription 订阅'}</span></td>
+      <td class="mono" style="color:var(--mut)">${t.sub.period}</td>
+      <td><span style="color:${expSoon?'var(--amber)':t.status==='grace'||t.status==='suspended'?'var(--red)':'var(--ink2)'};font-weight:${expSoon||t.status==='grace'?600:400}">${t.sub.renew}</span></td>
+      <td class="num">${t.sub.seats}</td>
+      <td class="num">${t.mrr?('¥'+t.mrr.toLocaleString()):'<span style="color:var(--faint)">—</span>'}</td>
+      <td><div class="row-act" style="justify-content:flex-end">
+        ${term?`<button class="btn sm" onclick="toast('已发起续约流程：${t.name}','ok')">续约</button>`:`<button class="btn sm" onclick="toast('调整订阅：${t.name}','')">调整</button>`}
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+/* ---------- 渲染：配额 ---------- */
+function qbar(used,max){const p=Math.min(used/max*100,100);const over=used>max;const warn=p>=80&&!over;return `<div class="qbar"><i class="${over?'over':warn?'warn':''}" style="width:0" data-w="${over?100:p}"></i></div>`;}
+function renderQuotas(){
+  $('#quotaGrid').innerHTML=TENANTS.map(t=>{
+    const [su,sx]=t.quotas.sites,[du,dx]=t.quotas.diag,[cu,cx]=t.quotas.cite;
+    const row=(label,sub,u,x)=>`<div class="qrow"><div class="qn"><b>${label}</b><span>${sub}</span></div>${qbar(u,x)}<div class="qv ${u>x?'over':''}">${u.toLocaleString()} / ${x>=99999?'∞':x.toLocaleString()}</div></div>`;
+    return `<div class="panel"><div class="panel-h"><div class="t-name" style="font-size:13px"><span class="ta" style="background:${avOf(t.name)};width:26px;height:26px;font-size:11px">${t.name[0]}</span>${t.name}</div><span class="chip ${t.status}" style="margin-left:auto"><i></i>${STATUS_LABEL[t.status]}</span></div><div class="panel-b" style="padding:6px 18px 14px">
+      ${row('站点数','sites 上限',su,sx)}
+      ${row('诊断调用','diagnoses / 月',du,dx)}
+      ${row('引用监测','citation freq / 日',cu,cx)}
+    </div></div>`;
+  }).join('');
+  requestAnimationFrame(()=>setTimeout(()=>$$('.qbar i').forEach(i=>i.style.width=i.dataset.w+'%'),80));
+}
+
+/* ---------- 渲染：工作空间（品牌） ---------- */
+function renderWS(){
+  const cards=[];
+  TENANTS.forEach(t=>t.workspaces.forEach(w=>cards.push({t,w})));
+  $('#wsGrid').innerHTML=cards.map(({t,w})=>`
+    <div class="brand-card">
+      <div class="bc-top"><div class="bc-mk" style="background:${avOf(w.brand)}">${w.mk}</div><div><h4>${w.brand}</h4><div class="own">租户 ${t.name} · ${t.id}</div></div><span class="chip ${t.status}" style="margin-left:auto"><i></i>${STATUS_LABEL[t.status]}</span></div>
+      <div class="bc-meta"><div><span>旗下站点</span><b>${w.sites.length}</b></div><div><span>sameAs 锚点</span><b>${w.sameAs}</b></div><div><span>会话数</span><b>${w.sessions}</b></div></div>
+      <div class="bc-ent">${w.wiki!=='—'?`<span class="e">wikidata:${w.wiki}</span>`:''}${w.sites.map(s=>`<span class="e" style="color:var(--ink2);background:var(--sink)">${s}</span>`).join('')}</div>
+    </div>`).join('');
+}
+
+/* ---------- 渲染：审计 ---------- */
+const AUDIT=[
+ ['14:52:08','ops-admin','芯联微电子 / 芯联 X-Link','tenant.status → active','解封 · 工单 #S-2201','a3f9…c10'],
+ ['14:30:12','system','云栖数据 / 云栖 YunQi','quota.exceeded','diagnoses 5610/5000 · 降级排队','9c21…44e'],
+ ['13:10:44','ops-admin','壶天科技 / 壶天','entity_rename.dry_run','37 files · 428 matches','71de…0b2'],
+ ['11:48:30','ops-admin','拓邦半导体 / 拓邦 TopBand','subscription.dunning','grace D9 · 续费失败','55ab…9f1'],
+ ['10:02:17','system','光年 SaaS / 光年 LightYear','tenant.created','trial · 14-day','e08c…773'],
+ ['09:15:51','ops-admin','灰产测试号 / [redacted]','tenant.suspend','违反 ToS · 不可自助恢复','c44f…2ad'],
+ ['08:40:09','system','锐石射频 / 锐石 RuiShi','sitemap.submitted','IndexNow 200 OK · 1284 urls','1f90…884'],
+ ['昨日 18:22','ops-admin','芯联微电子','subscription.renew','term-license 续约提醒已发','0d77…5c9']
+];
+function renderAudit(){
+  $('#auditBody').innerHTML=AUDIT.map(a=>`<tr>
+    <td class="mono" style="color:var(--mut);white-space:nowrap">${a[0]}</td>
+    <td><span class="chip ${a[1]==='system'?'mode':'plan pro'}" style="${a[1]==='system'?'':'color:var(--steel);background:var(--steel-soft)'}">${a[1]}</span></td>
+    <td style="color:var(--ink2)">${a[2]}</td>
+    <td class="mono" style="color:var(--steel)">${a[3]}</td>
+    <td style="color:var(--mut)">${a[4]}</td>
+    <td><span class="hash"><svg><use href="#i-lock"/></svg>${a[5]}</span></td>
+  </tr>`).join('');
+}
+
+/* ---------- 视图切换 ---------- */
+const TITLES={overview:['总览','全部租户的实时经营视图'],tenants:['租户管理','开号 · 状态机 · 封号与解封'],subs:['订阅与计费','订阅与按期限合同授权并存'],quotas:['额度与计量','服务端计量正本 · 配额用量'],workspaces:['工作空间 · 品牌','workspace = 品牌实体'],audit:['审计日志','append-only · 不可篡改']};
+function switchView(v){
+  $$('.ni').forEach(n=>n.classList.toggle('on',n.dataset.view===v));
+  $$('.view').forEach(s=>s.classList.toggle('on',s.dataset.view===v));
+  if(TITLES[v]){$('#topTitle').firstChild.textContent=TITLES[v][0];$('#topSub').textContent=TITLES[v][1];}
+  if(v==='tenants')renderTenants();
+  if(v==='subs')renderSubs();
+  if(v==='quotas')renderQuotas();
+  if(v==='workspaces')renderWS();
+  if(v==='audit')renderAudit();
+  $('.content').scrollTo({top:0});
+}
+$$('.ni[data-view]').forEach(n=>n.addEventListener('click',()=>switchView(n.dataset.view)));
+
+/* ---------- 抽屉 ---------- */
+function openDrawer(title,body,foot){$('#drawerTitle').textContent=title;$('#drawerBody').innerHTML=body;$('#drawerFoot').innerHTML=foot||'';$('#scrim').classList.add('open');$('#drawer').classList.add('open');}
+function closeDrawer(){$('#scrim').classList.remove('open');$('#drawer').classList.remove('open');}
+function openNewTenant(){
+  openDrawer('新建租户 · 开号',`
+    <div class="sec-t">基本信息</div>
+    <div class="field"><label>租户名称</label><input id="ntName" placeholder="例如：瀚海物联网"></div>
+    <div class="field"><label>Owner 邮箱</label><input id="ntEmail" placeholder="owner@company.com"></div>
+    <div class="field-row">
+      <div class="field"><label>初始套餐</label><select id="ntPlan"><option value="free">免费版</option><option value="pro" selected>专业版</option><option value="ent">企业版</option></select></div>
+      <div class="field"><label>初始状态</label><select id="ntStatus"><option value="trial" selected>Trial 试用</option><option value="active">Active 直接开通</option></select></div>
+    </div>
+    <div class="sec-t">授权与配额</div>
+    <div class="field-row">
+      <div class="field"><label>授权模式</label><select id="ntMode"><option value="subscription">subscription 订阅</option><option value="term-license">term-license 按期限</option></select></div>
+      <div class="field"><label>席位</label><input id="ntSeats" value="5"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>站点配额</label><input id="ntSites" value="10"></div>
+      <div class="field"><label>诊断调用 / 月</label><input id="ntDiag" value="5000"></div>
+    </div>
+    <div class="field"><label>首个品牌工作空间</label><input id="ntBrand" placeholder="品牌名（workspace = 品牌实体）"><div class="hint">创建后将作为该租户的第一个 workspace，绑定 brand_entity。</div></div>
+  `,`<button class="btn" onclick="closeDrawer()">取消</button><button class="btn primary" onclick="createTenant()"><svg><use href="#i-plus"/></svg>创建并开号</button>`);
+}
+function createTenant(){
+  const name=$('#ntName').value.trim()||'未命名租户';
+  const id='T-'+(1206+Math.floor(Math.random()*90));
+  const plan=$('#ntPlan').value,status=$('#ntStatus').value,seats=+$('#ntSeats').value||5;
+  const sites=+$('#ntSites').value||10,diag=+$('#ntDiag').value||5000,brand=$('#ntBrand').value.trim()||name.slice(0,4);
+  TENANTS.unshift({id,name,owner:$('#ntEmail').value.trim()||'—',plan,status,ws:1,sites:0,mrr:0,created:new Date().toISOString().slice(0,10),
+    sub:{mode:$('#ntMode').value,tier:PLAN_LABEL[plan]+(status==='trial'?'试用':''),period:status==='trial'?'14-day trial':'monthly',renew:status==='trial'?'试用剩 14 天':'—',seats},
+    quotas:{sites:[0,sites],diag:[0,diag],cite:[0,20]},
+    workspaces:[{brand,mk:brand[0],sameAs:0,wiki:'—',sites:[],sessions:0}]});
+  $('#bdgTenants').textContent=TENANTS.length;
+  closeDrawer();renderTenants();
+  toast(`已开号：${name}（${id}）· ${STATUS_LABEL[status]}`,'ok');
+}
+function openTenant(id){
+  const t=TENANTS.find(x=>x.id===id);if(!t)return;
+  const susp=t.status==='suspended';
+  const ring=(u,x,col)=>{const p=Math.min(u/x,1)*100;const C=2*Math.PI*16;const off=C*(1-p/100);return `<div class="mini-ring"><svg width="48" height="48" viewBox="0 0 48 48"><circle class="bg" cx="24" cy="24" r="16"/><circle cx="24" cy="24" r="16" stroke="${col}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${C.toFixed(0)}" stroke-dashoffset="${C.toFixed(0)}" data-off="${off.toFixed(0)}" class="mr-seg"/><text class="pct" x="24" y="28" text-anchor="transform" transform="rotate(90 24 24)" style="display:none"></text></svg><span>${u>=99999?'∞':u.toLocaleString()}${x>=99999?'':'/'+x.toLocaleString()}</span></div>`;};
+  const ws=t.workspaces.map(w=>`<div class="dd-ws"><b><span class="wm" style="background:${avOf(w.brand)}">${w.mk}</span>${w.brand}</b><div class="sites">${w.sites.length?w.sites.map(s=>`<code>${s}</code>`).join(''):'<span style="color:var(--faint)">暂无验证站点</span>'}</div></div>`).join('');
+  openDrawer(t.name,`
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px">
+      <span class="ta" style="background:${avOf(t.name)};width:44px;height:44px;font-size:17px;border-radius:11px">${t.name[0]}</span>
+      <div><div style="font-family:var(--disp);font-size:16px;font-weight:600">${t.owner}</div><div class="mono" style="font-size:11.5px;color:var(--mut)">${t.id} · 创建于 ${t.created}</div></div>
+      <span class="chip ${t.status}" style="margin-left:auto"><i></i>${STATUS_LABEL[t.status]}</span>
+    </div>
+    <div class="dd-block"><h4>订阅</h4>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px"><span class="chip plan ${t.plan}">${t.sub.tier}</span><span class="chip mode">${t.sub.mode}</span><span class="chip mode">${t.sub.period}</span><span class="chip mode">席位 ${t.sub.seats}</span></div>
+      <div class="mono" style="font-size:12px;color:var(--ink2)">续费 / 到期：<b>${t.sub.renew}</b></div>
+    </div>
+    <div class="dd-block"><h4>配额用量</h4><div class="mini-rings">${ring(t.quotas.sites[0],t.quotas.sites[1],'var(--steel)')}${ring(t.quotas.diag[0],t.quotas.diag[1],t.quotas.diag[0]>t.quotas.diag[1]?'var(--red)':'var(--amber)')}${ring(t.quotas.cite[0],t.quotas.cite[1],'var(--violet)')}</div>
+      <div style="display:flex;gap:18px;font-size:10.5px;color:var(--mut);margin-top:8px"><span>● 站点</span><span style="color:var(--amber)">● 诊断/月</span><span style="color:var(--violet)">● 引用/日</span></div>
+    </div>
+    <div class="dd-block"><h4>工作空间 · 品牌（${t.workspaces.length}）</h4>${ws}</div>
+  `,`<button class="btn" onclick="closeDrawer()">关闭</button>${susp?`<button class="btn primary" onclick="setStatus('${t.id}','active');closeDrawer()"><svg><use href="#i-check"/></svg>解封</button>`:`<button class="btn danger" onclick="openSuspend('${t.name}','${t.id}')"><svg><use href="#i-ban"/></svg>封停</button>`}`);
+  requestAnimationFrame(()=>setTimeout(()=>$$('.mr-seg').forEach(s=>s.style.strokeDashoffset=s.dataset.off),60));
+}
+
+/* ---------- 状态机 / 封停 ---------- */
+let pendingSuspend=null;
+function openSuspend(name,id){
+  const t=id?TENANTS.find(x=>x.id===id):TENANTS.find(x=>x.name===name);
+  pendingSuspend=t?t.id:null;
+  const nm=t?t.name:name;
+  $('#modalTitle').textContent=`确认封停「${nm}」？`;
+  $('#modalText').innerHTML=`封停后该租户的<strong>全部会话与工具调用立即返回 401</strong>，工作台与收件箱不可用，状态进入 <code>suspended</code>。此操作写入审计日志，且<strong>不可由客户自助恢复</strong>。`;
+  $('#modal').classList.add('open');
+}
+function closeModal(){$('#modal').classList.remove('open');pendingSuspend=null;}
+$('#modalConfirm').addEventListener('click',()=>{if(pendingSuspend){setStatus(pendingSuspend,'suspended');}closeModal();closeDrawer();});
+function setStatus(id,st){
+  const t=TENANTS.find(x=>x.id===id);if(!t)return;
+  const old=t.status;t.status=st;
+  if(st==='suspended'){t.sub.renew='已封停';}
+  else if(old==='suspended'&&st==='active'){t.sub.renew=t.sub.mode==='term-license'?'已恢复 · 待核对到期':'已恢复';}
+  renderTenants();
+  toast(`${t.name} → ${STATUS_LABEL[st]}`,st==='suspended'?'err':'ok');
+}
+
+/* ---------- toast ---------- */
+function toast(msg,kind){
+  const ic=kind==='ok'?'i-check':kind==='err'?'i-ban':kind==='warn'?'i-warn':'i-zap';
+  const t=document.createElement('div');t.className='toast '+(kind||'');
+  t.innerHTML=`<svg><use href="#${ic}"/></svg>${msg}`;
+  $('#toasts').appendChild(t);
+  setTimeout(()=>{t.classList.add('out');setTimeout(()=>t.remove(),320);},2800);
+}
+
+/* ---------- count up ---------- */
+function countUp(el,to){const t0=performance.now();(function f(t){const p=Math.min((t-t0)/1200,1);const e=1-Math.pow(1-p,3);el.textContent=Math.round(to*e).toLocaleString();if(p<1)requestAnimationFrame(f);})(t0);}
+
+/* ---------- live feed ---------- */
+const FEED_SEED=[
+ ['steel','<b>芯联微电子</b> 触发 <code>entity_rename</code> · dry_run 完成','14:52'],
+ ['green','<b>锐石射频</b> 提交语义站点地图 · IndexNow 200 OK','14:41'],
+ ['blue','新试用 <b>光年 SaaS</b> 完成首次 <code>run_diagnosis</code>','14:33'],
+ ['amber','<b>云栖数据</b> 诊断调用达到配额 100%','14:20'],
+ ['green','<b>壶天科技</b> 工作空间「壶天」新增站点 status.hutian.com','14:02']
+];
+const FEED_LIVE=[
+ ['green','<b>瀚海物联网</b> POC 站点通过所有权验证','刚刚'],
+ ['steel','<b>芯联微电子</b> <code>check_schema</code> 富媒体资格 ✓','刚刚'],
+ ['blue','<b>拓邦半导体</b> 续费重试 #3 失败','刚刚'],
+ ['green','<b>锐石射频</b> GEO 评分 78 → 84','刚刚'],
+ ['amber','<b>云栖数据</b> 超额调用进入排队','刚刚']
+];
+function feedRow(f,isNew){return `<div class="fe ${isNew?'new':''}"><span class="fd ${f[0]}"></span><div class="ft">${f[1]}</div><span class="fw">${f[2]}</span></div>`;}
+function renderFeed(){$('#feed').innerHTML=FEED_SEED.map(f=>feedRow(f,false)).join('');}
+let liveIdx=0;
+function pushLive(){const f=FEED_LIVE[liveIdx%FEED_LIVE.length];liveIdx++;const feed=$('#feed');feed.insertAdjacentHTML('afterbegin',feedRow(f,true));while(feed.children.length>9)feed.removeChild(feed.lastChild);}
+
+/* ---------- donut animate ---------- */
+function animateDonut(){setTimeout(()=>$$('.donut .seg').forEach(s=>s.style.strokeDashoffset=s.dataset.off),300);}
+
+/* ---------- clock ---------- */
+function tick(){$('#clock').textContent=new Date().toTimeString().slice(0,8);}
+
+/* ---------- init ---------- */
+renderTenants();renderFeed();
+$$('.cnt').forEach(el=>countUp(el,+el.dataset.to));
+animateDonut();tick();setInterval(tick,1000);
+setInterval(pushLive,3500);
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeDrawer();closeModal();}});
+</script>
+</body>
+</html>

@@ -41,3 +41,12 @@ tmp/
 # Wails 编译产物
 **/build/bin/
 **/package.json.md5
+
+# Go 编译产物
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+

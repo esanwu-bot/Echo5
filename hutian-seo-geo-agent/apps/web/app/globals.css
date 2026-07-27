@@ -260,3 +260,11 @@ body {
 .gap-4\.5 {
   gap: 1.125rem;
 }
+
+/* ── 移动端 safe-area 适配（Capacitor 套壳用，桌面/web 无副作用）── */
+.safe-top { padding-top: env(safe-area-inset-top, 0px); }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.safe-left { padding-left: env(safe-area-inset-left, 0px); }
+.safe-right { padding-right: env(safe-area-inset-right, 0px); }
+.safe-pt { padding-top: env(safe-area-inset-top, 0px); }
+.safe-pb { padding-bottom: env(safe-area-inset-bottom, 0px); }

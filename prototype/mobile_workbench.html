@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>壶天 · 移动工作台原型</title>
+<style>
+  /* 桌面看手机的壳；真机里这层不存在 */
+  :root{
+    --bg:#0a0e14; --panel:#11161f; --panel2:#161c27; --line:#222b38;
+    --txt:#e6ebf2; --txt2:#9aa7b8; --txt3:#5d6b7e;
+    --accent:#6366f1; --accent2:#22c55e; --warn:#f59e0b; --err:#ef4444;
+    --user:#1e293b; --tool:#0f1a14;
+    --safe-b:env(safe-area-inset-bottom,0px);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{font-family:-apple-system,"Segoe UI","PingFang SC",sans-serif;background:#1b2230;
+    min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;color:var(--txt)}
+  .hint{position:fixed;top:14px;left:50%;transform:translateX(-50%);color:#7d8aa0;font-size:12px}
+  /* 手机框 */
+  .phone{width:390px;height:844px;background:var(--bg);border-radius:44px;overflow:hidden;
+    position:relative;box-shadow:0 30px 80px rgba(0,0,0,.55);border:1px solid #2a3340;display:flex;flex-direction:column}
+  .notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:150px;height:30px;
+    background:#000;border-radius:0 0 20px 20px;z-index:60}
+  /* 顶栏 */
+  header{flex:0 0 auto;padding:46px 16px 12px;display:flex;align-items:center;gap:10px;
+    border-bottom:1px solid var(--line);background:var(--panel)}
+  .burger{width:34px;height:34px;border-radius:10px;background:var(--panel2);display:grid;place-items:center;
+    border:1px solid var(--line);cursor:pointer}
+  .burger span,.burger span::before,.burger span::after{content:"";display:block;width:16px;height:2px;
+    background:var(--txt2);border-radius:2px;position:relative}
+  .burger span::before{position:absolute;top:-5px}.burger span::after{position:absolute;top:5px}
+  .brand{font-weight:800;font-size:17px;letter-spacing:.5px}
+  .brand small{display:block;font-size:9px;font-weight:600;color:var(--txt3);letter-spacing:2px}
+  .mdl{margin-left:auto;font-size:11px;color:var(--txt2);background:var(--panel2);border:1px solid var(--line);
+    padding:5px 9px;border-radius:8px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--accent2);box-shadow:0 0 8px var(--accent2)}
+  /* 主体 */
+  main{flex:1 1 auto;position:relative;overflow:hidden}
+  .view{position:absolute;inset:0;overflow-y:auto;display:none;flex-direction:column}
+  .view.on{display:flex}
+  /* 对话流 */
+  #stream{padding:16px 14px 12px;display:flex;flex-direction:column;gap:12px}
+  .empty{margin:auto;text-align:center;color:var(--txt3);padding:40px 30px;line-height:1.7;font-size:13px}
+  .empty b{color:var(--txt2);display:block;font-size:15px;margin-bottom:8px}
+  .bub{max-width:86%;padding:11px 13px;border-radius:16px;font-size:14px;line-height:1.55;white-space:pre-wrap}
+  .bub.u{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:5px}
+  .bub.a{align-self:flex-start;background:var(--panel2);border:1px solid var(--line);border-bottom-left-radius:5px}
+  /* 工具块 */
+  .tool{align-self:stretch;background:var(--tool);border:1px solid #1c3326;border-radius:14px;overflow:hidden}
+  .tool .th{display:flex;align-items:center;gap:9px;padding:11px 12px;cursor:pointer}
+  .tool .ic{width:24px;height:24px;border-radius:7px;background:#10301f;display:grid;place-items:center;font-size:13px}
+  .tool .nm{font-size:13px;font-weight:600;color:#bfe9cd}
+  .tool .st{margin-left:auto;font-size:11px;color:var(--txt3);display:flex;align-items:center;gap:6px}
+  .spin{width:12px;height:12px;border:2px solid #2c5a3f;border-top-color:var(--accent2);border-radius:50%;
+    animation:sp .7s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .ok{color:var(--accent2)}
+  .tool .bd{display:none;padding:0 12px 11px;font-size:12px;color:var(--txt2);line-height:1.6;
+    border-top:1px solid #1c3326}
+  .tool.open .bd{display:block;padding-top:9px}
+  .tool.fold{opacity:.62}
+  .tool.fold .th{padding:8px 12px}
+  .chev{transition:transform .2s;color:var(--txt3)}
+  .tool.open .chev{transform:rotate(90deg)}
+  /* 思考态 */
+  .think{align-self:flex-start;display:flex;gap:5px;padding:6px 2px}
+  .think i{width:7px;height:7px;border-radius:50%;background:var(--txt3);animation:tk 1.1s infinite}
+  .think i:nth-child(2){animation-delay:.18s}.think i:nth-child(3){animation-delay:.36s}
+  @keyframes tk{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-4px)}}
+  /* 指标卡 */
+  .tiles{align-self:stretch;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .tile{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:11px}
+  .tile .v{font-size:20px;font-weight:800}
+  .tile .v.g{color:var(--accent2)}.tile .v.i{color:var(--accent)}
+  .tile .k{font-size:11px;color:var(--txt3);margin-top:2px}
+  /* 内联产物卡 */
+  .inline{align-self:flex-start;background:var(--panel2);border:1px solid var(--line);border-radius:12px;
+    padding:10px 12px;font-size:12px;color:var(--txt2);cursor:pointer;display:flex;align-items:center;gap:8px}
+  .inline .pi{color:var(--accent)}
+  /* 输入区 */
+  .composer{flex:0 0 auto;border-top:1px solid var(--line);background:var(--panel);
+    padding:10px 12px calc(10px + var(--safe-b));display:flex;gap:8px;align-items:flex-end}
+  .composer textarea{flex:1;resize:none;background:var(--panel2);border:1px solid var(--line);color:var(--txt);
+    border-radius:14px;padding:10px 12px;font-size:14px;font-family:inherit;max-height:96px;line-height:1.4}
+  .composer textarea:focus{outline:none;border-color:var(--accent)}
+  .send{width:42px;height:42px;border-radius:13px;background:var(--accent);border:none;color:#fff;
+    font-size:18px;cursor:pointer;flex:0 0 auto}
+  .send:disabled{opacity:.4}
+  /* 底部 tab */
+  nav{flex:0 0 auto;display:flex;background:var(--panel);border-top:1px solid var(--line);
+    padding:6px 0 calc(6px + var(--safe-b))}
+  nav button{flex:1;background:none;border:none;color:var(--txt3);font-size:10px;cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px}
+  nav button .ni{font-size:18px}
+  nav button.on{color:var(--accent)}
+  /* 会话抽屉 */
+  .scrim{position:absolute;inset:0;background:rgba(0,0,0,.5);z-index:40;opacity:0;pointer-events:none;transition:.25s}
+  .scrim.on{opacity:1;pointer-events:auto}
+  .drawer{position:absolute;top:0;left:0;bottom:0;width:80%;background:var(--panel);z-index:50;
+    transform:translateX(-100%);transition:.28s;display:flex;flex-direction:column;border-right:1px solid var(--line)}
+  .drawer.on{transform:none}
+  .drawer h3{padding:50px 18px 12px;font-size:13px;color:var(--txt3);letter-spacing:1px}
+  .sess{padding:12px 18px;border-bottom:1px solid var(--line);cursor:pointer}
+  .sess .t{font-size:14px;font-weight:600}.sess .s{font-size:11px;color:var(--txt3);margin-top:3px}
+  .sess.act{background:var(--panel2);border-left:3px solid var(--accent)}
+  .newchat{margin:14px 18px;padding:12px;border:1px dashed var(--line);border-radius:12px;text-align:center;
+    color:var(--txt2);font-size:13px;cursor:pointer}
+  /* 底部 sheet */
+  .sheet{position:absolute;left:0;right:0;bottom:0;background:var(--panel);border-top:1px solid var(--line);
+    border-radius:18px 18px 0 0;z-index:55;transform:translateY(100%);transition:.3s;max-height:62%;
+    display:flex;flex-direction:column;padding-bottom:var(--safe-b)}
+  .sheet.on{transform:none}
+  .sheet .grab{width:40px;height:4px;background:var(--line);border-radius:3px;margin:9px auto}
+  .sheet h4{padding:4px 18px 10px;font-size:14px}
+  .sheet .body{overflow:auto;padding:0 18px 16px;font-size:12px;color:var(--txt2);line-height:1.7;
+    font-family:ui-monospace,monospace;white-space:pre-wrap}
+  /* 会话/我的 视图 */
+  .listrow{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+  .listrow .lt{font-size:14px}.listrow .lv{font-size:13px;color:var(--txt2)}
+  .sec{padding:18px 18px 6px;font-size:12px;color:var(--txt3);letter-spacing:1px}
+  .badge{font-size:11px;color:var(--accent2);background:#10301f;border:1px solid #1c3326;padding:3px 8px;border-radius:20px}
+</style>
+</head>
+<body>
+<div class="hint">移动端 Agent Workbench 原型 · 点发送看流式演示 · 左上角开会话抽屉</div>
+<div class="phone">
+  <div class="notch"></div>
+
+  <header>
+    <div class="burger" id="burger"><span></span></div>
+    <div class="brand">壶天<small>SEO / GEO AGENT</small></div>
+    <div class="mdl">DeepSeek V4</div>
+    <div class="dot" title="bridge 在线"></div>
+  </header>
+
+  <main>
+    <!-- 工作台 -->
+    <section class="view on" id="v-work">
+      <div id="stream">
+        <div class="empty" id="empty">
+          <b>一句话，开始干活</b>
+          诊断、补结构化数据、追踪引用、提交收录——<br>移动端只保留对话主舞台，<br>Diff / 终端 / 产物点卡片弹底部面板。
+        </div>
+      </div>
+      <div class="composer">
+        <textarea id="inp" rows="1" placeholder="描述你的 SEO/GEO 目标…"></textarea>
+        <button class="send" id="send">↑</button>
+      </div>
+    </section>
+
+    <!-- 会话列表（作为独立 tab 时也复用结构，这里给个简版） -->
+    <section class="view" id="v-sess">
+      <div class="sec">最近会话</div>
+      <div class="listrow"><span class="lt">诊断 tikchip.cn 产品页</span><span class="lv">2 分钟前</span></div>
+      <div class="listrow"><span class="lt">电动三轮车站 SEO 审计</span><span class="lv">昨天</span></div>
+      <div class="listrow"><span class="lt">品牌更名 壶天 全站</span><span class="lv">3 天前</span></div>
+    </section>
+
+    <!-- 我的（接 M7 租户后台入口） -->
+    <section class="view" id="v-me">
+      <div class="sec">账户</div>
+      <div class="listrow"><span class="lt">租户</span><span class="lv">Acme 出海 <span class="badge">Pro</span></span></div>
+      <div class="listrow"><span class="lt">工作空间</span><span class="lv">tikchip-trike</span></div>
+      <div class="listrow"><span class="lt">本月用量</span><span class="lv">128 / 500 次</span></div>
+      <div class="sec">设置</div>
+      <div class="listrow"><span class="lt">席位与成员</span><span class="lv">›</span></div>
+      <div class="listrow"><span class="lt">凭证管理</span><span class="lv">›</span></div>
+      <div class="listrow"><span class="lt">审计日志</span><span class="lv">›</span></div>
+    </section>
+
+    <!-- 会话抽屉 -->
+    <div class="scrim" id="scrim"></div>
+    <aside class="drawer" id="drawer">
+      <h3>会话</h3>
+      <div class="newchat">＋ 新建会话</div>
+      <div class="sess act"><div class="t">诊断 tikchip.cn 产品页</div><div class="s">run_diagnosis · 进行中</div></div>
+      <div class="sess"><div class="t">电动三轮车站 SEO 审计</div><div class="s">已完成 · 4 工具</div></div>
+      <div class="sess"><div class="t">品牌更名 壶天 全站</div><div class="s">entity_rename · 已写盘</div></div>
+    </aside>
+
+    <!-- 产物/终端 底部 sheet -->
+    <div class="scrim" id="scrim2"></div>
+    <div class="sheet" id="sheet">
+      <div class="grab"></div>
+      <h4 id="sheet-t">产物 · schema-patch.jsonld</h4>
+      <div class="body" id="sheet-b"></div>
+    </div>
+  </main>
+
+  <nav>
+    <button class="on" data-v="v-work"><span class="ni">💬</span>工作台</button>
+    <button data-v="v-sess"><span class="ni">🗂</span>会话</button>
+    <button data-v="v-me"><span class="ni">👤</span>我的</button>
+  </nav>
+</div>
+
+<script>
+  const $=s=>document.querySelector(s), stream=$('#stream'), empty=$('#empty'),
+        inp=$('#inp'), send=$('#send');
+  // 输入框自适应高度
+  inp.addEventListener('input',()=>{inp.style.height='auto';inp.style.height=Math.min(inp.scrollHeight,96)+'px'});
+  // tab 切换
+  document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on'));
+    document.querySelectorAll('.view').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); $('#'+b.dataset.v).classList.add('on');
+  });
+  // 抽屉
+  const openD=on=>{$('#drawer').classList.toggle('on',on);$('#scrim').classList.toggle('on',on)};
+  $('#burger').onclick=()=>openD(true); $('#scrim').onclick=()=>openD(false);
+  // sheet
+  const openS=on=>{$('#sheet').classList.toggle('on',on);$('#scrim2').classList.toggle('on',on)};
+  $('#scrim2').onclick=()=>openS(false);
+  const wait=ms=>new Promise(r=>setTimeout(r,ms));
+  const el=(c,h)=>{const d=document.createElement('div');d.className=c;if(h!=null)d.innerHTML=h;return d};
+
+  function addTool(name,summary,detail){
+    const t=el('tool');
+    t.innerHTML=`<div class="th"><div class="ic">🔧</div><div class="nm">${name}</div>
+      <div class="st"><span class="spin"></span><span class="tt">运行中</span><span class="chev">›</span></div></div>
+      <div class="bd">${detail}</div>`;
+    t.querySelector('.th').onclick=()=>t.classList.toggle('open');
+    stream.appendChild(t); scroll();
+    return {done(ms){return wait(ms).then(()=>{
+      t.querySelector('.spin').outerHTML='<span class="ok">✓</span>';
+      t.querySelector('.tt').textContent=ms+'ms';
+      t.querySelector('.bd').insertAdjacentHTML('afterbegin','<div style="margin-bottom:6px;color:#7fae8d">'+summary+'</div>');
+      // UX-07：新工具出现时折叠已完成的旧工具
+      document.querySelectorAll('.tool').forEach(o=>{if(o!==t&&o.querySelector('.ok'))o.classList.add('fold')});
+    })}};
+  }
+  const scroll=()=>stream.scrollTop=stream.scrollHeight;
+
+  async function run(q){
+    empty?.remove();
+    stream.appendChild(el('bub u',q)); scroll();
+    const th=el('think','<i></i><i></i><i></i>'); stream.appendChild(th); scroll();
+    await wait(700); th.remove();
+
+    const t1=addTool('run_diagnosis','双评分：传统 64% / GEO 71% · 结构化缺失 ⚠',
+      '技术爬取 ✓ · 品牌声誉 ✓ · 用户意图 ⚠ · 性能 ✓\n问题：产品页缺 Product JSON-LD 的 offers/brand');
+    await t1.done(1840);
+
+    const a1=el('bub a','诊断完成：抓取健康，但产品页**结构化数据缺失**，AI 引擎难以引用。建议补 Product Schema。');
+    stream.appendChild(a1); scroll(); await wait(500);
+
+    const t2=addTool('check_schema','缺字段：offers.price / brand / sku',
+      'expected=Product · found=true · valid=false · rich_result_eligible=false');
+    await t2.done(920);
+
+    // 内联产物卡 → 点弹 sheet
+    const ic=el('inline','<span class="pi">📄</span> schema-patch.jsonld <span style="margin-left:auto;color:var(--txt3)">查看 ›</span>');
+    ic.onclick=()=>{$('#sheet-b').textContent=
+      '{\n  "@type":"Product",\n  "brand":{"@type":"Brand","name":"壶天"},\n  "sku":"TRIKE-X1",\n  "offers":{"@type":"Offer","price":"1299","priceCurrency":"USD"}\n}';
+      openS(true)};
+    stream.appendChild(ic); scroll(); await wait(400);
+
+    const a2=el('bub a','已生成补丁并写入。提交收录让搜索引擎与 AI 重新抓取？');
+    stream.appendChild(a2); scroll(); await wait(400);
+
+    const t3=addTool('submit_sitemap','IndexNow 已提交 1 URL · accepted',
+      'targets: bing=accepted · yandex=accepted · verified=unknown（业务层待观测）');
+    await t3.done(1300);
+
+    // 收尾指标卡
+    const tiles=el('tiles',`
+      <div class="tile"><div class="v g">+89%</div><div class="k">搜索流量 30d</div></div>
+      <div class="tile"><div class="v i">92%</div><div class="k">GEO 评分</div></div>
+      <div class="tile"><div class="v">2,410</div><div class="k">AI 引用量</div></div>
+      <div class="tile"><div class="v g">+12.5%</div><div class="k">引用增速</div></div>`);
+    stream.appendChild(tiles); scroll();
+  }
+
+  send.onclick=()=>{const q=(inp.value||'诊断 tikchip.cn 的产品页，补结构化数据').trim();
+    inp.value='';inp.style.height='auto';send.disabled=true;run(q).finally(()=>send.disabled=false)};
+  inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send.click()}});
+</script>
+</body>
+</html>

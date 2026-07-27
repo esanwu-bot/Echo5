@@ -22,7 +22,11 @@ import { mockStream } from "./mockStream";
  * Replaces the previous zustand store + useAgentSSE pair with a pure
  * useReducer + streamReducer, per 技术方案 §2/§8 (no zustand).
  */
-export function useAgentSession(mode: "mock" | "sse" = "mock") {
+export function useAgentSession(
+  mode: "mock" | "sse" = "mock",
+  baseURL: string = "",
+) {
+  const api = (p: string) => `${baseURL}${p}`;
   const [state, dispatch] = useReducer(streamReducer, initialStreamState);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sseReady, setSseReady] = useState(false);
@@ -43,7 +47,7 @@ export function useAgentSession(mode: "mock" | "sse" = "mock") {
     if (mode !== "sse") return;
     esRef.current?.close();
     setSseReady(false);
-    const es = new EventSource(`/api/sessions/${sid}/stream`);
+    const es = new EventSource(api(`/api/sessions/${sid}/stream`));
     es.onopen = () => setSseReady(true);
     es.onmessage = (e) => {
       try {
@@ -66,7 +70,7 @@ export function useAgentSession(mode: "mock" | "sse" = "mock") {
     while (pendingRef.current.length > 0) {
       const text = pendingRef.current.shift()!;
       try {
-        await fetch(`/api/sessions/${sid}/messages`, {
+        await fetch(api(`/api/sessions/${sid}/messages`), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ prompt: text }),
@@ -103,7 +107,7 @@ export function useAgentSession(mode: "mock" | "sse" = "mock") {
         // Lazy create session
         pendingRef.current.push(text);
         try {
-          const resp = await fetch("/api/sessions", { method: "POST" });
+          const resp = await fetch(api("/api/sessions"), { method: "POST" });
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
           const data = (await resp.json()) as { id: string };
           setSessionId(data.id);
@@ -128,7 +132,7 @@ export function useAgentSession(mode: "mock" | "sse" = "mock") {
       }
 
       try {
-        await fetch(`/api/sessions/${sessionId}/messages`, {
+        await fetch(api(`/api/sessions/${sessionId}/messages`), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ prompt: text }),

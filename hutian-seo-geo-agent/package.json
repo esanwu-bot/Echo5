@@ -6,7 +6,10 @@
     "dev": "turbo run dev",
     "build": "turbo run build",
     "lint": "turbo run lint",
-    "probe:tenant": "powershell -ExecutionPolicy Bypass -File apps/tenant-api/verify.ps1"
+    "probe:tenant": "powershell -ExecutionPolicy Bypass -File apps/tenant-api/verify.ps1",
+    "dev:mobile": "pnpm --filter @hutian/mobile dev",
+    "build:mobile": "pnpm --filter @hutian/mobile build",
+    "cap:sync": "pnpm --filter @hutian/mobile cap:sync"
   },
   "devDependencies": {
     "turbo": "^2.3.0",

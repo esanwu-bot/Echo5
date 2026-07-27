@@ -23,7 +23,7 @@ import type { RunCtx } from "./flow-control.ts";
 
 const MAX_TURNS = 15;
 
-const SYSTEM_PROMPT = `你是壶天 SEO/GEO 智能体，通过调用工具帮助用户完成品牌实体更新、SEO/GEO 诊断、AI 引用追踪、结构化数据补齐、站点地图提交等任务。
+const SYSTEM_PROMPT = `你是壶天 SEO/GEO 智能体，通过调用工具帮助用户完成品牌实体更新、SEO/GEO 诊断、AI 引用追踪、结构化数据补齐、站点地图提交、AI 建站等任务。
 
 工作原则：
 1. 收到用户指令后，先简要说明计划（1-2 句），然后调用合适的工具
@@ -32,7 +32,19 @@ const SYSTEM_PROMPT = `你是壶天 SEO/GEO 智能体，通过调用工具帮助
 4. 不要臆测评分或数据 —— 所有结论必须来自工具返回
 5. 完成所有步骤后，用一句话总结本次会话执行的工具数
 
-可用工具经 MCP 提供，包括：run_diagnosis / check_schema / trace_citations / submit_sitemap / entity_rename。`;
+可用工具经 MCP 提供，包括：
+- SEO/GEO：run_diagnosis / check_schema / trace_citations / submit_sitemap / entity_rename
+- 建站：cms_create_page / cms_update_content / cms_configure_product / cms_upload_media / cms_publish
+
+建站工具用法：
+- cms_create_page：创建页面/文章（title/summary/content/category_id/status）
+  - content 是 markdown 格式正文；不要以一级标题（# 标题）开头，因为页面已用 <h1> 渲染 title
+  - 正文标题请从二级标题（##）开始，避免 H1 重复
+- cms_configure_product：创建或编辑商品（name/product_code/description/price/stock/category_id）
+- cms_upload_media：上传图片/媒体（file_path）
+- cms_publish：发布/上线页面或商品（id/type/status）
+- 建完页面/商品后，loop 会自动调用 check_schema 复验渲染器输出的 JSON-LD 是否合法`;
+
 
 export interface AgentLoopDeps {
   llm: LLMClient;
@@ -277,6 +289,16 @@ function planItemForTool(name: string, args: Record<string, unknown>): string {
       return `补齐 Product 结构化数据（JSON-LD）`;
     case "submit_sitemap":
       return `提交语义站点地图并验证收录`;
+    case "cms_create_page":
+      return `创建页面 / ${args.title ?? "未命名"}`;
+    case "cms_update_content":
+      return `更新页面内容 / id=${args.id}`;
+    case "cms_configure_product":
+      return `配置商品 / ${args.name ?? "未命名"}`;
+    case "cms_upload_media":
+      return `上传媒体 / ${args.file_path ?? ""}`;
+    case "cms_publish":
+      return `发布 ${args.type} / id=${args.id}`;
     default:
       return `调用 ${name}`;
   }
@@ -295,6 +317,16 @@ function formatArgs(name: string, args: Record<string, unknown>): string {
       return `url=${args.url}${args.expected_type ? ` · type=${args.expected_type}` : ""}`;
     case "submit_sitemap":
       return `host=${args.host} · ${(args.urls as string[])?.length ?? 0} URLs`;
+    case "cms_create_page":
+      return `title="${args.title}" · status=${args.status ?? 1}`;
+    case "cms_update_content":
+      return `id=${args.id}${args.title ? ` · title="${args.title}"` : ""}`;
+    case "cms_configure_product":
+      return `name="${args.name}" · price=${args.price} · stock=${args.stock}`;
+    case "cms_upload_media":
+      return `file=${args.file_path}`;
+    case "cms_publish":
+      return `type=${args.type} · id=${args.id} · status=${args.status}`;
     default:
       return JSON.stringify(args);
   }

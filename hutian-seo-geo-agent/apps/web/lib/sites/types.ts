@@ -35,6 +35,8 @@ export interface Product {
 
 export interface SiteSettings {
   site_name: string;
+  /** 壶天侧品牌名（PRD §4.1 现行品牌），优先用于 γ 建站产物 */
+  brand_name: string;
   site_description: string;
   site_keywords: string;
   meta_title: string;

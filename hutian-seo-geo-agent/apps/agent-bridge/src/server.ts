@@ -69,7 +69,17 @@ async function buildLLM(): Promise<LLMClient> {
 // 共享 MCP client（每个 session 复用，避免每次 spawn hutian-seo-mcp）
 let sharedMcp: McpToolClient | null = null;
 function getMcp(): McpToolClient {
-  if (!sharedMcp) sharedMcp = new StdioMcpClient();
+  if (!sharedMcp) {
+    // 把 Node --env-file 加载进当前进程的环境变量显式传给 Python 子进程，
+    // 否则 hutian-seo-mcp 读不到 SITEBASE_* / CODEBUDDY_API_KEY 等配置。
+    const env: Record<string, string> = {};
+    const keys = Object.keys(process.env);
+    for (const key of keys) {
+      const value = process.env[key];
+      if (value !== undefined) env[key] = value;
+    }
+    sharedMcp = new StdioMcpClient({ env });
+  }
   return sharedMcp;
 }
 

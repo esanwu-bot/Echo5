@@ -98,10 +98,14 @@ class SiteBaseClient:
         self._token_expires_at = time.time() + 2592000 - 3600
         return token
 
-    def _get_token(self) -> str:
+    def _get_token(self) -> str | None:
         if self._token and time.time() < self._token_expires_at:
             return self._token
-        return self.login()
+        try:
+            return self.login()
+        except SiteBaseAuthError as exc:
+            # 让 request 统一返回结构化错误，不抛 traceback 给模型
+            return None
 
     # ─────────────────────────────────────────────
     # 请求封装（401 自动重登）
@@ -186,12 +190,16 @@ def get_client() -> SiteBaseClient:
 
 
 def is_sitebase_available() -> bool:
-    """探活 siteBase backend（用于 mock fallback 判断）"""
+    """探活 siteBase backend（用于 mock fallback 判断）
+
+    红线：探活验 admin login 拿 token，不验 public 读接口。
+    原因：public v1 接口可能有既有 bug（如 /api/v1/products/:id 返回 500），
+    但 admin 写链路仍可用；验 public 会让 cms 工具误判"siteBase 不可用"走 mock。
+    admin login 是写链路的真实前置，验它才准确。
+    """
     try:
-        resp = requests.get(
-            "http://localhost:8000/api/v1/articles?limit=1",
-            timeout=2,
-        )
-        return resp.status_code == 200
-    except requests.RequestException:
+        client = get_client()
+        token = client._get_token()
+        return token is not None
+    except SiteBaseAuthError:
         return False

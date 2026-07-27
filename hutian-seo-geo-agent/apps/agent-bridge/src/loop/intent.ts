@@ -28,6 +28,7 @@ export type IntentKind =
   | "report" // AI 引用追踪
   | "submit" // sitemap 提交
   | "check_schema" // 结构化数据补齐
+  | "cms" // 建站 / 创建页面 / 添加商品
   | "chitchat" // 闲聊 / 问候
   | "ambiguous"; // 低置信反问
 
@@ -91,6 +92,10 @@ const SUBMIT_KEYWORDS = /(sitemap|站点地图|提交|收录|submit|indexnow)/i;
 /** check_schema 关键词 */
 const SCHEMA_KEYWORDS = /(结构化数据|json-?ld|schema|microdata|product\s*type)/i;
 
+/** 建站关键词 */
+const CMS_KEYWORDS =
+  /(建[站站]|创建?页面?|添加?商品|创建?文章|创建?产品|上传图片|上传媒体|发布页面?|cms|page|product|article|独立站)/i;
+
 /** 闲聊关键词 */
 const CHITCHAT_KEYWORDS = /^(你好|您好|hi|hello|hey|谢谢|感谢|bye|再见|你是谁|你能做什么)/i;
 
@@ -145,6 +150,9 @@ export function classifyIntentByRule(input: string): Intent | null {
   }
   if (SCHEMA_KEYWORDS.test(raw)) {
     return { kind: "check_schema", confidence: 0.8, slots, source: "rule", raw };
+  }
+  if (CMS_KEYWORDS.test(raw)) {
+    return { kind: "cms", confidence: 0.85, slots, source: "rule", raw };
   }
 
   // 3. 闲聊（短句 + 问候词）
@@ -227,6 +235,7 @@ const INTENT_ENUM = [
   "report",
   "submit",
   "check_schema",
+  "cms",
   "chitchat",
   "ambiguous",
 ] as const;
@@ -237,6 +246,7 @@ const INTENT_CLASSIFY_PROMPT = `你是壶天 SEO/GEO Agent 的意图分类器。
 - report: AI 引用追踪 / 可见度统计
 - submit: sitemap 提交 / 收录推送
 - check_schema: 结构化数据补齐 / JSON-LD
+- cms: 建站 / 创建页面 / 添加商品 / 上传媒体 / 发布（如"建一篇文章页""添加一个商品""上传图片"）
 - chitchat: 闲聊 / 问候 / 无业务意图
 - ambiguous: 模糊 / 信息不足 / 多意图冲突
 
@@ -321,12 +331,12 @@ function parseIntentJson(text: string): {
 
 function buildClarifyQuestion(input: string, slots: IntentSlots): string {
   if (!slots.url && !slots.brand) {
-    return "你想做什么？比如「诊断 example.com 的 SEO」「把品牌从 X 改为 Y」「提交 sitemap」";
+    return "你想做什么？比如「诊断 example.com 的 SEO」「把品牌从 X 改为 Y」「提交 sitemap」「建一篇关于三轮车的文章页」";
   }
-  if (slots.url && !slots.brand && !/诊断|分析|seo|geo/i.test(input)) {
+  if (slots.url && !slots.brand && !/诊断|分析|seo|geo|建|cms/i.test(input)) {
     return `针对 ${slots.url}，你想诊断 SEO、追踪 AI 引用、还是补 JSON-LD？`;
   }
-  return "能补充一下细节吗？比如目标 URL、品牌名、时间窗口";
+  return "能补充一下细节吗？比如目标 URL、品牌名、时间窗口，或要建的页面/商品信息";
 }
 
 // ───────────────────────────────────────────────────────────────

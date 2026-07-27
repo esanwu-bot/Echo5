@@ -14,6 +14,7 @@ import type { Article, Product, ReaderResult, SiteSettings } from "./types";
 const SITEBASE_URL =
   process.env.SITEBASE_API_URL || "http://localhost:8000/api/v1";
 const SITEBASE_DOMAIN = process.env.SITEBASE_DOMAIN || "https://tikchip.cn";
+const HUTIAN_BRAND_NAME = process.env.HUTIAN_BRAND_NAME || "壶天";
 
 // 门禁开关：v1 不通时是否 fallback 到 mock。生产期应关闭，MVP 期开启。
 const ALLOW_MOCK_FALLBACK =
@@ -25,31 +26,50 @@ const SKIP_LIVE_FETCH =
   process.env.NODE_ENV !== "production" &&
   process.env.SITEBASE_SKIP_LIVE !== "false";
 
-async function fetchJson<T>(path: string): Promise<T | null> {
-  if (SKIP_LIVE_FETCH) return null;
+/**
+ * fetchJson — 调 siteBase v1 public GET
+ *
+ * 返回三态（与 cms_tools.py 降级判据对齐）：
+ *   - { ok: true, data }           类0：live 成功
+ *   - { ok: false, kind: "network" } 类1：连接拒/超时/5xx → 调用方可 mock fallback
+ *   - { ok: false, kind: "business" } 类3：4xx/业务码(404/400) → 调用方禁止 mock（避免假页污染索引）
+ */
+type FetchResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; kind: "network" }
+  | { ok: false; kind: "business" };
+
+async function fetchJson<T>(path: string): Promise<FetchResult<T>> {
+  if (SKIP_LIVE_FETCH) return { ok: false, kind: "network" };
   const url = `${SITEBASE_URL}${path}`;
   try {
-    // 用 Promise.race + 显式 timeout，避免 AbortController 被 Next.js patch 当 retry 信号
-    const timeout = new Promise<null>((resolve) =>
-      setTimeout(() => resolve(null), 1500)
+    const timeout = new Promise<FetchResult<T>>((resolve) =>
+      setTimeout(() => resolve({ ok: false, kind: "network" }), 1500)
     );
     const req = fetch(url, {
       headers: { Accept: "application/json", "Accept-Language": "zh-CN" },
-    }).then(async (res) => {
-      if (!res.ok) return null;
+    }).then(async (res): Promise<FetchResult<T>> => {
+      if (!res.ok) {
+        // HTTP 5xx = 服务端错误（类1，可 mock）；HTTP 4xx = 业务错（类3，不 mock）
+        return { ok: false, kind: res.status >= 500 ? "network" : "business" };
+      }
       const json = (await res.json()) as {
         code: number;
         data?: T;
         msg?: string;
       };
       if (json && (json.code === 0 || json.code === 200) && json.data) {
-        return json.data;
+        return { ok: true, data: json.data };
       }
-      return null;
+      // siteBase 返回 200 但 code 非 0/200（如 code:500 "服务器内部错误"）
+      // → 服务端业务错（类1，可 mock，因为是 siteBase bug 不是请求错）
+      if (json && json.code >= 500) return { ok: false, kind: "network" };
+      // code:400/404 → 业务错（类3，不 mock）
+      return { ok: false, kind: "business" };
     });
-    return (await Promise.race([req, timeout])) as T | null;
+    return (await Promise.race([req, timeout])) as FetchResult<T>;
   } catch {
-    return null;
+    return { ok: false, kind: "network" };
   }
 }
 
@@ -90,6 +110,7 @@ const MOCK_PRODUCT: Product = {
 
 const MOCK_SETTINGS: SiteSettings = {
   site_name: "天启芯科技",
+  brand_name: HUTIAN_BRAND_NAME,
   site_description: "专业的半导体元器件供应商",
   site_keywords: "半导体,电子元件,MOS管,二极管,三极管,MCU",
   meta_title: "天启芯科技 - 专业的半导体元器件供应商",
@@ -105,30 +126,36 @@ const MOCK_SETTINGS: SiteSettings = {
 // ────────────────────────────────────────────────
 
 export async function getArticle(id: string | number): Promise<ReaderResult<Article>> {
-  const data = await fetchJson<Article>(`/articles/${id}`);
-  if (data) return { data, source: "live" };
-  if (ALLOW_MOCK_FALLBACK) {
+  const r = await fetchJson<Article>(`/articles/${id}`);
+  if (r.ok) return { data: r.data, source: "live" };
+  if (r.kind === "network" && ALLOW_MOCK_FALLBACK) {
     return { data: { ...MOCK_ARTICLE, id: Number(id) || 1 }, source: "mock" };
   }
-  return { data: null, source: "error", error: "article not found in v1" };
+  // business 错（404/400）或不允许 mock → 返回 null，渲染器走 notFound()
+  // 不返回 mock 假数据，避免爬虫索引假页污染索引
+  return { data: null, source: "error", error: `article ${id} ${r.kind} error` };
 }
 
 export async function getProduct(id: string | number): Promise<ReaderResult<Product>> {
-  const data = await fetchJson<Product>(`/products/${id}`);
-  if (data) return { data, source: "live" };
-  if (ALLOW_MOCK_FALLBACK) {
+  const r = await fetchJson<Product>(`/products/${id}`);
+  if (r.ok) return { data: r.data, source: "live" };
+  if (r.kind === "network" && ALLOW_MOCK_FALLBACK) {
     return { data: { ...MOCK_PRODUCT, id: Number(id) || 1 }, source: "mock" };
   }
-  return { data: null, source: "error", error: "product not found in v1" };
+  // business 错（404/400）或不允许 mock → 返回 null，渲染器走 notFound()
+  // 不返回 mock 假数据，避免爬虫索引假页污染索引
+  return { data: null, source: "error", error: `product ${id} ${r.kind} error` };
 }
 
 export async function getSiteSettings(): Promise<ReaderResult<SiteSettings>> {
   // /api/v1/settings/group/seo — 证据 route/api.php:451
-  const data = await fetchJson<Record<string, string>>(`/settings/seo`);
-  if (data && data.meta_title) {
+  const r = await fetchJson<Record<string, string>>(`/settings/seo`);
+  if (r.ok && r.data && r.data.meta_title) {
+    const data = r.data;
     return {
       data: {
         site_name: data.site_name || MOCK_SETTINGS.site_name,
+        brand_name: HUTIAN_BRAND_NAME,
         site_description: data.site_description || MOCK_SETTINGS.site_description,
         site_keywords: data.site_keywords || MOCK_SETTINGS.site_keywords,
         meta_title: data.meta_title,
@@ -140,8 +167,8 @@ export async function getSiteSettings(): Promise<ReaderResult<SiteSettings>> {
       source: "live",
     };
   }
-  if (ALLOW_MOCK_FALLBACK) return { data: MOCK_SETTINGS, source: "mock" };
-  return { data: null, source: "error", error: "settings not found in v1" };
+  if (r.kind === "network" && ALLOW_MOCK_FALLBACK) return { data: MOCK_SETTINGS, source: "mock" };
+  return { data: null, source: "error", error: `settings ${r.kind} error` };
 }
 
 export { SITEBASE_DOMAIN };

@@ -94,6 +94,19 @@ export function beforeGuardrail(intent: Intent): BeforeGuardrailResult {
         ].join("\n"),
       };
     }
+    case "cms": {
+      return {
+        systemPromptSuffix: [
+          "",
+          "【硬约束 · 建站】",
+          "用户意图是建站（创建页面/商品/上传媒体/发布）。",
+          "根据用户描述调用合适的建站工具：cms_create_page / cms_configure_product / cms_upload_media / cms_publish。",
+          "创建页面用 cms_create_page（title/summary/content 必填），创建商品用 cms_configure_product（name/product_code 必填）。",
+          "建完页面或商品后，loop 会自动触发 check_schema 复验渲染器输出的 JSON-LD 是否合法，无需手动再调 check_schema。",
+          "siteBase backend 未启动时工具会返回 mock 数据（source=mock），loop 仍可继续跑复验链路。",
+        ].join("\n"),
+      };
+    }
     default:
       return { systemPromptSuffix: "" };
   }

@@ -19,6 +19,7 @@ interface SchemaBase {
 
 export interface ArticleSchema extends SchemaBase {
   "@type": "Article";
+  name: string;
   headline: string;
   description: string;
   datePublished: string;
@@ -98,13 +99,14 @@ export function buildArticleSchema(
   const schema: ArticleSchema = {
     "@context": "https://schema.org",
     "@type": "Article",
+    name: article.title,
     headline: article.title,
     description: article.summary || article.title,
     datePublished: article.publish_time,
-    author: { "@type": "Organization", name: settings.site_name },
+    author: { "@type": "Organization", name: settings.brand_name },
     publisher: {
       "@type": "Organization",
-      name: settings.site_name,
+      name: settings.brand_name,
       logo: { "@type": "ImageObject", url: absUrl(settings.og_image, settings.domain) },
     },
     mainEntityOfPage: { "@type": "WebPage", "@id": pageUrl },
@@ -129,7 +131,7 @@ export function buildProductSchema(
     sku: String(product.id),
     brand: {
       "@type": "Brand",
-      name: product.brand_name || settings.site_name,
+      name: product.brand_name || settings.brand_name,
     },
     offers: {
       "@type": "Offer",
@@ -139,7 +141,7 @@ export function buildProductSchema(
         ? "https://schema.org/InStock"
         : "https://schema.org/OutOfStock",
       url: pageUrl,
-      seller: { "@type": "Organization", name: settings.site_name },
+      seller: { "@type": "Organization", name: settings.brand_name },
     },
   };
   if (product.category_name) schema.category = product.category_name;

@@ -26,6 +26,8 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import sys
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
@@ -110,6 +112,20 @@ def cms_create_page(
         JSON 字符串，含 { ok, data: {id, ...}, source: "live"|"mock" }
         afterGuardrail 会据 data.id 自动触发 check_schema 复验渲染器 URL
     """
+    # 判官日志：验证 env 是否传到 MCP 子进程（脱敏凭证，写 stderr 避免被 MCP stdio 吞掉）
+    admin_url = os.getenv("SITEBASE_ADMIN_URL", "<unset>")
+    admin_user = os.getenv("SITEBASE_ADMIN_USER", "<unset>")
+    admin_pass_mask = "set" if os.getenv("SITEBASE_ADMIN_PASS") else "<unset>"
+    sys.stderr.write(
+        f"[cms_create_page] env: SITEBASE_ADMIN_URL={admin_url} "
+        f"SITEBASE_ADMIN_USER={admin_user} SITEBASE_ADMIN_PASS={admin_pass_mask}\n"
+    )
+    sys.stderr.flush()
+
+    # 硬纪律：正文不以一级标题开头，避免页面 H1 与 title 重复
+    # LLM prompt 已约束，此处兜底
+    content = re.sub(r"^#\s+.+\n?", "", content, count=1)
+
     body: dict[str, Any] = {
         "title": title,
         "summary": summary,
@@ -128,7 +144,20 @@ def cms_create_page(
     client = get_client()
     result = client.request("POST", "/articles", json_body=body)
     if not result.get("ok"):
-        # live 失败也 fallback mock，保证 loop 能继续跑复验
+        # 类3（business error）：原样返回，不 mock，让 LLM 修正参数
+        if result.get("error") == "business error":
+            return json.dumps(
+                {
+                    "ok": False,
+                    "retryable": False,
+                    "error": "business error",
+                    "detail": result.get("body"),
+                    "hint": "siteBase 拒绝了请求（如分类不存在、字段非法），请修正参数后重试",
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        # 类1（network/5xx）：fallback mock，保证 loop 能继续跑复验
         mock = _mock_article_response(title, summary, content)
         mock["live_error"] = result.get("error")
         return json.dumps(mock, ensure_ascii=False, indent=2)
@@ -251,6 +280,20 @@ def cms_configure_product(
         result = client.request("POST", "/products", json_body=body)
 
     if not result.get("ok"):
+        # 类3（business error）：原样返回，不 mock，让 LLM 修正参数
+        if result.get("error") == "business error":
+            return json.dumps(
+                {
+                    "ok": False,
+                    "retryable": False,
+                    "error": "business error",
+                    "detail": result.get("body"),
+                    "hint": "siteBase 拒绝了请求（如分类不存在、字段非法），请修正参数后重试",
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        # 类1（network/5xx）：fallback mock，保证 loop 能继续跑复验
         mock = _mock_product_response(name, product_code, price)
         mock["live_error"] = result.get("error")
         return json.dumps(mock, ensure_ascii=False, indent=2)

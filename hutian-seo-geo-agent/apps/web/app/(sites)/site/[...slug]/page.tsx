@@ -19,6 +19,7 @@ import {
   getSiteSettings,
   SITEBASE_DOMAIN,
 } from "@/lib/sites/reader";
+import { MarkdownContent } from "@/lib/markdown";
 import {
   buildArticleSchema,
   buildBreadcrumbSchema,
@@ -28,6 +29,7 @@ import type {
   ArticleSchema,
   BreadcrumbSchema,
   ProductSchema,
+  WebPageSchema,
 } from "@/lib/sites/schema-mapping";
 
 // 强制 SSR（每次请求都重新生成，不缓存）
@@ -85,7 +87,7 @@ export async function generateMetadata({
         description: s.meta_description,
         type: "website",
         url,
-        siteName: s.site_name,
+        siteName: s.brand_name,
         images: [{ url: s.og_image }],
       },
       twitter: {
@@ -111,7 +113,7 @@ export async function generateMetadata({
         description: a.summary || s.meta_description,
         type: "article",
         url,
-        siteName: s.site_name,
+        siteName: s.brand_name,
         publishedTime: a.publish_time,
         images: a.image ? [{ url: a.image }] : [{ url: s.og_image }],
       },
@@ -133,7 +135,7 @@ export async function generateMetadata({
     ? p.images
     : s.og_image;
   return {
-    title: `${p.name} | ${s.site_name}`,
+    title: `${p.name} | ${s.brand_name}`,
     description: p.description || s.meta_description,
     keywords: s.meta_keywords,
     alternates: { canonical: url },
@@ -142,7 +144,7 @@ export async function generateMetadata({
       description: p.description || s.meta_description,
       type: "website",
       url,
-      siteName: s.site_name,
+      siteName: s.brand_name,
       images: [{ url: img }],
     },
     twitter: {
@@ -175,20 +177,20 @@ export default async function SitesPage({
   const s = settings.data;
   const url = pageUrl(route.type, route.id);
 
-  const schemas: Array<ArticleSchema | ProductSchema | BreadcrumbSchema> = [];
+  const schemas: Array<ArticleSchema | ProductSchema | BreadcrumbSchema | WebPageSchema> = [];
   let body: React.ReactNode = null;
 
   if (route.type === "home") {
     schemas.push({
       "@context": "https://schema.org",
       "@type": "WebPage",
-      name: s.site_name,
+      name: s.brand_name,
       description: s.meta_description,
       url,
     });
     body = (
       <main className="max-w-3xl mx-auto p-8">
-        <h1 className="text-4xl font-bold mb-4">{s.site_name}</h1>
+        <h1 className="text-4xl font-bold mb-4">{s.brand_name}</h1>
         <p className="text-lg text-gray-600">{s.site_description}</p>
       </main>
     );
@@ -199,7 +201,7 @@ export default async function SitesPage({
     schemas.push(
       buildArticleSchema(a, s, url),
       buildBreadcrumbSchema([
-        { name: s.site_name, url: SITEBASE_DOMAIN },
+        { name: s.brand_name, url: SITEBASE_DOMAIN },
         { name: "文章", url: `${SITEBASE_DOMAIN}/site/articles` },
         { name: a.title, url },
       ])
@@ -208,7 +210,7 @@ export default async function SitesPage({
       <main className="max-w-3xl mx-auto p-8">
         <nav className="text-sm text-gray-500 mb-4">
           <a href={`${SITEBASE_DOMAIN}/site`} className="hover:underline">
-            {s.site_name}
+            {s.brand_name}
           </a>
           {" / "}
           <span>文章</span>
@@ -216,11 +218,7 @@ export default async function SitesPage({
         <article>
           <h1 className="text-4xl font-bold mb-3">{a.title}</h1>
           <p className="text-gray-600 mb-6">{a.summary}</p>
-          <div className="prose prose-lg max-w-none">
-            {a.content.split("\n").map((line, i) => (
-              <p key={i}>{line}</p>
-            ))}
-          </div>
+          <MarkdownContent content={a.content} />
         </article>
       </main>
     );
@@ -232,7 +230,7 @@ export default async function SitesPage({
     schemas.push(
       buildProductSchema(p, s, url),
       buildBreadcrumbSchema([
-        { name: s.site_name, url: SITEBASE_DOMAIN },
+        { name: s.brand_name, url: SITEBASE_DOMAIN },
         { name: "商品", url: `${SITEBASE_DOMAIN}/site/products` },
         { name: p.name, url },
       ])
@@ -246,7 +244,7 @@ export default async function SitesPage({
       <main className="max-w-4xl mx-auto p-8">
         <nav className="text-sm text-gray-500 mb-4">
           <a href={`${SITEBASE_DOMAIN}/site`} className="hover:underline">
-            {s.site_name}
+            {s.brand_name}
           </a>
           {" / "}
           <span>商品</span>

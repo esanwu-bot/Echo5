@@ -16,6 +16,8 @@
 import { spawn } from "node:child_process";
 
 const WEB_URL = process.env.WEB_URL || "http://localhost:3000";
+const ARTICLE_ID = process.env.ARTICLE_ID || "8";
+const PRODUCT_ID = process.env.PRODUCT_ID || "2007";
 
 interface Assertion {
   name: string;
@@ -133,7 +135,32 @@ async function probePage(
     detail: canonical || "missing",
   });
 
-  // (b) body JSON-LD 断言
+  // (b) 人视角断言：正文被真正渲染，不是裸 markdown 源码；H1 唯一
+  if (expectedType === "Article") {
+    const h1Count = (html.match(/<h1[\s>]/gi) ?? []).length;
+    asserts.push({
+      name: `[${url}] H1 计数 == 1`,
+      pass: h1Count === 1,
+      detail: `found ${h1Count} <h1>`,
+    });
+
+    const bodyMatch = html.match(/<article[\s\S]*?<\/article>/i);
+    const articleBody = bodyMatch ? bodyMatch[0] : "";
+    const hasRenderedHeadings = /<h[2-6][\s>]/.test(articleBody);
+    const hasRenderedList = /<(?:ul|ol)[\s>]/.test(articleBody);
+    const hasRenderedStrong = /<strong[\s>]/.test(articleBody);
+    const rawMarkdownFeature =
+      /^#{1,6}\s/m.test(articleBody) || /^[-*]\s+\*\*/m.test(articleBody);
+    asserts.push({
+      name: `[${url}] 正文含渲染后的标题/列表/加粗（非裸 markdown 源码）`,
+      pass:
+        (hasRenderedHeadings || hasRenderedList || hasRenderedStrong) &&
+        !rawMarkdownFeature,
+      detail: `headings=${hasRenderedHeadings} list=${hasRenderedList} strong=${hasRenderedStrong} raw=${rawMarkdownFeature}`,
+    });
+  }
+
+  // (c) body JSON-LD 断言
   const ldScripts = extractJsonLdScripts(html);
   asserts.push({
     name: `[${url}] 至少 1 个 <script type="application/ld+json">`,
@@ -194,12 +221,14 @@ async function main() {
   const allAsserts: Assertion[] = [];
 
   // 文章页
-  console.log("\n[1/2] 抓 /site/articles/1 ...");
-  allAsserts.push(...(await probePage(`${WEB_URL}/site/articles/1`, "Article")));
+  console.log(`\n[1/2] 抓 /site/articles/${ARTICLE_ID} ...`);
+  allAsserts.push(
+    ...(await probePage(`${WEB_URL}/site/articles/${ARTICLE_ID}`, "Article"))
+  );
 
   // 商品页
-  console.log("[2/2] 抓 /site/products/1 ...");
-  allAsserts.push(...(await probePage(`${WEB_URL}/site/products/1`, "Product")));
+  console.log(`\n[2/2] 抓 /site/products/${PRODUCT_ID} ...`);
+  allAsserts.push(...(await probePage(`${WEB_URL}/site/products/${PRODUCT_ID}`, "Product")));
 
   // 汇总
   console.log("\n" + "─".repeat(60));

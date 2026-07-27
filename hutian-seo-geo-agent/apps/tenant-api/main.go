@@ -231,12 +231,12 @@ func main() {
 	// 链②（触发工具）仍走 /api/v1/internal/token 签 HMAC token
 	// ────────────────────────────────────────────────
 	// T7.5 登录端点（公开，不过 JWT 中间件）
-	r.POST("/portal/api/v1/auth/login", handlers.TenantLogin(gormDB, jwtSigner))
+	r.POST("/portal/api/v1/auth/login", handlers.TenantLogin(gormDB, jwtSigner, cfg.Dev))
+	r.POST("/portal/api/v1/auth/logout", handlers.TenantLogout(cfg.Dev))
 
-	// 租户自服务受保护路由组
 	portal := r.Group("/portal/api/v1")
-	portal.Use(func(c *gin.Context) { c.Set("db", gormDB); c.Next() }) // 兼容旧 handler 取 db 方式
-	portal.Use(middleware.TenantJWTContext(gormDB, jwtVerifier))
+	portal.Use(func(c *gin.Context) { c.Set("db", gormDB); c.Set("cfg.dev", cfg.Dev); c.Next() })
+	portal.Use(middleware.TenantJWTContext(gormDB, jwtVerifier, cfg.Dev))
 	{
 		// 1. 我的工作台（个人资料）
 		portal.GET("/me", handlers.TenantMe)

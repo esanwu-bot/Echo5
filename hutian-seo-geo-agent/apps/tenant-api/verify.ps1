@@ -4,11 +4,12 @@
 # Reviewer P1: Go service go vet/test/build + isolation probes must enter CI,
 # not float outside the pnpm + Turborepo Node/TS pipeline.
 #
-# Orchestration: go vet -> go build -> start tenant-api -> run 4 probes -> kill -> exit
+# Orchestration: go vet -> go build -> start tenant-api -> run 5 probes -> kill -> exit
 #   - probe:tenant-isolation      (T6.3a Go layer, 4 asserts)
 #   - probe:cross-lang            (T6.3b cross-lang boundary, 6 asserts)
 #   - probe:admin-isolation       (P0-1 admin auth seam, 7 asserts)
 #   - probe:tenant-selfservice    (T7.4 portal self-service, 13+ asserts)
+#   - probe:m5-auth               (M5 收口：httpOnly cookie / CSRF / 404 UX / logout)
 #
 # Run from repo root:
 #   pnpm probe:tenant
@@ -25,13 +26,13 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Resolve-Path (Join-Path (Join-Path $PSScriptRoot "..") "..")
 $apiDir   = Join-Path $repoRoot "apps\tenant-api"
 
-Write-Host "=== [1/6] go vet ===" -ForegroundColor Cyan
+Write-Host "=== [1/8] go vet ===" -ForegroundColor Cyan
 Push-Location $apiDir
 go vet ./...
 if ($LASTEXITCODE -ne 0) { Write-Host "FAIL: go vet" -ForegroundColor Red; Pop-Location; exit 1 }
 Write-Host "PASS: go vet" -ForegroundColor Green
 
-Write-Host "=== [2/6] go build ===" -ForegroundColor Cyan
+Write-Host "=== [2/8] go build ===" -ForegroundColor Cyan
 go build ./...
 if ($LASTEXITCODE -ne 0) { Write-Host "FAIL: go build" -ForegroundColor Red; Pop-Location; exit 1 }
 Write-Host "PASS: go build" -ForegroundColor Green
@@ -41,9 +42,9 @@ $needStop = $false
 $proc = $null
 try {
     $health = Invoke-WebRequest -Uri "http://localhost:4318/healthz" -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop
-    Write-Host "=== [3/6] tenant-api already running (healthz=$($health.StatusCode)) ===" -ForegroundColor Cyan
+    Write-Host "=== [3/8] tenant-api already running (healthz=$($health.StatusCode)) ===" -ForegroundColor Cyan
 } catch {
-    Write-Host "=== [3/6] start tenant-api (background) ===" -ForegroundColor Cyan
+    Write-Host "=== [3/8] start tenant-api (background) ===" -ForegroundColor Cyan
     $env:TENANT_INTERNAL_TOKEN_KEY = "dev-secret-key-change-in-prod"
     $env:TENANT_JWT_KEY = "dev-jwt-key-change-in-prod"
     $env:TENANT_ADMIN_TOKEN = "dev-admin-token-change-in-prod"
@@ -73,7 +74,7 @@ try {
 
 $exitCode = 0
 
-Write-Host "=== [4/6] probe:tenant-isolation (T6.3a Go layer) ===" -ForegroundColor Cyan
+Write-Host "=== [4/8] probe:tenant-isolation (T6.3a Go layer) ===" -ForegroundColor Cyan
 go run ./cmd/probe_tenant_isolation
 if ($LASTEXITCODE -ne 0) {
     Write-Host "FAIL: probe:tenant-isolation" -ForegroundColor Red
@@ -82,7 +83,7 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "PASS: probe:tenant-isolation" -ForegroundColor Green
 }
 
-Write-Host "=== [5/6] probe:cross-lang (T6.3b cross-lang boundary) ===" -ForegroundColor Cyan
+Write-Host "=== [5/8] probe:cross-lang (T6.3b cross-lang boundary) ===" -ForegroundColor Cyan
 $env:TENANT_INTERNAL_TOKEN_KEY = "dev-secret-key-change-in-prod"
 go run ./cmd/probe_cross_lang
 if ($LASTEXITCODE -ne 0) {
@@ -92,7 +93,7 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "PASS: probe:cross-lang" -ForegroundColor Green
 }
 
-Write-Host "=== [6/7] probe:admin-isolation (P0-1 admin auth) ===" -ForegroundColor Cyan
+Write-Host "=== [6/8] probe:admin-isolation (P0-1 admin auth) ===" -ForegroundColor Cyan
 $env:TENANT_ADMIN_TOKEN = "dev-admin-token-change-in-prod"
 go run ./cmd/probe_admin_isolation
 if ($LASTEXITCODE -ne 0) {
@@ -102,7 +103,7 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "PASS: probe:admin-isolation" -ForegroundColor Green
 }
 
-Write-Host "=== [7/7] probe:tenant-selfservice (T7.4) ===" -ForegroundColor Cyan
+Write-Host "=== [7/8] probe:tenant-selfservice (T7.4) ===" -ForegroundColor Cyan
 $env:TENANT_JWT_KEY = "dev-jwt-key-change-in-prod"
 go run ./cmd/probe_tenant_selfservice
 if ($LASTEXITCODE -ne 0) {
@@ -110,6 +111,16 @@ if ($LASTEXITCODE -ne 0) {
     $exitCode = 1
 } else {
     Write-Host "PASS: probe:tenant-selfservice" -ForegroundColor Green
+}
+
+Write-Host "=== [8/8] probe:m5-auth (M5 收口：cookie+CSRF+404+logout) ===" -ForegroundColor Cyan
+$env:TENANT_JWT_KEY = "dev-jwt-key-change-in-prod"
+go run ./cmd/probe_m5_auth
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "FAIL: probe:m5-auth" -ForegroundColor Red
+    $exitCode = 1
+} else {
+    Write-Host "PASS: probe:m5-auth" -ForegroundColor Green
 }
 
 # Cleanup: kill the service if we started it

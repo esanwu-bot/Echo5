@@ -1,25 +1,7 @@
 import type { Metadata } from "next";
 import { ThemeProvider } from "next-themes";
-import { Space_Grotesk, JetBrains_Mono, Noto_Sans_SC } from "next/font/google";
+import { fonts } from "@/lib/fonts";
 import "./globals.css";
-
-const fontDisp = Space_Grotesk({
-  subsets: ["latin"],
-  variable: "--font-disp",
-  display: "swap",
-});
-
-const fontSans = Noto_Sans_SC({
-  subsets: ["latin"],
-  variable: "--font-sans",
-  display: "swap",
-});
-
-const fontMono = JetBrains_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "壶天 · AI SEO/GEO Agent",
@@ -35,7 +17,7 @@ export default function RootLayout({
     <html
       lang="zh-CN"
       suppressHydrationWarning
-      className={`${fontDisp.variable} ${fontSans.variable} ${fontMono.variable}`}
+      className={`${fonts.disp.variable} ${fonts.sans.variable} ${fonts.mono.variable}`}
     >
       <body>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>

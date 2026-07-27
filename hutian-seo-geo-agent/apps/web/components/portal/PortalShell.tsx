@@ -1,26 +1,26 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { loadToken, login, logout, type TenantToken, type LoginCredentials } from "@/lib/portal/auth";
+import { loadUser, login, logout, type TenantUser, type LoginCredentials } from "@/lib/portal/auth";
 import { PortalNav } from "./PortalNav";
 
 export function PortalShell({ children }: { children: React.ReactNode }) {
-  const [token, setToken] = useState<TenantToken | null>(null);
+  const [user, setUser] = useState<TenantUser | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    setToken(loadToken());
+    setUser(loadUser());
     setReady(true);
   }, []);
 
   const handleLogin = async (creds: LoginCredentials) => {
-    const t = await login(creds);
-    setToken(t);
+    const u = await login(creds);
+    setUser(u);
   };
 
-  const handleLogout = () => {
-    logout();
-    setToken(null);
+  const handleLogout = async () => {
+    await logout();
+    setUser(null);
   };
 
   if (!ready) {
@@ -31,7 +31,7 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!token) {
+  if (!user) {
     return <LoginForm onLogin={handleLogin} />;
   }
 
@@ -41,7 +41,7 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
       <main className="flex-1 overflow-auto p-6">
         <div className="mb-4 flex items-center justify-between">
           <div className="text-sm text-slate-400">
-            {token.display_name || token.email} · {token.email}
+            {user.display_name || user.email} · {user.email}
           </div>
           <button
             onClick={handleLogout}
@@ -91,7 +91,8 @@ function LoginForm({
       >
         <h1 className="text-xl font-semibold">租户后台登录</h1>
         <p className="text-sm text-slate-400">
-          portal 与 workbench 共享同一份登录态（HUTIAN_TENANT_TOKEN）。
+          portal 与 workbench 共享同一份登录态（httpOnly Cookie：HUTIAN_TENANT_TOKEN，SameSite=Strict，
+          明文 token 不出现在响应 JSON / localStorage 里）。
         </p>
         {error && <div className="rounded bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</div>}
         <div className="space-y-1">

@@ -2,9 +2,15 @@
 //
 // 所有端点强制过 TenantJWTContext 四合一鉴权（T7.2），从 ctx 取 tenant/workspace/seat/user，
 // 绝不信任请求体里的 tenant_id/workspace_id。
+//
+// M5：鉴权传输从 Authorization header → httpOnly Cookie HUTIAN_TENANT_TOKEN
+//   SameSite=Strict 防 CSRF；非简单写请求强制 X-Hutian-Tenant 自定义头兜底；
+//   登出显式清 cookie。
 package handlers
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"net/http"
 	"strconv"
 	"time"
@@ -16,6 +22,81 @@ import (
 	"hutian-tenant-api/middleware"
 	"hutian-tenant-api/models"
 )
+
+const (
+	// TenantTokenCookie httpOnly cookie 名（M5 替换 localStorage）
+	TenantTokenCookie = "HUTIAN_TENANT_TOKEN"
+	// CSRFHeaderName 非简单写请求必须带此头（值任意），SameSite=Strict 的二次兜底
+	CSRFHeaderName = "X-Hutian-Tenant"
+	// CSRFNonceHeaderName 写请求的 one-time nonce 头（M5 NFR-TS08：防重放 CSRF）
+	CSRFNonceHeaderName = "X-Hutian-Nonce"
+	// CSRFNonceCookie 与 nonce 头配对的 cookie（SameSite=Strict、httpOnly=false、随响应刷新）
+	CSRFNonceCookie = "HUTIAN_TENANT_NONCE"
+)
+
+// randomHex 生成 n 字节十六进制串
+func randomHex(n int) string {
+	buf := make([]byte, n)
+	if _, err := rand.Read(buf); err != nil {
+		return ""
+	}
+	return hex.EncodeToString(buf)
+}
+
+// setTenantCookie 写入 httpOnly+SameSite=Strict cookie；M5 统一走此函数
+// secure=dev 环境按 cfg.Dev 放行（local 走 http）
+func setTenantCookie(c *gin.Context, tok string, maxAge int, secure bool, path string) {
+	c.SetSameSite(http.SameSiteStrictMode)
+	c.SetCookie(
+		TenantTokenCookie,
+		tok,
+		maxAge,
+		path,
+		"",
+		secure,
+		true, // httpOnly=TRUE：JS 读不到，XSS 偷不走
+	)
+}
+
+// rotateNonce 每次成功响应刷新 one-time nonce（防重放 CSRF）
+// nonce 分两份：一份 cookie（SameSite Strict，JS 可读给 fetch 设头），
+// 一份塞进响应头 X-Hutian-Nonce 便于 EventSource 流等不带 cookie 的场景复用
+func rotateNonce(c *gin.Context, secure bool) string {
+	nonce := randomHex(16)
+	if nonce == "" {
+		return ""
+	}
+	c.SetSameSite(http.SameSiteStrictMode)
+	c.SetCookie(CSRFNonceCookie, nonce, 86400, "/", "", secure, false)
+	c.Header(CSRFNonceHeaderName, nonce)
+	return nonce
+}
+
+// writePortalOK 统一 200 出口：附带 nonce 刷新（登录、登出外的所有写请求也用）
+func writePortalOK(c *gin.Context, cfgDev bool, data interface{}) {
+	rotateNonce(c, !cfgDev)
+	c.JSON(http.StatusOK, gin.H{"data": data})
+}
+
+// writePortalError 统一错误出口：同样刷新 nonce 防重放
+func writePortalError(c *gin.Context, cfgDev bool, status int, errMsg, reason string) {
+	rotateNonce(c, !cfgDev)
+	payload := gin.H{"error": errMsg}
+	if reason != "" {
+		payload["reason"] = reason
+	}
+	c.AbortWithStatusJSON(status, payload)
+}
+
+// WritePortalFatal middleware/外部 handler 可调用的统一致命错误出口
+func WritePortalFatal(c *gin.Context, cfgDev bool, status int, errMsg, reason string) {
+	writePortalError(c, cfgDev, status, errMsg, reason)
+}
+
+// RotateNonce 外部包可调用的 nonce 刷新器
+func RotateNonce(c *gin.Context, secure bool) string {
+	return rotateNonce(c, secure)
+}
 
 // ────────────────────────────────────────────────
 // 请求/响应结构
@@ -136,38 +217,40 @@ type AuditLogResponse struct {
 // 登录（公开端点）
 // ────────────────────────────────────────────────
 
-func TenantLogin(db *gorm.DB, signer *auth.Signer) gin.HandlerFunc {
+// TenantLogin devOnly 参数：dev 模式下 secure=false 允许 http 本地 Cookie 写入
+// 保留 Authorization JSON 返回（兼容期），M5 统一用 httpOnly cookie
+func TenantLogin(db *gorm.DB, signer *auth.Signer, devOnly bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req LoginRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body", "reason": err.Error()})
+			writePortalError(c, devOnly, http.StatusBadRequest, "invalid request body", err.Error())
 			return
 		}
 
 		var user models.User
 		if err := db.Where("email = ?", req.Email).First(&user).Error; err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+			writePortalError(c, devOnly, http.StatusUnauthorized, "invalid credentials", "")
 			return
 		}
 		if user.Status != models.UserStatusActive {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "user disabled or inactive"})
+			writePortalError(c, devOnly, http.StatusUnauthorized, "user disabled or inactive", "")
 			return
 		}
 		if !auth.CheckPassword(req.Password, user.PasswordHash) {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+			writePortalError(c, devOnly, http.StatusUnauthorized, "invalid credentials", "")
 			return
 		}
 
 		var tenant models.Tenant
 		if err := db.Where("slug = ?", req.TenantSlug).First(&tenant).Error; err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid tenant"})
+			writePortalError(c, devOnly, http.StatusUnauthorized, "invalid tenant", "")
 			return
 		}
 
 		var workspace models.Workspace
 		if err := db.Where("slug = ? AND tenant_id = ?", req.WorkspaceSlug, tenant.ID).
 			First(&workspace).Error; err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid workspace"})
+			writePortalError(c, devOnly, http.StatusNotFound, "invalid workspace", "")
 			return
 		}
 
@@ -175,7 +258,7 @@ func TenantLogin(db *gorm.DB, signer *auth.Signer) gin.HandlerFunc {
 		if err := db.Where("tenant_id = ? AND user_id = ? AND status = ?",
 			tenant.ID, user.ID, models.SeatStatusActive).
 			First(&seat).Error; err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "seat inactive or not found"})
+			writePortalError(c, devOnly, http.StatusUnauthorized, "seat inactive or not found", "")
 			return
 		}
 
@@ -183,20 +266,22 @@ func TenantLogin(db *gorm.DB, signer *auth.Signer) gin.HandlerFunc {
 		if err := db.Where("tenant_id = ?", tenant.ID).First(&sub).Error; err == nil {
 			switch sub.Status {
 			case models.SubStatusSuspended, models.SubStatusReadonly, models.SubStatusCanceled:
-				c.JSON(http.StatusForbidden, gin.H{"error": "tenant subscription suspended/readonly/canceled"})
+				writePortalError(c, devOnly, http.StatusForbidden, "tenant subscription suspended/readonly/canceled", "")
 				return
 			}
 		}
 
 		tok, err := signer.Issue(user.ID, seat.ID, tenant.ID, workspace.ID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "issue token failed"})
+			writePortalError(c, devOnly, http.StatusInternalServerError, "issue token failed", "")
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{"data": LoginResponse{
-			AccessToken: tok,
-			TokenType:   "Bearer",
+		// M5：写 httpOnly cookie；dev 环境允许非 https
+		setTenantCookie(c, tok, int(auth.TokenLifetime.Seconds()), !devOnly, "/")
+		resp := LoginResponse{
+			AccessToken: "", // 置空：XSS 不再能从 JSON 响应里读到明文 token
+			TokenType:   "Cookie",
 			ExpiresIn:   int(auth.TokenLifetime.Seconds()),
 			UserID:      user.ID,
 			SeatID:      seat.ID,
@@ -204,7 +289,16 @@ func TenantLogin(db *gorm.DB, signer *auth.Signer) gin.HandlerFunc {
 			WorkspaceID: workspace.ID,
 			Email:       user.Email,
 			DisplayName: user.DisplayName,
-		}})
+		}
+		writePortalOK(c, devOnly, resp)
+	}
+}
+
+// TenantLogout 登出：清 HUTIAN_TENANT_TOKEN cookie + 刷新 nonce
+func TenantLogout(devOnly bool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		setTenantCookie(c, "", -1, !devOnly, "/")
+		writePortalOK(c, devOnly, gin.H{"ok": true})
 	}
 }
 
@@ -231,13 +325,15 @@ func loadSeatRole(db *gorm.DB, seatID int64) (models.SeatRole, error) {
 }
 
 func requireAdminOrOwner(c *gin.Context, db *gorm.DB, seatID int64) bool {
+	devOnly, _ := c.Get("cfg.dev")
+	cfgDev, _ := devOnly.(bool)
 	role, err := loadSeatRole(db, seatID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "load seat failed"})
+		writePortalError(c, cfgDev, http.StatusInternalServerError, "load seat failed", "")
 		return false
 	}
 	if role != models.SeatRoleOwner && role != models.SeatRoleAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "permission denied: owner or admin required"})
+		writePortalError(c, cfgDev, http.StatusForbidden, "permission denied: owner or admin required", "")
 		return false
 	}
 	return true
@@ -249,19 +345,21 @@ func requireAdminOrOwner(c *gin.Context, db *gorm.DB, seatID int64) bool {
 
 func TenantMe(c *gin.Context) {
 	_, db, userID, seatID, tenantID, workspaceID := portalCtx(c)
+	devOnly, _ := c.Get("cfg.dev")
+	cfgDev, _ := devOnly.(bool)
 
 	var user models.User
 	if err := db.Select("id, email, display_name, status").First(&user, userID).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "load user failed"})
+		writePortalError(c, cfgDev, http.StatusInternalServerError, "load user failed", "")
 		return
 	}
 	var seat models.Seat
 	if err := db.Select("role").First(&seat, seatID).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "load seat failed"})
+		writePortalError(c, cfgDev, http.StatusInternalServerError, "load seat failed", "")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": MeResponse{
+	writePortalOK(c, cfgDev, MeResponse{
 		ID:          user.ID,
 		Email:       user.Email,
 		DisplayName: user.DisplayName,
@@ -270,7 +368,7 @@ func TenantMe(c *gin.Context) {
 		WorkspaceID: workspaceID,
 		SeatID:      seatID,
 		Role:        string(seat.Role),
-	}})
+	})
 }
 
 // ────────────────────────────────────────────────
@@ -279,14 +377,16 @@ func TenantMe(c *gin.Context) {
 
 func TenantGetWorkspace(c *gin.Context) {
 	_, db, _, _, _, workspaceID := portalCtx(c)
+	devOnly, _ := c.Get("cfg.dev")
+	cfgDev, _ := devOnly.(bool)
 
 	var ws models.Workspace
 	if err := db.First(&ws, workspaceID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "workspace not found"})
+		writePortalError(c, cfgDev, http.StatusNotFound, "workspace not found", "")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": WorkspaceResponse{
+	writePortalOK(c, cfgDev, WorkspaceResponse{
 		ID:                 ws.ID,
 		Slug:               ws.Slug,
 		BrandName:          ws.BrandName,
@@ -296,24 +396,26 @@ func TenantGetWorkspace(c *gin.Context) {
 		Status:             string(ws.Status),
 		CreatedAt:          ws.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:          ws.UpdatedAt.Format(time.RFC3339),
-	}})
+	})
 }
 
 func TenantUpdateWorkspace(c *gin.Context) {
 	_, db, seatID, _, _, workspaceID := portalCtx(c)
+	devOnly, _ := c.Get("cfg.dev")
+	cfgDev, _ := devOnly.(bool)
 	if !requireAdminOrOwner(c, db, seatID) {
 		return
 	}
 
 	var req UpdateWorkspaceRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body", "reason": err.Error()})
+		writePortalError(c, cfgDev, http.StatusBadRequest, "invalid request body", err.Error())
 		return
 	}
 
 	var ws models.Workspace
 	if err := db.First(&ws, workspaceID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "workspace not found"})
+		writePortalError(c, cfgDev, http.StatusNotFound, "workspace not found", "")
 		return
 	}
 
@@ -321,11 +423,11 @@ func TenantUpdateWorkspace(c *gin.Context) {
 	ws.Industry = req.Industry
 	ws.FallbackCopyJSON = req.FallbackCopyJSON
 	if err := db.Save(&ws).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "update workspace failed"})
+		writePortalError(c, cfgDev, http.StatusInternalServerError, "update workspace failed", "")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": WorkspaceResponse{
+	writePortalOK(c, cfgDev, WorkspaceResponse{
 		ID:                 ws.ID,
 		Slug:               ws.Slug,
 		BrandName:          ws.BrandName,
@@ -335,7 +437,7 @@ func TenantUpdateWorkspace(c *gin.Context) {
 		Status:             string(ws.Status),
 		CreatedAt:          ws.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:          ws.UpdatedAt.Format(time.RFC3339),
-	}})
+	})
 }
 
 // ────────────────────────────────────────────────
@@ -344,10 +446,12 @@ func TenantUpdateWorkspace(c *gin.Context) {
 
 func TenantListSeats(c *gin.Context) {
 	_, db, _, _, tenantID, _ := portalCtx(c)
+	devOnly, _ := c.Get("cfg.dev")
+	cfgDev, _ := devOnly.(bool)
 
 	var seats []models.Seat
 	if err := db.Where("tenant_id = ?", tenantID).Find(&seats).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "list seats failed"})
+		writePortalError(c, cfgDev, http.StatusInternalServerError, "list seats failed", "")
 		return
 	}
 
@@ -378,46 +482,52 @@ func TenantListSeats(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": resp})
+	writePortalOK(c, cfgDev, resp)
 }
 
 func TenantInviteSeat(c *gin.Context) {
 	_, db, seatID, _, tenantID, _ := portalCtx(c)
+	devOnly, _ := c.Get("cfg.dev")
+	cfgDev, _ := devOnly.(bool)
 	if !requireAdminOrOwner(c, db, seatID) {
 		return
 	}
 
 	var req InviteSeatRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body", "reason": err.Error()})
+		writePortalError(c, cfgDev, http.StatusBadRequest, "invalid request body", err.Error())
 		return
 	}
 
-	// 查 subscription 席位上限
 	var sub models.Subscription
 	if err := db.Where("tenant_id = ?", tenantID).First(&sub).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "subscription not found"})
+		writePortalError(c, cfgDev, http.StatusInternalServerError, "subscription not found", "")
 		return
 	}
 	var activeCount int64
 	if err := db.Model(&models.Seat{}).Where("tenant_id = ? AND status = ?", tenantID, models.SeatStatusActive).Count(&activeCount).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "count seats failed"})
+		writePortalError(c, cfgDev, http.StatusInternalServerError, "count seats failed", "")
 		return
 	}
 	if int(activeCount) >= sub.SeatsLimit {
-		c.JSON(http.StatusForbidden, gin.H{"error": "seat limit exceeded", "limit": sub.SeatsLimit})
+		writePortalError(c, cfgDev, http.StatusForbidden, "seat limit exceeded", "")
+		c.Writer.Header().Del("Reason")
+		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+			"error": "seat limit exceeded",
+			"limit": sub.SeatsLimit,
+		})
+		rotateNonce(c, !cfgDev)
 		return
 	}
 
-	// 创建用户（pending_invite）
 	randomHash, _ := auth.HashPassword(strconv.FormatInt(time.Now().UnixNano(), 10))
 	user := models.User{
 		Email:        req.Email,
-		PasswordHash: randomHash, // 占位，邀请邮件设置真实密码（T7.5 v2）
+		PasswordHash: randomHash,
 		Status:       models.UserStatusPendingInvite,
 	}
 	if err := db.Create(&user).Error; err != nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "email already exists"})
+		writePortalError(c, cfgDev, http.StatusConflict, "email already exists", "")
 		return
 	}
 
@@ -428,11 +538,11 @@ func TenantInviteSeat(c *gin.Context) {
 		Status:   models.SeatStatusActive,
 	}
 	if err := db.Create(&seat).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "create seat failed"})
+		writePortalError(c, cfgDev, http.StatusInternalServerError, "create seat failed", "")
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"data": SeatResponse{
+	writePortalOK(c, cfgDev, SeatResponse{
 		ID:          seat.ID,
 		UserID:      user.ID,
 		Email:       user.Email,
@@ -440,35 +550,36 @@ func TenantInviteSeat(c *gin.Context) {
 		Role:        string(seat.Role),
 		Status:      string(seat.Status),
 		CreatedAt:   seat.CreatedAt.Format(time.RFC3339),
-	}})
+	})
 }
 
 func TenantUpdateSeat(c *gin.Context) {
 	_, db, seatID, _, tenantID, _ := portalCtx(c)
+	devOnly, _ := c.Get("cfg.dev")
+	cfgDev, _ := devOnly.(bool)
 	if !requireAdminOrOwner(c, db, seatID) {
 		return
 	}
 
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid seat id"})
+		writePortalError(c, cfgDev, http.StatusBadRequest, "invalid seat id", "")
 		return
 	}
 
 	var req UpdateSeatRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body", "reason": err.Error()})
+		writePortalError(c, cfgDev, http.StatusBadRequest, "invalid request body", err.Error())
 		return
 	}
 
 	var target models.Seat
 	if err := db.Where("id = ? AND tenant_id = ?", id, tenantID).First(&target).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "seat not found"})
+		writePortalError(c, cfgDev, http.StatusNotFound, "seat not found", "")
 		return
 	}
-	// 不能改自己（避免 owner 把自己改没）
 	if target.ID == seatID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "cannot modify your own seat"})
+		writePortalError(c, cfgDev, http.StatusForbidden, "cannot modify your own seat", "")
 		return
 	}
 
@@ -479,16 +590,16 @@ func TenantUpdateSeat(c *gin.Context) {
 		target.Status = models.SeatStatus(req.Status)
 	}
 	if err := db.Save(&target).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "update seat failed"})
+		writePortalError(c, cfgDev, http.StatusInternalServerError, "update seat failed", "")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": SeatResponse{
+	writePortalOK(c, cfgDev, SeatResponse{
 		ID:     target.ID,
 		UserID: target.UserID,
 		Role:   string(target.Role),
 		Status: string(target.Status),
-	}})
+	})
 }
 
 // ────────────────────────────────────────────────
@@ -497,10 +608,12 @@ func TenantUpdateSeat(c *gin.Context) {
 
 func TenantGetSubscription(c *gin.Context) {
 	_, db, _, _, tenantID, _ := portalCtx(c)
+	devOnly, _ := c.Get("cfg.dev")
+	cfgDev, _ := devOnly.(bool)
 
 	var sub models.Subscription
 	if err := db.Where("tenant_id = ?", tenantID).First(&sub).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "subscription not found"})
+		writePortalError(c, cfgDev, http.StatusNotFound, "subscription not found", "")
 		return
 	}
 
@@ -512,7 +625,7 @@ func TenantGetSubscription(c *gin.Context) {
 		return &s
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": SubscriptionResponse{
+	writePortalOK(c, cfgDev, SubscriptionResponse{
 		ID:                 sub.ID,
 		Plan:               string(sub.Plan),
 		Status:             string(sub.Status),
@@ -521,27 +634,23 @@ func TenantGetSubscription(c *gin.Context) {
 		CurrentPeriodEnd:   fmtDate(sub.CurrentPeriodEnd),
 		TrialEndsAt:        fmtDate(sub.TrialEndsAt),
 		GraceDays:          sub.GraceDays,
-	}})
+	})
 }
-
-// ────────────────────────────────────────────────
-// 5. 额度与用量（只读）
-// ────────────────────────────────────────────────
 
 func TenantListUsage(c *gin.Context) {
 	_, db, _, _, tenantID, _ := portalCtx(c)
+	devOnly, _ := c.Get("cfg.dev")
+	cfgDev, _ := devOnly.(bool)
 
-	// 取当月 1 号 00:00
 	now := time.Now()
 	windowStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
 
 	var meters []models.UsageMeter
 	if err := db.Where("tenant_id = ? AND window_start = ?", tenantID, windowStart).Find(&meters).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "list usage failed"})
+		writePortalError(c, cfgDev, http.StatusInternalServerError, "list usage failed", "")
 		return
 	}
 
-	// 取套餐配额（month 窗口）
 	var sub models.Subscription
 	db.Where("tenant_id = ?", tenantID).First(&sub)
 	var quotas []models.PlanQuota
@@ -566,19 +675,18 @@ func TenantListUsage(c *gin.Context) {
 		})
 	}
 
+	rotateNonce(c, !cfgDev)
 	c.JSON(http.StatusOK, gin.H{"data": resp, "window_start": windowStart.Format(time.RFC3339)})
 }
 
-// ────────────────────────────────────────────────
-// 6. 凭证管理（只读元信息 + 轮换/吊销，owner/admin）
-// ────────────────────────────────────────────────
-
 func TenantListCredentials(c *gin.Context) {
 	_, db, _, _, _, workspaceID := portalCtx(c)
+	devOnly, _ := c.Get("cfg.dev")
+	cfgDev, _ := devOnly.(bool)
 
 	var creds []models.TenantCredential
 	if err := db.Where("workspace_id = ?", workspaceID).Find(&creds).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "list credentials failed"})
+		writePortalError(c, cfgDev, http.StatusInternalServerError, "list credentials failed", "")
 		return
 	}
 
@@ -605,24 +713,26 @@ func TenantListCredentials(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": resp})
+	writePortalOK(c, cfgDev, resp)
 }
 
 func TenantRotateCredential(c *gin.Context) {
 	_, db, seatID, _, _, workspaceID := portalCtx(c)
+	devOnly, _ := c.Get("cfg.dev")
+	cfgDev, _ := devOnly.(bool)
 	if !requireAdminOrOwner(c, db, seatID) {
 		return
 	}
 
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid credential id"})
+		writePortalError(c, cfgDev, http.StatusBadRequest, "invalid credential id", "")
 		return
 	}
 
 	var cr models.TenantCredential
 	if err := db.Where("id = ? AND workspace_id = ?", id, workspaceID).First(&cr).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "credential not found"})
+		writePortalError(c, cfgDev, http.StatusNotFound, "credential not found", "")
 		return
 	}
 
@@ -631,55 +741,54 @@ func TenantRotateCredential(c *gin.Context) {
 	cr.LastRotatedAt = &now
 	cr.KeyVersion++
 	if err := db.Save(&cr).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "rotate credential failed"})
+		writePortalError(c, cfgDev, http.StatusInternalServerError, "rotate credential failed", "")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": gin.H{"id": cr.ID, "status": cr.Status, "key_version": cr.KeyVersion}})
+	writePortalOK(c, cfgDev, gin.H{"id": cr.ID, "status": cr.Status, "key_version": cr.KeyVersion})
 }
 
 func TenantRevokeCredential(c *gin.Context) {
 	_, db, seatID, _, _, workspaceID := portalCtx(c)
+	devOnly, _ := c.Get("cfg.dev")
+	cfgDev, _ := devOnly.(bool)
 	if !requireAdminOrOwner(c, db, seatID) {
 		return
 	}
 
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid credential id"})
+		writePortalError(c, cfgDev, http.StatusBadRequest, "invalid credential id", "")
 		return
 	}
 
 	var cr models.TenantCredential
 	if err := db.Where("id = ? AND workspace_id = ?", id, workspaceID).First(&cr).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "credential not found"})
+		writePortalError(c, cfgDev, http.StatusNotFound, "credential not found", "")
 		return
 	}
 
 	cr.Status = models.CredentialStatusRevoked
 	if err := db.Save(&cr).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "revoke credential failed"})
+		writePortalError(c, cfgDev, http.StatusInternalServerError, "revoke credential failed", "")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": gin.H{"id": cr.ID, "status": cr.Status}})
+	writePortalOK(c, cfgDev, gin.H{"id": cr.ID, "status": cr.Status})
 }
-
-// ────────────────────────────────────────────────
-// 7. 操作日志（audit_logs，tenant scope，只读）
-// ────────────────────────────────────────────────
 
 func TenantListAuditLogs(c *gin.Context) {
 	_, db, _, _, tenantID, workspaceID := portalCtx(c)
+	devOnly, _ := c.Get("cfg.dev")
+	cfgDev, _ := devOnly.(bool)
 
 	var logs []models.AuditLog
 	query := db.Where("tenant_id = ?", tenantID)
-	// workspace 维度可选过滤
 	if c.Query("workspace_only") == "true" {
 		query = query.Where("workspace_id = ?", workspaceID)
 	}
 	if err := query.Order("created_at DESC").Limit(100).Find(&logs).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "list audit logs failed"})
+		writePortalError(c, cfgDev, http.StatusInternalServerError, "list audit logs failed", "")
 		return
 	}
 
@@ -704,5 +813,6 @@ func TenantListAuditLogs(c *gin.Context) {
 		})
 	}
 
+	rotateNonce(c, !cfgDev)
 	c.JSON(http.StatusOK, gin.H{"data": resp, "tenant_id": tenantID, "workspace_id": workspaceID})
 }

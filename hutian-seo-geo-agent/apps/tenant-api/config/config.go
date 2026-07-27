@@ -21,6 +21,10 @@ type Config struct {
 	// 与租户内部 token（HMAC 短期）物理隔离——admin 跨租户查，权限远大于租户
 	// env TENANT_ADMIN_TOKEN 配置，空则 admin 路由全 401（NFR-T01 红线：不得裸奔）
 	AdminToken string
+	// 租户 JWT 签名密钥（tenant self-service 登录态）
+	// 与 AdminToken、TENANT_INTERNAL_TOKEN_KEY 三者物理隔离
+	// env TENANT_JWT_KEY 配置，空则租户自服务路由全 401（NFR-TS05）
+	JWTKey string
 }
 
 // Load 从环境变量加载配置，带默认值
@@ -30,6 +34,7 @@ func Load() Config {
 		MetaDBDSN: envOrDefault("TENANT_META_DSN", "root:root@tcp(localhost:3306)/hutian?charset=utf8mb4&parseTime=True&loc=Local"),
 		Dev:       os.Getenv("TENANT_API_DEV") != "false",
 		AdminToken: os.Getenv("TENANT_ADMIN_TOKEN"),
+		JWTKey:     os.Getenv("TENANT_JWT_KEY"),
 	}
 	return c
 }

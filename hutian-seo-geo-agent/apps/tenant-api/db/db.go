@@ -67,18 +67,18 @@ func Migrate(db *gorm.DB) error {
 		AutoMigrate(models.AllModels()...); err != nil {
 		return fmt.Errorf("auto migrate: %w", err)
 	}
-	// 验证 9 张表都建好
+	// 验证 10 张表都建好（M7 T7.1 起 +users）
 	var tableCount int64
 	if err := db.Raw(`
 		SELECT COUNT(*) FROM information_schema.tables
 		WHERE table_schema = 'hutian'
-		AND table_name IN ('tenants','workspaces','sitebase_instances','tenant_credentials','subscriptions','seats','usage_meters','plan_quotas','audit_logs')
+		AND table_name IN ('users','tenants','workspaces','sitebase_instances','tenant_credentials','subscriptions','seats','usage_meters','plan_quotas','audit_logs')
 	`).Scan(&tableCount).Error; err != nil {
 		return fmt.Errorf("verify tables: %w", err)
 	}
-	if tableCount != 9 {
-		return fmt.Errorf("FATAL: expected 9 tables, got %d — migration incomplete", tableCount)
+	if tableCount != 10 {
+		return fmt.Errorf("FATAL: expected 10 tables, got %d — migration incomplete", tableCount)
 	}
-	log.Printf("[db] migrated 9 tables to hutian (verified count=%d)", tableCount)
+	log.Printf("[db] migrated 10 tables to hutian (verified count=%d)", tableCount)
 	return nil
 }

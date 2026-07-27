@@ -28,6 +28,36 @@ type BaseModel struct {
 }
 
 // ────────────────────────────────────────────────
+// 0. users — 平台用户=租户登录主体（M7 T7.1 补，落地 9 表悬空 fk）
+//    seats.user_id 指向本表；登录/个人资料/2FA 依赖此表
+// ────────────────────────────────────────────────
+
+type UserStatus string
+
+const (
+	UserStatusActive         UserStatus = "active"
+	UserStatusDisabled       UserStatus = "disabled"
+	UserStatusPendingInvite  UserStatus = "pending_invite"
+)
+
+// User 平台用户（租户成员登录主体）
+// password_hash 用 bcrypt/argon2；totp_secret_encrypted envelope 加密（NFR-T02 同红线）
+type User struct {
+	BaseModel
+	Email                string `gorm:"type:varchar(255);uniqueIndex;not null" json:"email"`
+	PasswordHash         string `gorm:"type:varchar(255);not null" json:"-"` // JSON 标 -，永不序列化到响应
+	DisplayName          string `gorm:"type:varchar(128)" json:"display_name"`
+	Status               UserStatus `gorm:"type:varchar(32);index;not null;default:active" json:"status"`
+	TOTPSecretEncrypted  []byte `gorm:"type:varbinary(512)" json:"-"` // 加密的 TOTP secret，永不序列化
+	TOTPEnabled          bool   `gorm:"not null;default:false" json:"totp_enabled"`
+	LastLoginAt          *time.Time `gorm:"index" json:"last_login_at,omitempty"`
+	FailedLoginCount     int    `gorm:"not null;default:0" json:"-"`
+	LockedUntil          *time.Time `gorm:"index" json:"-"`
+}
+
+func (User) TableName() string { return "users" }
+
+// ────────────────────────────────────────────────
 // 1. tenants — 租户=计费/登录主体
 // ────────────────────────────────────────────────
 
@@ -281,9 +311,10 @@ type AuditLog struct {
 func (AuditLog) TableName() string { return "audit_logs" }
 
 // AllModels 返回所有需 AutoMigrate 的模型（T6.1 migration 用）
-// 顺序：无外键依赖的先建（tenants/sitebase_instances/plan_quotas），有依赖的后建
+// 顺序：无外键依赖的先建（users/tenants/sitebase_instances/plan_quotas），有依赖的后建
 func AllModels() []interface{} {
 	return []interface{}{
+		&User{},
 		&Tenant{},
 		&SitebaseInstance{},
 		&PlanQuota{},

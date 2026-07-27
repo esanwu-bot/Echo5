@@ -49,4 +49,5 @@ tmp/
 *.so
 *.dylib
 *.test
+/apps/tenant-api/tenant-api
 

@@ -15,6 +15,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"hutian-tenant-api/auth"
 	"hutian-tenant-api/config"
 	"hutian-tenant-api/db"
 	"hutian-tenant-api/handlers"
@@ -39,8 +40,20 @@ func main() {
 		if err := db.Migrate(gormDB); err != nil {
 			log.Fatalf("[fatal] migrate: %v", err)
 		}
-		log.Println("[ok] T6.1 migration done, 9 tables ready in hutian db")
+		log.Println("[ok] migration done, 10 tables ready in hutian db")
 		return
+	}
+
+	// 租户自服务 JWT 签发/验签器（T7.2）
+	jwtSigner, err := auth.NewSigner(cfg.JWTKey)
+	if err != nil {
+		log.Printf("[warn] tenant JWT signer not configured: %v — /portal/api/v1/* will return 401", err)
+		jwtSigner = nil
+	}
+	jwtVerifier, err := auth.NewVerifier(cfg.JWTKey)
+	if err != nil {
+		log.Printf("[warn] tenant JWT verifier not configured: %v — /portal/api/v1/* will return 401", err)
+		jwtVerifier = nil
 	}
 
 	if cfg.Dev {
@@ -192,7 +205,25 @@ func main() {
 		admin.GET("/audit-logs", handlers.ListAuditLogs)
 	}
 
-	log.Printf("[tenant-api] listening on :%s (dev=%v, db=hutian, admin=%v)", cfg.Port, cfg.Dev, cfg.AdminToken != "")
+	// ────────────────────────────────────────────────
+	// portal 路由组（租户自服务后台，链①：tenant-api 直查 hutian）
+	// 接缝（T7.2）：强制 TenantJWTContext 四合一单中间件；与 ops admin 中间件物理分开
+	// 链①不签 ADR 内部 token，只读/写自己元数据
+	// 链②（触发工具）仍走 /api/v1/internal/token 签 HMAC token
+	// ────────────────────────────────────────────────
+	// T7.5 登录端点（公开，不过 JWT 中间件）
+	r.POST("/portal/api/v1/auth/login", handlers.TenantLogin(gormDB, jwtSigner))
+
+	// 租户自服务受保护路由组
+	portal := r.Group("/portal/api/v1")
+	portal.Use(func(c *gin.Context) { c.Set("db", gormDB); c.Next() }) // 兼容旧 handler 取 db 方式
+	portal.Use(middleware.TenantJWTContext(gormDB, jwtVerifier))
+	{
+		// 当前登录用户信息
+		portal.GET("/me", handlers.TenantMe)
+	}
+
+	log.Printf("[tenant-api] listening on :%s (dev=%v, db=hutian, admin=%v, jwt=%v)", cfg.Port, cfg.Dev, cfg.AdminToken != "", cfg.JWTKey != "")
 	if err := r.Run(":" + cfg.Port); err != nil {
 		log.Fatalf("[fatal] server: %v", err)
 	}

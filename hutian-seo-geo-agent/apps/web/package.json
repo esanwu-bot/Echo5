@@ -10,7 +10,8 @@
     "verify:demo": "tsx scripts/verify-demo.ts",
     "verify:tools": "tsx scripts/verify-tools.ts",
     "probe:md-table": "tsx scripts/probe-md-table.tsx",
-    "probe:sites-ssr": "tsx scripts/probe-sites-ssr.ts"
+    "probe:sites-ssr": "tsx scripts/probe-sites-ssr.ts",
+    "probe:server-error": "tsx scripts/probe-server-error.ts"
   },
   "dependencies": {
     "@hutian/agent-protocol": "workspace:*",

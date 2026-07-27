@@ -69,6 +69,26 @@ export interface BreadcrumbSchema extends SchemaBase {
   }>;
 }
 
+/**
+ * ItemList schema — B2 第一刀：产品列表页 JSON-LD
+ * 球门：列表页是独立站门面，给爬虫一个明确的"这是产品列表"信号，
+ *       配合 BreadcrumbList 让爬虫理解站点结构。
+ * 规范：https://schema.org/ItemList（listItem 用 ListItem + position）
+ */
+export interface ItemListSchema extends SchemaBase {
+  "@type": "ItemList";
+  name: string;
+  description: string;
+  url: string;
+  numberOfItems: number;
+  itemListElement: Array<{
+    "@type": "ListItem";
+    position: number;
+    url: string;
+    name: string;
+  }>;
+}
+
 function absUrl(path: string, domain: string): string {
   if (path.startsWith("http")) return path;
   return `${domain}${path.startsWith("/") ? "" : "/"}${path}`;
@@ -175,6 +195,32 @@ export function buildBreadcrumbSchema(
       position: idx + 1,
       name: item.name,
       ...(item.url ? { item: item.url } : {}),
+    })),
+  };
+}
+
+/**
+ * buildItemListSchema — 产品列表页 JSON-LD
+ * 球门：列表页给爬虫明确的"产品列表"结构信号，配合 BreadcrumbList 理解站点层级。
+ * 真连 siteBase 后，products 来自 live；dev 期 mock 兜底时此 schema 仍生成（爬虫见 noindex 不索引）。
+ */
+export function buildItemListSchema(
+  products: Product[],
+  settings: SiteSettings,
+  listUrl: string
+): ItemListSchema {
+  return {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: `${settings.brand_name} Products`,
+    description: settings.site_description,
+    url: listUrl,
+    numberOfItems: products.length,
+    itemListElement: products.map((p, idx) => ({
+      "@type": "ListItem",
+      position: idx + 1,
+      url: `${listUrl}/${p.id}`,
+      name: p.name,
     })),
   };
 }

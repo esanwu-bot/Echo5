@@ -18,6 +18,10 @@ import {
   getProduct,
   getProductsList,
   getSiteSettings,
+  getFaqs,
+  getNewsList,
+  getAbout,
+  getContactSettings,
   SITEBASE_DOMAIN,
 } from "@/lib/sites/reader";
 import { MarkdownContent } from "@/lib/markdown";
@@ -34,7 +38,7 @@ import type {
   ProductSchema,
   WebPageSchema,
 } from "@/lib/sites/schema-mapping";
-import type { Product, SiteSettings } from "@/lib/sites/types";
+import type { Product, SiteSettings, Faq, NewsItem, AboutContent, ContactSettings } from "@/lib/sites/types";
 
 // 强制 SSR（每次请求都重新生成，不缓存）
 export const dynamic = "force-dynamic";
@@ -457,6 +461,17 @@ export default async function SitesPage({
       acceptedAnswer: { "@type": "Answer"; text: string };
     }>;
   };
+  // LocalBusiness 内联定义（contact 页 schema.org/LocalBusiness，利于地图/本地搜索）
+  type LocalBusinessSchema = {
+    "@context": "https://schema.org";
+    "@type": "LocalBusiness";
+    name: string;
+    telephone: string;
+    email: string;
+    address: { "@type": "PostalAddress"; streetAddress: string };
+    openingHours: string;
+    url: string;
+  };
   const schemas: Array<
     | ArticleSchema
     | ProductSchema
@@ -464,6 +479,7 @@ export default async function SitesPage({
     | WebPageSchema
     | ItemListSchema
     | FAQPageSchema
+    | LocalBusinessSchema
   > = [];
   let body: React.ReactNode = null;
 
@@ -607,7 +623,7 @@ export default async function SitesPage({
     route.type === "faq" ||
     route.type === "contact"
   ) {
-    // B2 整站扩展：四个静态内容页，面包屑统一，body 按类型分支
+    // B3 填真内容：四个静态内容页改为 reader 取数，硬编码占位全部下线
     schemas.push(
       buildBreadcrumbSchema([
         { name: s.brand_name, url: SITEBASE_DOMAIN },
@@ -620,355 +636,354 @@ export default async function SitesPage({
     );
 
     if (route.type === "about") {
-      body = (
-        <main className="max-w-4xl mx-auto px-8 py-12">
-          <header className="mb-10 text-center">
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">
-              About {s.brand_name}
-            </h1>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              {s.brand_name} designs and manufactures electric cargo trikes
-              for sustainable last-mile delivery and urban mobility.
-            </p>
-          </header>
+      const aboutR = await getAbout();
+      if (aboutR.data) {
+        const a: AboutContent = aboutR.data;
+        if (aboutR.source === "mock" || aboutR.source === "mock-demo") {
+          isDemo = true;
+          demoSource = aboutR.source;
+        }
+        body = (
+          <main className="max-w-4xl mx-auto px-8 py-12">
+            <header className="mb-10 text-center">
+              <h1 className="text-4xl font-bold text-gray-900 mb-4">
+                About {s.brand_name}
+              </h1>
+              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+                {s.brand_name} designs and manufactures electric cargo trikes
+                for sustainable last-mile delivery and urban mobility.
+              </p>
+            </header>
 
-          {/* 品牌故事 */}
-          <section className="mb-12">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              Our Story
-            </h2>
-            <p className="text-gray-700 leading-relaxed mb-4">
-              Founded with a vision to decarbonize urban logistics, {s.brand_name}{" "}
-              has spent years engineering electric trikes that combine cargo
-              capacity with the agility of a bicycle. From compact urban
-              commuters to heavy-duty industrial haulers, our vehicles are
-              built to serve businesses and individuals across global markets.
-            </p>
-            <p className="text-gray-700 leading-relaxed">
-              Every trike we build is CE and UL certified, reflecting our
-              commitment to safety, quality, and international compliance
-              standards.
-            </p>
-          </section>
+            <section className="mb-12">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                {a.about_title}
+              </h2>
+              <p className="text-gray-700 leading-relaxed mb-4">{a.about}</p>
+              {a.about.includes("\n") && (
+                <p className="text-gray-700 leading-relaxed">
+                  Every trike we build is CE and UL certified, reflecting our
+                  commitment to safety, quality, and international compliance
+                  standards.
+                </p>
+              )}
+            </section>
 
-          {/* 使命与价值观 */}
-          <section className="mb-12">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">
-              Our Values
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="p-6 border rounded-lg">
-                <div className="text-3xl mb-3">🌱</div>
-                <h3 className="font-semibold text-lg mb-2">Sustainability</h3>
-                <p className="text-sm text-gray-600">
-                  Electric drivetrains replace fossil fuels, reducing urban
-                  emissions one delivery at a time.
-                </p>
-              </div>
-              <div className="p-6 border rounded-lg">
-                <div className="text-3xl mb-3">⚙️</div>
-                <h3 className="font-semibold text-lg mb-2">Engineering</h3>
-                <p className="text-sm text-gray-600">
-                  Precision-built frames, reliable motors, and field-tested
-                  batteries ensure durability across demanding use cases.
-                </p>
-              </div>
-              <div className="p-6 border rounded-lg">
-                <div className="text-3xl mb-3">🌍</div>
-                <h3 className="font-semibold text-lg mb-2">Global Reach</h3>
-                <p className="text-sm text-gray-600">
-                  CE/UL certified for international markets, with shipping and
-                  support designed for cross-border customers.
-                </p>
-              </div>
-            </div>
-          </section>
+            <section className="mb-12">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                {a.vision_title}
+              </h2>
+              <p className="text-gray-700 leading-relaxed">{a.vision}</p>
+            </section>
 
-          {/* CTA */}
-          <section className="bg-blue-50 rounded-lg p-8 text-center">
-            <h2 className="text-2xl font-bold text-gray-900 mb-3">
-              Ready to Explore?
-            </h2>
-            <p className="text-gray-600 mb-6">
-              Browse our full range of electric cargo trikes.
-            </p>
-            <a
-              href="/site/products"
-              className="inline-block bg-blue-600 text-white font-semibold px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              View Products
-            </a>
-          </section>
-        </main>
-      );
-    } else if (route.type === "news") {
-      // News 页：占位文章列表（真连 siteBase 后改用 getArticlesList）
-      const NEWS_PLACEHOLDER: Array<{
-        title: string;
-        excerpt: string;
-        date: string;
-        category: string;
-      }> = [
-        {
-          title: "Electric Cargo Trikes: The Future of Last-Mile Delivery",
-          excerpt:
-            "How electric trikes are reshaping urban logistics, reducing costs and emissions for delivery businesses worldwide.",
-          date: "2026-07-15",
-          category: "Industry Insights",
-        },
-        {
-          title: "CE vs UL Certification: What Global Buyers Need to Know",
-          excerpt:
-            "A practical guide to electric trike certifications for cross-border buyers — what each mark means and why both matter.",
-          date: "2026-07-08",
-          category: "Compliance",
-        },
-        {
-          title: "Battery Maintenance Tips for Electric Trike Fleets",
-          excerpt:
-            "Maximize battery lifespan and reduce total cost of ownership with these field-tested maintenance practices.",
-          date: "2026-06-28",
-          category: "Maintenance",
-        },
-        {
-          title: "How to Choose Between Cargo, Commuter, and Heavy-Duty Trikes",
-          excerpt:
-            "A buyer's guide covering payload, range, motor power, and use-case matching across our trike categories.",
-          date: "2026-06-12",
-          category: "Buyer Guides",
-        },
-      ];
-      body = (
-        <main className="max-w-4xl mx-auto px-8 py-12">
-          <header className="mb-10">
-            <h1 className="text-4xl font-bold text-gray-900 mb-3">
-              News &amp; Updates
-            </h1>
-            <p className="text-lg text-gray-600">
-              Industry insights, product updates, and guides from the{" "}
-              {s.brand_name} team.
-            </p>
-          </header>
-          <div className="space-y-8">
-            {NEWS_PLACEHOLDER.map((post, idx) => (
-              <article
-                key={idx}
-                className="border-b border-gray-200 pb-8 last:border-b-0"
-              >
-                <div className="text-xs text-blue-600 font-medium mb-2">
-                  {post.category} · {post.date}
+            <section className="mb-12">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                {a.history_title}
+              </h2>
+              <p className="text-gray-700 leading-relaxed">{a.history}</p>
+            </section>
+
+            <section className="mb-12">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">
+                Our Values
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="p-6 border rounded-lg">
+                  <div className="text-3xl mb-3">🌱</div>
+                  <h3 className="font-semibold text-lg mb-2">Sustainability</h3>
+                  <p className="text-sm text-gray-600">
+                    Electric drivetrains replace fossil fuels, reducing urban
+                    emissions one delivery at a time.
+                  </p>
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-2 hover:text-blue-600 cursor-pointer">
-                  {post.title}
-                </h2>
-                <p className="text-gray-600">{post.excerpt}</p>
-                <a
-                  href="#"
-                  className="inline-block mt-3 text-sm text-blue-600 font-medium hover:underline"
-                >
-                  Read more →
-                </a>
-              </article>
-            ))}
-          </div>
-        </main>
-      );
-    } else if (route.type === "faq") {
-      // FAQ 页：三轮车业务 Q&A + FAQPage JSON-LD
-      const FAQS: Array<{ q: string; a: string }> = [
-        {
-          q: "What is the typical range of your electric cargo trikes?",
-          a: "Our trikes offer ranges from 60km to 150km per charge, depending on the model. The EcoCargo Trike X1 delivers 80km, while the X3 Pro reaches up to 150km with its 60V 30Ah battery.",
-        },
-        {
-          q: "How much payload can the trikes carry?",
-          a: "Payload capacity ranges from 150kg to 400kg. Urban commuter models start at 150kg, while our HeavyDuty H8 handles up to 400kg with its reinforced steel frame.",
-        },
-        {
-          q: "Are your trikes CE and UL certified?",
-          a: "Yes. All our electric trikes are CE certified for European markets and UL certified for North American markets. Certification documents are available on request.",
-        },
-        {
-          q: "How long does it take to charge the battery?",
-          a: "Standard charge time is 4-6 hours from empty to full. We recommend charging overnight for fleet operations. Fast-charge options are available on select models.",
-        },
-        {
-          q: "Do you offer customization for fleet buyers?",
-          a: "Yes. For bulk orders we offer customization on cargo box dimensions, color schemes, battery capacity, and additional features like reverse cameras or GPS tracking.",
-        },
-        {
-          q: "What is the warranty coverage?",
-          a: "Our trikes come with a 2-year warranty on the frame and motor, and a 1-year warranty on the battery. Extended warranty options are available for fleet customers.",
-        },
-        {
-          q: "Do you ship internationally?",
-          a: "Yes. We ship globally with CE/UL-compliant documentation. Shipping costs and lead times vary by destination — contact our sales team for a quote.",
-        },
-        {
-          q: "Can I get spare parts and after-sales support?",
-          a: "Yes. We maintain a spare parts inventory and provide remote technical support. For fleet customers, we offer training and on-site service options.",
-        },
-      ];
-      // FAQPage JSON-LD（schema.org/FAQPage，利于 Google 富文本结果）
-      schemas.push({
-        "@context": "https://schema.org",
-        "@type": "FAQPage",
-        mainEntity: FAQS.map((f) => ({
-          "@type": "Question",
-          name: f.q,
-          acceptedAnswer: { "@type": "Answer", text: f.a },
-        })),
-      });
-      body = (
-        <main className="max-w-3xl mx-auto px-8 py-12">
-          <header className="mb-10">
-            <h1 className="text-4xl font-bold text-gray-900 mb-3">
-              Frequently Asked Questions
-            </h1>
-            <p className="text-lg text-gray-600">
-              Answers to common questions about {s.brand_name} electric cargo
-              trikes.
-            </p>
-          </header>
-          <div className="space-y-6">
-            {FAQS.map((faq, idx) => (
-              <div key={idx} className="border-b border-gray-200 pb-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-2">
-                  {faq.q}
-                </h2>
-                <p className="text-gray-600">{faq.a}</p>
+                <div className="p-6 border rounded-lg">
+                  <div className="text-3xl mb-3">⚙️</div>
+                  <h3 className="font-semibold text-lg mb-2">Engineering</h3>
+                  <p className="text-sm text-gray-600">
+                    Precision-built frames, reliable motors, and field-tested
+                    batteries ensure durability across demanding use cases.
+                  </p>
+                </div>
+                <div className="p-6 border rounded-lg">
+                  <div className="text-3xl mb-3">🌍</div>
+                  <h3 className="font-semibold text-lg mb-2">Global Reach</h3>
+                  <p className="text-sm text-gray-600">
+                    CE/UL certified for international markets, with shipping and
+                    support designed for cross-border customers.
+                  </p>
+                </div>
               </div>
-            ))}
-          </div>
-          <div className="mt-10 p-6 bg-blue-50 rounded-lg text-center">
-            <p className="text-gray-700 mb-3">Still have questions?</p>
-            <a
-              href="/site/contact"
-              className="inline-block bg-blue-600 text-white font-semibold px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Contact Us
-            </a>
-          </div>
-        </main>
-      );
+            </section>
+
+            <section className="bg-blue-50 rounded-lg p-8 text-center">
+              <h2 className="text-2xl font-bold text-gray-900 mb-3">
+                Ready to Explore?
+              </h2>
+              <p className="text-gray-600 mb-6">
+                Browse our full range of electric cargo trikes.
+              </p>
+              <a
+                href="/site/products"
+                className="inline-block bg-blue-600 text-white font-semibold px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                View Products
+              </a>
+            </section>
+          </main>
+        );
+      } else {
+        // about 走 error 态（business 错，如 siteBase endpoint 404）
+        notFound();
+      }
+    } else if (route.type === "news") {
+      const newsR = await getNewsList();
+      if (newsR.data) {
+        const newsList: NewsItem[] = newsR.data;
+        if (newsR.source === "mock" || newsR.source === "mock-demo") {
+          isDemo = true;
+          demoSource = newsR.source;
+        }
+        body = (
+          <main className="max-w-4xl mx-auto px-8 py-12">
+            <header className="mb-10">
+              <h1 className="text-4xl font-bold text-gray-900 mb-3">
+                News &amp; Updates
+              </h1>
+              <p className="text-lg text-gray-600">
+                Industry insights, product updates, and guides from the{" "}
+                {s.brand_name} team.
+              </p>
+            </header>
+            <div className="space-y-8">
+              {newsList.map((post, idx) => (
+                <article
+                  key={idx}
+                  className="border-b border-gray-200 pb-8 last:border-b-0"
+                >
+                  <div className="text-xs text-blue-600 font-medium mb-2">
+                    {post.category || "News"} · {post.publish_time || post.create_time || ""}
+                  </div>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2 hover:text-blue-600 cursor-pointer">
+                    {post.title}
+                  </h2>
+                  <p className="text-gray-600">{post.summary}</p>
+                  {post.id && (
+                    <a
+                      href={`/site/articles/${post.id}`}
+                      className="inline-block mt-3 text-sm text-blue-600 font-medium hover:underline"
+                    >
+                      Read more →
+                    </a>
+                  )}
+                </article>
+              ))}
+            </div>
+          </main>
+        );
+      } else {
+        notFound();
+      }
+    } else if (route.type === "faq") {
+      const faqR = await getFaqs();
+      if (faqR.data) {
+        const faqs: Faq[] = faqR.data;
+        if (faqR.source === "mock" || faqR.source === "mock-demo") {
+          isDemo = true;
+          demoSource = faqR.source;
+        }
+        // FAQPage JSON-LD（schema.org/FAQPage，利于 Google 富文本结果）
+        schemas.push({
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          mainEntity: faqs.map((f) => ({
+            "@type": "Question",
+            name: f.question,
+            acceptedAnswer: { "@type": "Answer", text: f.answer },
+          })),
+        });
+        body = (
+          <main className="max-w-3xl mx-auto px-8 py-12">
+            <header className="mb-10">
+              <h1 className="text-4xl font-bold text-gray-900 mb-3">
+                Frequently Asked Questions
+              </h1>
+              <p className="text-lg text-gray-600">
+                Answers to common questions about {s.brand_name} electric cargo
+                trikes.
+              </p>
+            </header>
+            <div className="space-y-6">
+              {faqs.map((faq, idx) => (
+                <div key={idx} className="border-b border-gray-200 pb-6">
+                  <h2 className="text-lg font-semibold text-gray-900 mb-2">
+                    {faq.question}
+                  </h2>
+                  <p className="text-gray-600">{faq.answer}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-10 p-6 bg-blue-50 rounded-lg text-center">
+              <p className="text-gray-700 mb-3">Still have questions?</p>
+              <a
+                href="/site/contact"
+                className="inline-block bg-blue-600 text-white font-semibold px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Contact Us
+              </a>
+            </div>
+          </main>
+        );
+      } else {
+        notFound();
+      }
     } else {
       // contact
-      body = (
-        <main className="max-w-4xl mx-auto px-8 py-12">
-          <header className="mb-10 text-center">
-            <h1 className="text-4xl font-bold text-gray-900 mb-3">
-              Contact {s.brand_name}
-            </h1>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Questions about our electric trikes? Need a fleet quote? Reach
-              out — our team responds within 24 hours.
-            </p>
-          </header>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* 联系方式 */}
-            <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
-                Get in Touch
-              </h2>
-              <dl className="space-y-4">
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">
-                    Sales Inquiries
-                  </dt>
-                  <dd className="text-gray-900">sales@hutian-trike.com</dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">
-                    Technical Support
-                  </dt>
-                  <dd className="text-gray-900">support@hutian-trike.com</dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Phone</dt>
-                  <dd className="text-gray-900">+86 400-XXX-XXXX</dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">
-                    Business Hours
-                  </dt>
-                  <dd className="text-gray-900">
-                    Mon-Fri, 9:00-18:00 (GMT+8)
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">
-                    Headquarters
-                  </dt>
-                  <dd className="text-gray-900">
-                    [Placeholder — real address to be filled at launch]
-                  </dd>
-                </div>
-              </dl>
-            </div>
-
-            {/* 表单占位 */}
-            <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
-                Send a Message
-              </h2>
-              <form className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Name
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Your name"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="you@example.com"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Subject
-                  </label>
-                  <select className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option>Sales inquiry</option>
-                    <option>Technical support</option>
-                    <option>Fleet / bulk order</option>
-                    <option>Partnership</option>
-                    <option>Other</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Message
-                  </label>
-                  <textarea
-                    rows={4}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="How can we help?"
-                  />
-                </div>
-                <button
-                  type="button"
-                  className="w-full bg-blue-600 text-white font-semibold py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  Send Message
-                </button>
-              </form>
-              <p className="text-xs text-gray-400 mt-3">
-                Form is a visual placeholder — backend integration pending.
+      const contactR = await getContactSettings();
+      if (contactR.data) {
+        const c: ContactSettings = contactR.data;
+        if (contactR.source === "mock" || contactR.source === "mock-demo") {
+          isDemo = true;
+          demoSource = contactR.source;
+        }
+        // LocalBusiness JSON-LD（contact 页补 LocalBusiness schema 利于地图/本地搜索）
+        schemas.push({
+          "@context": "https://schema.org",
+          "@type": "LocalBusiness",
+          name: c.company_name,
+          telephone: c.contact_phone,
+          email: c.contact_email,
+          address: {
+            "@type": "PostalAddress",
+            streetAddress: c.contact_address,
+          },
+          openingHours: c.service_time,
+          url: SITEBASE_DOMAIN,
+        });
+        body = (
+          <main className="max-w-4xl mx-auto px-8 py-12">
+            <header className="mb-10 text-center">
+              <h1 className="text-4xl font-bold text-gray-900 mb-3">
+                Contact {s.brand_name}
+              </h1>
+              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+                Questions about our electric trikes? Need a fleet quote? Reach
+                out — our team responds within 24 hours.
               </p>
+            </header>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 mb-4">
+                  Get in Touch
+                </h2>
+                <dl className="space-y-4">
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">
+                      Sales Inquiries
+                    </dt>
+                    <dd className="text-gray-900">
+                      <a href={`mailto:${c.contact_email}`} className="hover:text-blue-600">
+                        {c.contact_email}
+                      </a>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">
+                      Technical Support
+                    </dt>
+                    <dd className="text-gray-900">
+                      <a href={`mailto:${c.company_email}`} className="hover:text-blue-600">
+                        {c.company_email}
+                      </a>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Phone</dt>
+                    <dd className="text-gray-900">
+                      <a href={`tel:${c.contact_phone.replace(/\s/g, "")}`} className="hover:text-blue-600">
+                        {c.contact_phone}
+                      </a>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">
+                      Business Hours
+                    </dt>
+                    <dd className="text-gray-900">{c.service_time}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">
+                      Headquarters
+                    </dt>
+                    <dd className="text-gray-900">{c.contact_address}</dd>
+                  </div>
+                </dl>
+              </div>
+
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 mb-4">
+                  Send a Message
+                </h2>
+                <form className="space-y-4" action={`/api/inbox/${route.id}/reply`} method="POST">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Name
+                    </label>
+                    <input
+                      type="text"
+                      name="name"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Your name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      name="email"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="you@example.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Subject
+                    </label>
+                    <select name="subject" className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <option>Sales inquiry</option>
+                      <option>Technical support</option>
+                      <option>Fleet / bulk order</option>
+                      <option>Partnership</option>
+                      <option>Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Message
+                    </label>
+                    <textarea
+                      rows={4}
+                      name="message"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="How can we help?"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="w-full bg-blue-600 text-white font-semibold py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Send Message
+                  </button>
+                </form>
+              </div>
             </div>
-          </div>
-        </main>
-      );
+          </main>
+        );
+      } else {
+        notFound();
+      }
     }
   } else if (route.type === "article") {
     const r = await getArticle(route.id);

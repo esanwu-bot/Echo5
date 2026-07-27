@@ -9,7 +9,7 @@
  * 证据：route/api.php:200-201 (articles/:id)、api.php:72 (products/:id) 均 public GET
  */
 
-import type { Article, Product, ReaderResult, SiteSettings } from "./types";
+import type { Article, Product, ReaderResult, SiteSettings, Faq, NewsItem, AboutContent, ContactSettings } from "./types";
 
 const SITEBASE_URL =
   process.env.SITEBASE_API_URL || "http://localhost:8000/api/v1";
@@ -256,6 +256,143 @@ const MOCK_SETTINGS: SiteSettings = {
 };
 
 // ────────────────────────────────────────────────
+// B3 填真内容：about/news/faq/contact 兜底素材
+// 球门：dev 期 siteBase 不通时走 mock，production 期 siteBase 抖动时 about/news/faq 走 stale 兜底
+//       （contact 跟 settings 一样是全局依赖，production 走 stale）
+// 兜底内容必须贴品牌（HUTIAN_BRAND_NAME）+ 三轮车业务，禁止裸 placeholder（如 [Placeholder]）
+// ────────────────────────────────────────────────
+
+const MOCK_FAQS: Faq[] = [
+  {
+    id: 1,
+    question: "What is the typical range of your electric cargo trikes?",
+    answer: `Our trikes offer ranges from 60km to 150km per charge, depending on the model. The EcoCargo Trike X1 delivers 80km, while the X3 Pro reaches up to 150km with its 60V 30Ah battery.`,
+    category: "Specifications",
+    is_hot: 1,
+    sort: 1,
+    status: 1,
+  },
+  {
+    id: 2,
+    question: "How much payload can the trikes carry?",
+    answer: `Payload capacity ranges from 150kg to 400kg. Urban commuter models start at 150kg, while our HeavyDuty H8 handles up to 400kg with its reinforced steel frame.`,
+    category: "Specifications",
+    is_hot: 1,
+    sort: 2,
+    status: 1,
+  },
+  {
+    id: 3,
+    question: "Are your trikes CE and UL certified?",
+    answer: `Yes. All ${HUTIAN_BRAND_NAME} electric trikes are CE certified for European markets and UL certified for North American markets. Certification documents are available on request.`,
+    category: "Compliance",
+    is_hot: 1,
+    sort: 3,
+    status: 1,
+  },
+  {
+    id: 4,
+    question: "How long does it take to charge the battery?",
+    answer: "Standard charge time is 4-6 hours from empty to full. We recommend charging overnight for fleet operations. Fast-charge options are available on select models.",
+    category: "Battery",
+    sort: 4,
+    status: 1,
+  },
+  {
+    id: 5,
+    question: "Do you offer customization for fleet buyers?",
+    answer: "Yes. For bulk orders we offer customization on cargo box dimensions, color schemes, battery capacity, and additional features like reverse cameras or GPS tracking.",
+    category: "Orders",
+    sort: 5,
+    status: 1,
+  },
+  {
+    id: 6,
+    question: "What is the warranty coverage?",
+    answer: `Our trikes come with a 2-year warranty on the frame and motor, and a 1-year warranty on the battery. Extended warranty options are available for fleet customers.`,
+    category: "Warranty",
+    sort: 6,
+    status: 1,
+  },
+  {
+    id: 7,
+    question: "Do you ship internationally?",
+    answer: `Yes. ${HUTIAN_BRAND_NAME} ships globally with CE/UL-compliant documentation. Shipping costs and lead times vary by destination — contact our sales team for a quote.`,
+    category: "Shipping",
+    sort: 7,
+    status: 1,
+  },
+  {
+    id: 8,
+    question: "Can I get spare parts and after-sales support?",
+    answer: "Yes. We maintain a spare parts inventory and provide remote technical support. For fleet customers, we offer training and on-site service options.",
+    category: "Support",
+    sort: 8,
+    status: 1,
+  },
+];
+
+const MOCK_NEWS: NewsItem[] = [
+  {
+    id: 1,
+    title: "Electric Cargo Trikes: The Future of Last-Mile Delivery",
+    summary:
+      "How electric trikes are reshaping urban logistics, reducing costs and emissions for delivery businesses worldwide.",
+    category: "Industry Insights",
+    publish_time: "2026-07-15",
+    views: 128,
+  },
+  {
+    id: 2,
+    title: "CE vs UL Certification: What Global Buyers Need to Know",
+    summary:
+      "A practical guide to electric trike certifications for cross-border buyers — what each mark means and why both matter.",
+    category: "Compliance",
+    publish_time: "2026-07-08",
+    views: 96,
+  },
+  {
+    id: 3,
+    title: "Battery Maintenance Tips for Electric Trike Fleets",
+    summary:
+      "Maximize battery lifespan and reduce total cost of ownership with these field-tested maintenance practices.",
+    category: "Maintenance",
+    publish_time: "2026-06-28",
+    views: 152,
+  },
+  {
+    id: 4,
+    title: "How to Choose Between Cargo, Commuter, and Heavy-Duty Trikes",
+    summary:
+      "A buyer's guide covering payload, range, motor power, and use-case matching across our trike categories.",
+    category: "Buyer Guides",
+    publish_time: "2026-06-12",
+    views: 210,
+  },
+];
+
+const MOCK_ABOUT: AboutContent = {
+  about_title: "Our Story",
+  about: `Founded with a vision to decarbonize urban logistics, ${HUTIAN_BRAND_NAME} has spent years engineering electric trikes that combine cargo capacity with the agility of a bicycle. From compact urban commuters to heavy-duty industrial haulers, our vehicles are built to serve businesses and individuals across global markets.`,
+  vision_title: "Our Vision",
+  vision: `We believe the future of urban mobility is electric, efficient, and cargo-capable. ${HUTIAN_BRAND_NAME} is committed to building trikes that reduce emissions, lower operating costs, and make last-mile delivery sustainable for businesses worldwide.`,
+  history_title: "Our History",
+  history: `From a small workshop to a global manufacturer, ${HUTIAN_BRAND_NAME} has grown by focusing on engineering precision, customer feedback, and international compliance. Every trike we build is CE and UL certified, reflecting our commitment to safety, quality, and international compliance standards.`,
+  images: [],
+};
+
+const MOCK_CONTACT: ContactSettings = {
+  contact_phone: "+86 400-000-0000",
+  contact_email: `sales@${HUTIAN_BRAND_NAME.toLowerCase().replace(/\s+/g, "")}.com`,
+  contact_address: `${HUTIAN_BRAND_NAME} Headquarters, Shenzhen, Guangdong, China`,
+  service_time: "Mon-Fri, 9:00-18:00 (GMT+8)",
+  company_name: HUTIAN_BRAND_NAME,
+  company_address: `${HUTIAN_BRAND_NAME} Headquarters, Shenzhen, Guangdong, China`,
+  company_phone: "+86 400-000-0000",
+  company_email: `sales@${HUTIAN_BRAND_NAME.toLowerCase().replace(/\s+/g, "")}.com`,
+};
+
+// ────────────────────────────────────────────────
 // Public API
 // ────────────────────────────────────────────────
 
@@ -369,6 +506,148 @@ export async function getSiteSettings(): Promise<ReaderResult<SiteSettings>> {
     source: "stale",
     error: `settings ${kind} (publish=${PUBLISH_MODE}, fallback=stale)`,
   };
+}
+
+/**
+ * getFaqs — B3 填真内容：FAQ 列表页数据源
+ *
+ * 调 siteBase /api/v1/faqs（public GET，列表接口）。
+ * 错误态分流：business 不 mock；network/server_error dev 期 mock，production 期走 stale 兜底
+ * （FAQ 是内容页非全局依赖，但 about/news/faq 三页在 production 失败时走 notFound 会太激进，
+ *  改走 stale 兜底让页面继续渲染 + 内容贴品牌，比 404 对 SEO 友好；siteBase 真填数据后自然覆盖）
+ */
+export async function getFaqs(): Promise<ReaderResult<Faq[]>> {
+  const r = await fetchJson<{ list: Faq[]; total: number } | Faq[]>(`/faqs`);
+  if (r.ok) {
+    // siteBase 列表接口返回 { list, total } 或直接数组，两种都兼容
+    const data = Array.isArray(r.data) ? r.data : r.data.list;
+    if (data && data.length > 0) return { data, source: "live" };
+  }
+  const kind: "network" | "server_error" | "business" = r.ok
+    ? "server_error"
+    : r.kind;
+  if (kind === "business") {
+    return { data: null, source: "error", error: `faqs business error` };
+  }
+  if (PUBLISH_MODE === "dev" && ALLOW_MOCK_FALLBACK) {
+    const source = kind === "server_error" ? "mock-demo" : "mock";
+    return { data: MOCK_FAQS, source };
+  }
+  // production: stale 兜底（FAQ 是内容页，404 太激进）
+  return { data: MOCK_FAQS, source: "stale", error: `faqs ${kind} (fallback=stale)` };
+}
+
+/**
+ * getNewsList — B3 填真内容：News 列表页数据源
+ *
+ * 调 siteBase /api/v1/news（public GET，列表接口）。
+ * 错误态分流同 getFaqs。
+ */
+export async function getNewsList(): Promise<ReaderResult<NewsItem[]>> {
+  const r = await fetchJson<{ list: NewsItem[]; total: number } | NewsItem[]>(`/news`);
+  if (r.ok) {
+    const data = Array.isArray(r.data) ? r.data : r.data.list;
+    if (data && data.length > 0) return { data, source: "live" };
+  }
+  const kind: "network" | "server_error" | "business" = r.ok
+    ? "server_error"
+    : r.kind;
+  if (kind === "business") {
+    return { data: null, source: "error", error: `news business error` };
+  }
+  if (PUBLISH_MODE === "dev" && ALLOW_MOCK_FALLBACK) {
+    const source = kind === "server_error" ? "mock-demo" : "mock";
+    return { data: MOCK_NEWS, source };
+  }
+  return { data: MOCK_NEWS, source: "stale", error: `news ${kind} (fallback=stale)` };
+}
+
+/**
+ * getAbout — B3 填真内容：About 页数据源
+ *
+ * 调 siteBase /api/v1/about/company（public GET）。
+ * siteBase 按 type=about|vision|history 分组返回，reader 聚合成单 AboutContent。
+ * 错误态分流同 getFaqs。
+ */
+export async function getAbout(): Promise<ReaderResult<AboutContent>> {
+  const r = await fetchJson<Partial<AboutContent> | Record<string, string>>(`/about/company`);
+  if (r.ok && r.data) {
+    const d = r.data as Record<string, string>;
+    if (d.about || d.about_title) {
+      return {
+        data: {
+          about_title: d.about_title || "Our Story",
+          about: d.about || MOCK_ABOUT.about,
+          vision_title: d.vision_title || "Our Vision",
+          vision: d.vision || MOCK_ABOUT.vision,
+          history_title: d.history_title || "Our History",
+          history: d.history || MOCK_ABOUT.history,
+          images: Array.isArray(d.images) ? d.images : [],
+        },
+        source: "live",
+      };
+    }
+  }
+  const kind: "network" | "server_error" | "business" = r.ok
+    ? "server_error"
+    : r.kind;
+  if (kind === "business") {
+    return { data: null, source: "error", error: `about business error` };
+  }
+  if (PUBLISH_MODE === "dev" && ALLOW_MOCK_FALLBACK) {
+    const source = kind === "server_error" ? "mock-demo" : "mock";
+    return { data: MOCK_ABOUT, source };
+  }
+  return { data: MOCK_ABOUT, source: "stale", error: `about ${kind} (fallback=stale)` };
+}
+
+/**
+ * getContactSettings — B3 填真内容：Contact 页数据源
+ *
+ * 调 siteBase /api/v1/settings/group/contact + /settings/group/company 两个分组，
+ * 合并成 ContactSettings（contact 组有电话/邮箱/地址/服务时间，company 组有公司名/地址/电话/邮箱）。
+ * 错误态分流同 getSiteSettings：production 期走 stale（contact 是全局依赖，每页 footer 都可能用）。
+ */
+export async function getContactSettings(): Promise<ReaderResult<ContactSettings>> {
+  // 并发取 contact + company 两个 settings 组
+  const [contactR, companyR] = await Promise.all([
+    fetchJson<Record<string, string>>(`/settings/contact`),
+    fetchJson<Record<string, string>>(`/settings/company`),
+  ]);
+
+  if (contactR.ok && contactR.data && (contactR.data.contact_email || contactR.data.contact_phone)) {
+    const c = contactR.data;
+    const comp = (companyR.ok && companyR.data) ? companyR.data : {};
+    return {
+      data: {
+        contact_phone: c.contact_phone || comp.company_phone || MOCK_CONTACT.contact_phone,
+        contact_email: c.contact_email || comp.company_email || MOCK_CONTACT.contact_email,
+        contact_address: c.contact_address || comp.company_address || MOCK_CONTACT.contact_address,
+        contact_qq: c.contact_qq || "",
+        contact_wechat: c.contact_wechat || "",
+        service_time: c.service_time || MOCK_CONTACT.service_time,
+        company_name: comp.company_name || HUTIAN_BRAND_NAME,
+        company_address: comp.company_address || c.contact_address || MOCK_CONTACT.company_address,
+        company_phone: comp.company_phone || c.contact_phone || MOCK_CONTACT.company_phone,
+        company_email: comp.company_email || c.contact_email || MOCK_CONTACT.company_email,
+      },
+      source: "live",
+    };
+  }
+
+  // 降级：contact 组失败 → 按 publish mode 分流
+  const kind: "network" | "server_error" | "business" = contactR.ok
+    ? "server_error"
+    : contactR.kind;
+  if (kind === "business") {
+    // settings endpoint 缺失属配置问题，用兜底比整站死强（同 getSiteSettings 的判据）
+  }
+  if (PUBLISH_MODE === "dev" && ALLOW_MOCK_FALLBACK) {
+    const source = kind === "server_error" ? "mock-demo" : "mock";
+    return { data: MOCK_CONTACT, source };
+  }
+  // production: contact 跟 settings 一样是全局依赖，走 stale
+  return { data: MOCK_CONTACT, source: "stale", error: `contact ${kind} (fallback=stale)` };
 }
 
 export { SITEBASE_DOMAIN };

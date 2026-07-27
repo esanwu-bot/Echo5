@@ -46,6 +46,70 @@ export interface SiteSettings {
   domain: string;
 }
 
+/**
+ * FAQ 条目（对齐 siteBase /api/v1/faqs 返回结构）
+ * 字段：question / answer / category / product_id / is_hot / sort / status
+ */
+export interface Faq {
+  id: number;
+  question: string;
+  answer: string;
+  category?: string;
+  product_id?: number;
+  is_hot?: number;
+  sort?: number;
+  status?: number;
+}
+
+/**
+ * News 条目（对齐 siteBase /api/v1/news 返回结构）
+ * 字段：title / summary / content / image / cover / views / status / create_time
+ */
+export interface NewsItem {
+  id: number;
+  title: string;
+  summary: string;
+  content?: string;
+  image?: string;
+  cover?: string;
+  views?: number;
+  category?: string;
+  publish_time?: string;
+  create_time?: string;
+}
+
+/**
+ * About 内容（对齐 siteBase /api/v1/about/company 返回结构）
+ * siteBase 按 type=about|vision|history 分组返回，reader 聚合成单对象
+ */
+export interface AboutContent {
+  about_title: string;
+  about: string;
+  vision_title: string;
+  vision: string;
+  history_title: string;
+  history: string;
+  images?: string[];
+}
+
+/**
+ * Contact 设置（对齐 siteBase /api/v1/settings/group/contact 返回结构）
+ * 字段：contact_phone / contact_email / contact_address / contact_qq / contact_wechat / service_time
+ * 补充 company 设置组的 company_name / company_address / company_phone / company_email
+ */
+export interface ContactSettings {
+  contact_phone: string;
+  contact_email: string;
+  contact_address: string;
+  contact_qq?: string;
+  contact_wechat?: string;
+  service_time: string;
+  company_name: string;
+  company_address: string;
+  company_phone: string;
+  company_email: string;
+}
+
 export interface ReaderResult<T> {
   data: T | null;
   /**

@@ -70,7 +70,7 @@ function extractJsonLdScripts(html: string): string[] {
 
 async function probePage(
   url: string,
-  expectedType: "Article" | "Product"
+  expectedType: "Article" | "Product" | "BreadcrumbList" | "FAQPage" | "LocalBusiness"
 ): Promise<Assertion[]> {
   const asserts: Assertion[] = [];
   const res = await curl(url);
@@ -175,7 +175,10 @@ async function probePage(
     for (const s of ldScripts) {
       try {
         const obj = JSON.parse(s);
-        if (obj["@type"] === expectedType) foundExpectedType = true;
+        // 内容页可能 expectedType 是 FAQPage / LocalBusiness / BreadcrumbList
+        // 也可能 obj["@type"] 是数组（BreadcrumbList + FAQPage 共存）
+        const types = Array.isArray(obj["@type"]) ? obj["@type"] : [obj["@type"]];
+        if (types.includes(expectedType)) foundExpectedType = true;
       } catch (e) {
         jsonParseOk = false;
         lastErr = (e as Error).message;
@@ -186,10 +189,38 @@ async function probePage(
       pass: jsonParseOk,
       detail: jsonParseOk ? "all parsed" : `parse error: ${lastErr}`,
     });
+    if (expectedType !== "Article" && expectedType !== "Product") {
+      // 内容页（FAQPage / LocalBusiness / BreadcrumbList）期望特定 schema type
+      asserts.push({
+        name: `[${url}] JSON-LD 含 @type=${expectedType}`,
+        pass: foundExpectedType,
+        detail: foundExpectedType ? "matched" : "not found",
+      });
+    }
+  }
+
+  // (d) B3 填真内容：内容页裸 placeholder 禁断言
+  // 球门：production 期 settings 活着 + 正文硬编码占位 + noindex 缺失 = 裸奔 P1
+  //       断言 HTML 不含裸 placeholder 标记（[Placeholder] / XXX-XXX-XXXX / Form is a visual placeholder）
+  if (expectedType !== "Article" && expectedType !== "Product") {
+    const placeholderPatterns = [
+      /\[Placeholder/i,
+      /XXX-XXX-XXXX/,
+      /Form is a visual placeholder/,
+      /backend integration pending/i,
+      /Lorem ipsum/i,
+    ];
+    let placeholderFound = "";
+    for (const p of placeholderPatterns) {
+      if (p.test(html)) {
+        placeholderFound = p.source;
+        break;
+      }
+    }
     asserts.push({
-      name: `[${url}] JSON-LD 含 @type=${expectedType}`,
-      pass: foundExpectedType,
-      detail: foundExpectedType ? "matched" : "not found",
+      name: `[${url}] 无裸 placeholder 文本（[Placeholder]/XXX/backend pending）`,
+      pass: !placeholderFound,
+      detail: placeholderFound ? `found pattern: ${placeholderFound}` : "clean",
     });
   }
 
@@ -221,14 +252,27 @@ async function main() {
   const allAsserts: Assertion[] = [];
 
   // 文章页
-  console.log(`\n[1/2] 抓 /site/articles/${ARTICLE_ID} ...`);
+  console.log(`\n[1/6] 抓 /site/articles/${ARTICLE_ID} ...`);
   allAsserts.push(
     ...(await probePage(`${WEB_URL}/site/articles/${ARTICLE_ID}`, "Article"))
   );
 
   // 商品页
-  console.log(`\n[2/2] 抓 /site/products/${PRODUCT_ID} ...`);
+  console.log(`\n[2/6] 抓 /site/products/${PRODUCT_ID} ...`);
   allAsserts.push(...(await probePage(`${WEB_URL}/site/products/${PRODUCT_ID}`, "Product")));
+
+  // B3 填真内容：四个内容页
+  console.log(`\n[3/6] 抓 /site/about ...`);
+  allAsserts.push(...(await probePage(`${WEB_URL}/site/about`, "BreadcrumbList")));
+
+  console.log(`\n[4/6] 抓 /site/news ...`);
+  allAsserts.push(...(await probePage(`${WEB_URL}/site/news`, "BreadcrumbList")));
+
+  console.log(`\n[5/6] 抓 /site/faq ...`);
+  allAsserts.push(...(await probePage(`${WEB_URL}/site/faq`, "FAQPage")));
+
+  console.log(`\n[6/6] 抓 /site/contact ...`);
+  allAsserts.push(...(await probePage(`${WEB_URL}/site/contact`, "LocalBusiness")));
 
   // 汇总
   console.log("\n" + "─".repeat(60));

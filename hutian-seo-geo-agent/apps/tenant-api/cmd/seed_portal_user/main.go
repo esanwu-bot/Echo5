@@ -82,6 +82,20 @@ func main() {
 			}
 		}
 
+		// 为 tenant 创建默认 subscription（幂等：不存在才创建）
+		var sub models.Subscription
+		if err := gormDB.Where("tenant_id = ?", tenant.ID).First(&sub).Error; err != nil {
+			sub = models.Subscription{
+				TenantID:   tenant.ID,
+				Plan:       models.PlanFree,
+				Status:     models.SubStatusActive,
+				SeatsLimit: 5,
+			}
+			if err2 := gormDB.Create(&sub).Error; err2 != nil {
+				log.Printf("create subscription for tenant %s: %v", tenant.Slug, err2)
+			}
+		}
+
 		fmt.Printf("OK  user=%s (id=%d)  tenant=%s (id=%d)  workspace=%s (id=%d)  seat=%d  role=%s\n",
 			user.Email, user.ID, tenant.Slug, tenant.ID, workspace.Slug, workspace.ID, seat.ID, seat.Role)
 	}

@@ -63,6 +63,25 @@ func main() {
 	}
 	r := gin.Default()
 
+	// T7.6 dev CORS：允许 apps/web（localhost:3000）/apps/admin 直连 tenant-api
+	// 生产环境应关闭或限定具体域名，不可 * 通配带凭证请求。
+	if cfg.Dev {
+		r.Use(func(c *gin.Context) {
+			origin := c.GetHeader("Origin")
+			if origin != "" {
+				c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+				c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+			}
+			c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+			c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Admin-Token, X-Tenant-ID, X-Workspace-ID")
+			if c.Request.Method == "OPTIONS" {
+				c.AbortWithStatus(204)
+				return
+			}
+			c.Next()
+		})
+	}
+
 	// 健康检查（T6.1 出口：服务起来 + DB 连通，无需 tenant ctx）
 	r.GET("/healthz", func(c *gin.Context) {
 		var dbName string
@@ -219,8 +238,31 @@ func main() {
 	portal.Use(func(c *gin.Context) { c.Set("db", gormDB); c.Next() }) // 兼容旧 handler 取 db 方式
 	portal.Use(middleware.TenantJWTContext(gormDB, jwtVerifier))
 	{
-		// 当前登录用户信息
+		// 1. 我的工作台（个人资料）
 		portal.GET("/me", handlers.TenantMe)
+
+		// 2. 站点设置
+		portal.GET("/workspace", handlers.TenantGetWorkspace)
+		portal.PATCH("/workspace", handlers.TenantUpdateWorkspace)
+
+		// 3. 成员管理（seats）
+		portal.GET("/seats", handlers.TenantListSeats)
+		portal.POST("/seats/invite", handlers.TenantInviteSeat)
+		portal.PATCH("/seats/:id", handlers.TenantUpdateSeat)
+
+		// 4. 订阅与计费
+		portal.GET("/subscription", handlers.TenantGetSubscription)
+
+		// 5. 额度与用量
+		portal.GET("/usage", handlers.TenantListUsage)
+
+		// 6. 凭证管理（只读元信息 + 轮换/吊销）
+		portal.GET("/credentials", handlers.TenantListCredentials)
+		portal.POST("/credentials/:id/rotate", handlers.TenantRotateCredential)
+		portal.POST("/credentials/:id/revoke", handlers.TenantRevokeCredential)
+
+		// 7. 操作日志
+		portal.GET("/audit-logs", handlers.TenantListAuditLogs)
 	}
 
 	log.Printf("[tenant-api] listening on :%s (dev=%v, db=hutian, admin=%v, jwt=%v)", cfg.Port, cfg.Dev, cfg.AdminToken != "", cfg.JWTKey != "")

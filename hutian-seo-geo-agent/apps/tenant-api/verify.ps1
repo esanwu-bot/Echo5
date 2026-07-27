@@ -4,17 +4,21 @@
 # Reviewer P1: Go service go vet/test/build + isolation probes must enter CI,
 # not float outside the pnpm + Turborepo Node/TS pipeline.
 #
-# Orchestration: go vet -> go build -> start tenant-api -> run 3 probes -> kill -> exit
-#   - probe:tenant-isolation (T6.3a Go layer, 4 asserts)
-#   - probe:cross-lang       (T6.3b cross-lang boundary, 6 asserts)
-#   - probe:admin-isolation  (P0-1 admin auth seam, 7 asserts)
+# Orchestration: go vet -> go build -> start tenant-api -> run 4 probes -> kill -> exit
+#   - probe:tenant-isolation      (T6.3a Go layer, 4 asserts)
+#   - probe:cross-lang            (T6.3b cross-lang boundary, 6 asserts)
+#   - probe:admin-isolation       (P0-1 admin auth seam, 7 asserts)
+#   - probe:tenant-selfservice    (T7.4 portal self-service, 13+ asserts)
 #
 # Run from repo root:
 #   pnpm probe:tenant
 #   # or directly:
 #   powershell -ExecutionPolicy Bypass -File apps/tenant-api/verify.ps1
 #
-# Prereqs: hutian db created + migration applied (0001_init.sql or tenant-api -migrate) + seed loaded
+# Prereqs:
+#   - hutian db created + migration applied (0001_init.sql/0002_users.sql or tenant-api -migrate)
+#   - M6 seed loaded: mysql hutian < cmd/probe_tenant_isolation/seed.sql
+#   - portal seed loaded: go run ./cmd/seed_portal_user
 # ============================================================================
 
 $ErrorActionPreference = "Stop"
@@ -41,6 +45,8 @@ try {
 } catch {
     Write-Host "=== [3/6] start tenant-api (background) ===" -ForegroundColor Cyan
     $env:TENANT_INTERNAL_TOKEN_KEY = "dev-secret-key-change-in-prod"
+    $env:TENANT_JWT_KEY = "dev-jwt-key-change-in-prod"
+    $env:TENANT_ADMIN_TOKEN = "dev-admin-token-change-in-prod"
     $proc = Start-Process -FilePath "go" -ArgumentList "run","." -WorkingDirectory $apiDir -PassThru -WindowStyle Hidden -RedirectStandardOutput "$env:TEMP\tenant-api.verify.log" -RedirectStandardError "$env:TEMP\tenant-api.verify.err"
     $needStop = $true
     # Wait for service to be healthy (up to 20s)
@@ -86,7 +92,7 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "PASS: probe:cross-lang" -ForegroundColor Green
 }
 
-Write-Host "=== [6/6] probe:admin-isolation (P0-1 admin auth) ===" -ForegroundColor Cyan
+Write-Host "=== [6/7] probe:admin-isolation (P0-1 admin auth) ===" -ForegroundColor Cyan
 $env:TENANT_ADMIN_TOKEN = "dev-admin-token-change-in-prod"
 go run ./cmd/probe_admin_isolation
 if ($LASTEXITCODE -ne 0) {
@@ -94,6 +100,16 @@ if ($LASTEXITCODE -ne 0) {
     $exitCode = 1
 } else {
     Write-Host "PASS: probe:admin-isolation" -ForegroundColor Green
+}
+
+Write-Host "=== [7/7] probe:tenant-selfservice (T7.4) ===" -ForegroundColor Cyan
+$env:TENANT_JWT_KEY = "dev-jwt-key-change-in-prod"
+go run ./cmd/probe_tenant_selfservice
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "FAIL: probe:tenant-selfservice" -ForegroundColor Red
+    $exitCode = 1
+} else {
+    Write-Host "PASS: probe:tenant-selfservice" -ForegroundColor Green
 }
 
 # Cleanup: kill the service if we started it

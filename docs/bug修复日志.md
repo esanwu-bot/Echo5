@@ -61,10 +61,47 @@
 2. **跨进程/跨天 session 持久化（M5 另排）**：`sessionHistories` 是内存 Map，bridge 重启即蒸发。真走开几小时/真重启再发"继续" = 失忆符合预期，持久化（Redis/文件/DB 按 sessionId 落）不进这一单，另排 M5。
 3. **verify:loop 的 meta.totalTools 预估断言**：当前 MCP 实际 10 个工具、断言写死 5 → fail 1 项。属于测试脚本常量与实际不一致，与"继续失忆"根因正交，不阻塞本次修复，后续单独对齐 verify-loop 脚本的工具清单。
 
-### 6. 改动文件清单（本次提交）
+### 6. 改动文件清单（2026-07-29 · 继续失忆 提交）
 - `hutian-seo-geo-agent/apps/agent-bridge/src/loop/intent.ts` —— 加 continue_last + 承接词白名单双护栏 + classify 上下文消歧 + ambiguous 反问不播欢迎
 - `hutian-seo-geo-agent/apps/agent-bridge/src/loop/run-agent.ts` —— 加 history 输入和回调、拼 messages、入口 log 判官、ambiguous 写回、continue_last 放行主 LLM
 - `hutian-seo-geo-agent/apps/agent-bridge/src/server.ts` —— sessionHistories Map + 读/写回
 - `hutian-seo-geo-agent/apps/agent-bridge/src/loop/verify-intent.ts` —— 新增 ■18-■21 共 12 条断言（双护栏、窄匹配、上下文消歧、上下文反问不播欢迎）
 - `hutian-seo-geo-agent/apps/agent-bridge/src/loop/probe-continue-amnesia.ts` —— 新增判官脚本 4/4 分层验规则层+loop 层
 - `docs/bug修复日志.md` —— 本条（新建）
+
+---
+
+## 2026-07-29 · 附带修复：启动脚本 ps1/bat 中文乱码（双保险 + 子窗口联动切代码页）
+
+### 1. 现象
+Windows PowerShell 5.x 运行 `start_all_web_with_sitebase.ps1` 时，所有中文全变乱码（典型 UTF-8 字节被按 GBK/CP936 解码），`start "xxx" cmd /k` 启动的 4 个子窗口（php think run / go run / pnpm dev）若输出 UTF-8 中文也会继续乱。
+
+### 2. 根因（两问题叠一起，缺一都乱）
+| 乱码点 | 原因 |
+| --- | --- |
+| ps1 源码中文乱 | ps1 默认被 Write 工具存为 **UTF-8 without BOM**，而 **Windows PowerShell 5.x（即"Windows PowerShell"不是 pwsh7）读无 BOM 脚本默认按 ANSI=简中 CP936/GBK** → UTF-8 字节当 GBK 解，彻底乱。 |
+| 控制台/子窗口输出乱 | 宿主控制台、以及 `start "siteBase" cmd /k` 打开的 4 个 cmd 子窗口，代码页默认停在 **936(GBK)**，php/go/node/pnpm 子进程默认 UTF-8 输出 → 字符错映射。 |
+
+### 3. 修复（双保险 + 子窗口联动）
+
+#### 3.1 `start_all_web_with_sitebase.ps1`（UTF-8 with BOM 存盘 + 4 处编码锁）
+- **存盘强制 UTF-8 with BOM**：用 `[System.IO.File]::WriteAllText(path, content, New-Object UTF8Encoding($true))` 落盘，PS5 读到 `EF BB BF` 就按 UTF-8 读脚本，不再默认 CP936。
+- **4 锁齐下**：
+  1. `chcp 65001 >$null`：宿主控制台直接切 UTF-8 代码页（王道，对 cmd/PS 都生效）
+  2. `[Console]::InputEncoding / OutputEncoding = UTF8`
+  3. `$OutputEncoding = UTF8`：PowerShell 管道发外部程序也 UTF-8
+  4. 每个 `Start-Process cmd.exe` 的命令串最前面先 `chcp 65001>nul`，**4 个服务子 cmd 窗口继承 UTF-8 代码页**，php think run / go run / pnpm dev 输出中文不乱。
+
+#### 3.2 `start_all_web_with_sitebase.bat`（CP936 存盘 + 首行切 65001）
+- cmd.exe 对 BOM 反而会显示首字乱，**bat 直接存 GBK/CP936**（echo/REM 的中文按 CP936 原生写），cmd 读 bat 必不乱。
+- 命令执行开头先 `chcp 65001 >nul` + 每个 `start "xxx" cmd /k` 内也先 `chcp 65001>nul` → 子进程（php/go/node/pnpm）UTF-8 输出同样正常显示。
+
+### 4. 验收
+- ps1 存盘后让 PS5 立读立验：前 4 行 `# 一键启动完整 B1 真链路...` 中文显示正常，无乱码。
+- bat 立读立验：`Get-Content -Encoding Default -TotalCount 4` 中文预览正常。
+- 运行态压测你工作台跑真两轮时一起验，子窗口日志若全中文正常即可闭环。
+
+### 5. 附带修复改动清单
+- `start_all_web_with_sitebase.ps1` —— 4 处编码锁 + 子窗口联动切 65001 + 以 UTF-8 BOM 存盘
+- `start_all_web_with_sitebase.bat` —— 首行 chcp 65001 + 4 个 start 子窗口同样切 65001 + 以 GBK/CP936 存盘
+- `docs/bug修复日志.md` —— 本附带修复条目

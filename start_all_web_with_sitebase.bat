@@ -1,41 +1,45 @@
 @echo off
-REM ä¸€é”®å¯åŠ¨å®Œæ•´ B1 çœŸé“¾è·¯ + ç§Ÿæˆ·è‡ªæœåŠ¡ï¼šsiteBase + tenant-api + agent-bridge + web
-REM å››ä¸ªçª—å£ä¿æŒå¼€å¯å³å¯ã€‚
-REM å…¥å£ï¼š
+REM Ò»¼üÆô¶¯ÍêÕû B1 ÕæÁ´Â· + ×â»§×Ô·şÎñ£ºsiteBase + tenant-api + agent-bridge + web
+REM ËÄ¸ö´°¿Ú±£³Ö¿ªÆô¼´¿É¡£
+REM Èë¿Ú£º
 REM   - workbench:   http://localhost:3000/workbench
-REM   - ç§Ÿæˆ·è‡ªæœåŠ¡ï¼š  http://localhost:3000/portal   (ä¸ workbench å…±äº«ç™»å½•æ€)
+REM   - ×â»§×Ô·şÎñ£º  http://localhost:3000/portal   (Óë workbench ¹²ÏíµÇÂ¼Ì¬)
 REM   - siteBase:    http://localhost:8000
+
+REM ¿ØÖÆÌ¨´úÂëÒ³ÇĞ 65001(UTF-8)£ºphp/go/node/pnpm Êä³ö UTF-8 ÖĞÎÄÒ²ÄÜÕıÈ·ÏÔÊ¾
+chcp 65001 >nul
+set PYTHONIOENCODING=utf-8
 
 cd /d %~dp0
 
-echo [1/5] å¯åŠ¨ siteBase backend (http://localhost:8000) ...
-start "siteBase" cmd /k "cd /d %~dp0\siteBase\backend\ElectronicPart && php think run --host 0.0.0.0 --port 8000"
+echo [1/5] Æô¶¯ siteBase backend (http://localhost:8000) ...
+start "siteBase" cmd /k "title siteBase && chcp 65001>nul && cd /d %~dp0\siteBase\backend\ElectronicPart && php think run --host 0.0.0.0 --port 8000"
 
-echo [2/5] ç­‰å¾… siteBase å°±ç»ª ...
+echo [2/5] µÈ´ı siteBase ¾ÍĞ÷ ...
 timeout /t 5 /nobreak >nul
 
-echo [3/5] å¯åŠ¨ tenant-api (port 4318) ...
+echo [3/5] Æô¶¯ tenant-api (port 4318) ...
 echo     TENANT_ADMIN_TOKEN = dev-admin-token-change-in-prod
 echo     TENANT_JWT_KEY     = dev-jwt-key-change-in-prod
-start "tenant-api" cmd /k "cd /d %~dp0\hutian-seo-geo-agent\apps\tenant-api && set TENANT_ADMIN_TOKEN=dev-admin-token-change-in-prod && set TENANT_JWT_KEY=dev-jwt-key-change-in-prod && go run ."
+start "tenant-api" cmd /k "title tenant-api && chcp 65001>nul && cd /d %~dp0\hutian-seo-geo-agent\apps\tenant-api && set TENANT_ADMIN_TOKEN=dev-admin-token-change-in-prod && set TENANT_JWT_KEY=dev-jwt-key-change-in-prod && go run ."
 
-echo [4/5] ç­‰å¾… tenant-api å°±ç»ª ...
+echo [4/5] µÈ´ı tenant-api ¾ÍĞ÷ ...
 timeout /t 4 /nobreak >nul
 
-echo [5/5] å¯åŠ¨ agent-bridge (http://localhost:4317) + web (http://localhost:3000) ...
-start "agent-bridge" cmd /k "cd /d %~dp0\hutian-seo-geo-agent && pnpm --filter @hutian/agent-bridge run dev"
-start "web" cmd /k "cd /d %~dp0\hutian-seo-geo-agent && pnpm --filter @hutian/web run dev"
+echo [5/5] Æô¶¯ agent-bridge (http://localhost:4317) + web (http://localhost:3000) ...
+start "agent-bridge" cmd /k "title agent-bridge && chcp 65001>nul && cd /d %~dp0\hutian-seo-geo-agent && pnpm --filter @hutian/agent-bridge run dev"
+start "web" cmd /k "title web && chcp 65001>nul && cd /d %~dp0\hutian-seo-geo-agent && pnpm --filter @hutian/web run dev"
 
 echo.
-echo ç­‰å¾…æœåŠ¡å°±ç»ªåæ‰“å¼€æµè§ˆå™¨ ...
+echo µÈ´ı·şÎñ¾ÍĞ÷ºó´ò¿ªä¯ÀÀÆ÷ ...
 timeout /t 8 /nobreak >nul
 start http://localhost:3000/workbench
 
 echo.
-echo å®Œæˆã€‚å››ä¸ªçª—å£ä¿æŒå¼€å¯ï¼š
-echo   - siteBase çª—å£ï¼š    ThinkPHP å†…ç½®æœåŠ¡å™¨ (8000)
-echo   - tenant-api çª—å£ï¼š  ç§Ÿæˆ·å…ƒæ•°æ® / è‡ªæœåŠ¡æ¥å£ (4318)
-echo   - agent-bridge çª—å£ï¼šMCP / LLM è°ƒç”¨æ—¥å¿— (4317)
-echo   - web çª—å£ï¼š         Next.js å¼€å‘æœåŠ¡å™¨ï¼Œworkbench + portal åŒ app (3000)
+echo Íê³É¡£ËÄ¸ö´°¿Ú±£³Ö¿ªÆô£º
+echo   - siteBase ´°¿Ú£º    ThinkPHP ÄÚÖÃ·şÎñÆ÷ (8000)
+echo   - tenant-api ´°¿Ú£º  ×â»§ÔªÊı¾İ / ×Ô·şÎñ½Ó¿Ú (4318)
+echo   - agent-bridge ´°¿Ú£ºMCP / LLM µ÷ÓÃÈÕÖ¾ (4317)
+echo   - web ´°¿Ú£º         Next.js ¿ª·¢·şÎñÆ÷£¬workbench + portal Í¬ app (3000)
 echo.
 pause

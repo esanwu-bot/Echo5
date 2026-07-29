@@ -492,6 +492,24 @@ async function run() {
         `带宾语的"需要"不能错放 continue_last，got kind=${r?.kind}`,
       );
     }
+    // 19.5f. 护栏一宽度对称："要改品牌名" 带宾语 → NOT continue_last（"要"是高频动词开头，必须焊死）
+    {
+      const r = classifyIntentByRule("要改品牌名", lastAgentYesNoAsk);
+      assert(
+        `"要改品牌名" 带宾语 → NOT continue_last`,
+        r === null || r.kind !== "continue_last",
+        `带宾语的"要"不能错放 continue_last，got kind=${r?.kind}`,
+      );
+    }
+    // 19.5g. 护栏一宽度对称："要补 canonical" 带宾语 → NOT continue_last
+    {
+      const r = classifyIntentByRule("要补 canonical", lastAgentYesNoAsk);
+      assert(
+        `"要补 canonical" 带宾语 → NOT continue_last`,
+        r === null || r.kind !== "continue_last",
+        `带宾语的"要"不能错放 continue_last，got kind=${r?.kind}`,
+      );
+    }
   }
 
   // ── 20. classifyIntent 传 lastAgentMessage / recentContextText → 上下文消歧生效

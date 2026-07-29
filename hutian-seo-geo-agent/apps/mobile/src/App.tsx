@@ -46,85 +46,98 @@ export default function MobileApp() {
   }, []);
 
   return (
-    <div className="workbench-bg flex h-screen flex-col overflow-hidden">
-      <WorkbenchIcons />
+    // 外层：H5 预览手机壳（桌面/浏览器 ≥ 480px 才显示；真机 WebView 下 width = viewport < 480，媒体查询自动不触发）
+    //       手机壳管 390×844 黑框 + 圆角 + 阴影 + 刘海；内部 workbench-bg 管网格+渐变背景。
+    //       两层分离，避免 phone-h5-shell::before 和 workbench-bg::before 争抢同一个 ::before 伪元素。
+    <div className="phone-h5-shell">
+      {/* 刘海：壳的最顶层，pointer-events:none，不占流高度，用绝对定位覆在顶栏上方 */}
+      <div className="phone-notch" aria-hidden="true" />
+      {/* 内层：工作台 UI，flex 三段式（header / main / nav），严格对齐原型 header/main/nav */}
+      <div className="workbench-bg mobile-root flex h-full flex-col overflow-hidden">
+        <WorkbenchIcons />
 
-      {/* 顶栏 */}
-      <header
-        className="safe-pt flex items-center gap-2.5 border-b border-line bg-bg1 px-4 pb-3"
-        style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 12px)" }}
-      >
-        <button
-          onClick={() => setDrawerOpen(true)}
-          className="flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-bg2"
-          aria-label="会话"
+        {/* 顶栏 — 对齐原型：padding 46/16/12
+         *  H5 壳里：刘海高 30px，所以上内边距 = 30px(刘海) + 16px = 46px
+         *  真机 WebView：env(safe-area-inset-top) 由系统返回，再加 16px
+         *  两种场景统一写成 env()，H5 壳里在 CSS 里重写 safe-area CSS 变量
+         */}
+        <header
+          className="flex flex-none items-center gap-2.5 border-b border-line bg-bg1 px-4 pb-3"
+          style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 16px)" }}
         >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-dim" />
-          </svg>
-        </button>
-        <div className="flex flex-col">
-          <span className="text-[17px] font-extrabold tracking-wide">壶天</span>
-          <span className="text-[9px] font-semibold tracking-widest text-faint">SEO / GEO AGENT</span>
-        </div>
-        <div className="ml-auto flex items-center gap-2">
-          <span className="rounded-lg border border-line bg-bg2 px-2 py-1 text-[11px] text-dim">
-            DeepSeek V4
-          </span>
-          <span
-            className={`h-2 w-2 rounded-full ${state.agentRunning ? "bg-amber" : "bg-green"}`}
-            style={state.agentRunning ? { boxShadow: "0 0 8px var(--amber)" } : { boxShadow: "0 0 8px var(--green)" }}
-          />
-        </div>
-      </header>
+          <button
+            onClick={() => setDrawerOpen(true)}
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-bg2"
+            aria-label="会话"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-dim" />
+            </svg>
+          </button>
+          <div className="flex flex-col">
+            <span className="text-[17px] font-extrabold tracking-wide">壶天</span>
+            <span className="text-[9px] font-semibold tracking-widest text-faint">SEO / GEO AGENT</span>
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            <span className="rounded-lg border border-line bg-bg2 px-2 py-1 text-[11px] text-dim">
+              DeepSeek V4
+            </span>
+            <span
+              className={`h-2 w-2 rounded-full ${state.agentRunning ? "bg-amber" : "bg-green"}`}
+              style={state.agentRunning ? { boxShadow: "0 0 8px var(--amber)" } : { boxShadow: "0 0 8px var(--green)" }}
+            />
+          </div>
+        </header>
 
-      {/* 主体 */}
-      <main className="relative flex-1 overflow-hidden">
-        {/* 工作台 tab */}
-        {tab === "work" && (
-          <div className="flex h-full flex-col">
-            <div className="flex-1 overflow-hidden">
-              <ChatStream state={state} />
-            </div>
+        {/* 主体（流 + Composer 分两层，对齐原型 header/main/nav 三段） */}
+        <main className="relative flex flex-1 flex-col flex-child-scrolly overflow-hidden">
+          {/* 滚动流区 = 对应原型 #stream + 会话/我的 tab 列表 */}
+          <div className="flex-1 flex-child-scrolly overflow-y-auto">
+            {tab === "work" && <ChatStream state={state} />}
+            {tab === "sess" && <SessionsList state={state} />}
+            {tab === "me" && <MePage />}
+          </div>
+
+          {/* Composer 独立在流区外，flex-none 严格不缩放
+           *  只有工作台 tab 显示；会话/我的 tab 不显示 Composer
+           */}
+          {tab === "work" && (
             <Composer
               disabled={state.agentRunning && !state.done}
               onSend={send}
             />
-          </div>
-        )}
+          )}
 
-        {/* 会话 tab */}
-        {tab === "sess" && <SessionsList state={state} />}
+          {/* 侧滑抽屉 */}
+          <SessionsDrawer
+            open={drawerOpen}
+            onClose={() => setDrawerOpen(false)}
+            state={state}
+          />
 
-        {/* 我的 tab */}
-        {tab === "me" && <MePage />}
+          {/* 底部 sheet（产物/终端/Diff） */}
+          <BottomSheet
+            open={sheetOpen}
+            onClose={() => setSheetOpen(false)}
+            state={state}
+            activeTab={sheetTab}
+            onTabChange={setSheetTab}
+          />
+        </main>
 
-        {/* 侧滑抽屉 */}
-        <SessionsDrawer
-          open={drawerOpen}
-          onClose={() => setDrawerOpen(false)}
-          state={state}
-        />
-
-        {/* 底部 sheet（产物/终端/Diff） */}
-        <BottomSheet
-          open={sheetOpen}
-          onClose={() => setSheetOpen(false)}
-          state={state}
-          activeTab={sheetTab}
-          onTabChange={setSheetTab}
-        />
-      </main>
-
-      {/* 底部 tab */}
-      <nav
-        className="safe-pb flex border-t border-line bg-bg1"
-        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
-      >
-        <TabButton active={tab === "work"} onClick={() => setTab("work")} icon="💬" label="工作台" />
-        <TabButton active={tab === "sess"} onClick={() => setTab("sess")} icon="🗂" label="会话" />
-        <TabButton active={tab === "me"} onClick={() => setTab("me")} icon="👤" label="我的" />
-      </nav>
+        {/* 底部 tab — 对齐原型：flex-none，safe-bottom 加 6px 内边距 */}
+        <nav
+          className="flex flex-none border-t border-line bg-bg1"
+          style={{
+            paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 6px)",
+            paddingTop: "6px",
+          }}
+        >
+          <TabButton active={tab === "work"} onClick={() => setTab("work")} icon="💬" label="工作台" />
+          <TabButton active={tab === "sess"} onClick={() => setTab("sess")} icon="🗂" label="会话" />
+          <TabButton active={tab === "me"} onClick={() => setTab("me")} icon="👤" label="我的" />
+        </nav>
+      </div>
     </div>
   );
 }

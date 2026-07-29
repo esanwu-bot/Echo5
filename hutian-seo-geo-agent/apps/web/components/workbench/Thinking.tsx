@@ -9,7 +9,7 @@ export default function Thinking() {
   return (
     <div className="animate-fade-in-up flex items-center gap-2.5 px-4 py-2">
       <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-violet to-blue text-white">
-        <svg className="h-4 w-4"><use href="#w-robot" /></svg>
+        <svg className="h-4 w-4" width="24" height="24"><use href="#w-robot" /></svg>
       </div>
       <div className="flex items-center gap-1.5 rounded-2xl rounded-tl-sm border border-line bg-bg1 px-4 py-3">
         {[0, 1, 2].map((i) => (

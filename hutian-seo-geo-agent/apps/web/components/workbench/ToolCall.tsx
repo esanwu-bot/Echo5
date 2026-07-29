@@ -49,11 +49,11 @@ export default function ToolCall({ tool, isLatest }: ToolCallProps) {
             />
           ) : tool.ok ? (
             <span className="grid h-5 w-5 place-items-center rounded-full bg-green/15 text-green">
-              <svg className="h-3 w-3"><use href="#w-check" /></svg>
+              <svg className="h-3 w-3" width="24" height="24"><use href="#w-check" /></svg>
             </span>
           ) : (
             <span className="grid h-5 w-5 place-items-center rounded-full bg-red/15 text-red">
-              <svg className="h-3 w-3"><use href="#w-x" /></svg>
+              <svg className="h-3 w-3" width="24" height="24"><use href="#w-x" /></svg>
             </span>
           )}
         </span>
@@ -81,7 +81,8 @@ export default function ToolCall({ tool, isLatest }: ToolCallProps) {
         {/* 展开箭头 */}
         {!running && !!tool.output && (
           <svg
-            className={`h-3.5 w-3.5 shrink-0 text-faint transition-transform ${
+                width="24" height="24"
+                className={`h-3.5 w-3.5 shrink-0 text-faint transition-transform ${
               expanded ? "rotate-180" : ""
             }`}
           >

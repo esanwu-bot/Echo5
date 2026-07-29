@@ -56,9 +56,9 @@ export default function Composer({ disabled, onSend }: ComposerProps) {
                 }`}
               >
                 {m === "auto" ? (
-                  <svg className="h-3 w-3"><use href="#w-zap" /></svg>
+                  <svg className="h-3 w-3" width="24" height="24"><use href="#w-zap" /></svg>
                 ) : (
-                  <svg className="h-3 w-3"><use href="#w-tune" /></svg>
+                  <svg className="h-3 w-3" width="24" height="24"><use href="#w-tune" /></svg>
                 )}
                 {m === "auto" ? "Auto" : "Manual"}
               </button>
@@ -106,7 +106,7 @@ export default function Composer({ disabled, onSend }: ComposerProps) {
             className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-amber to-amber2 text-white shadow-glow transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
             aria-label="发送"
           >
-            <svg className="h-4 w-4"><use href="#w-send" /></svg>
+            <svg className="h-4 w-4" width="24" height="24"><use href="#w-send" /></svg>
           </button>
         </div>
 

@@ -41,7 +41,7 @@ export default function ChatStream({ state }: ChatStreamProps) {
         {state.timeline.length === 0 && (
           <div className="animate-fade-in-up px-4 py-8 text-center">
             <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-amber to-amber2 text-white shadow-glow">
-              <svg className="h-6 w-6"><use href="#w-logo" /></svg>
+              <svg className="h-6 w-6" width="24" height="24"><use href="#w-logo" /></svg>
             </div>
             <h2 className="font-grotesk text-lg font-bold text-text">
               壶天 SEO/GEO 工作台

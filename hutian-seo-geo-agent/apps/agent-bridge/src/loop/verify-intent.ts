@@ -442,6 +442,58 @@ async function run() {
     }
   }
 
+  // ── 19.5 肯定应答词白名单：对上一轮 yes/no 问句的短肯定回答（如"需要"）→ continue_last
+  console.log("\n■ 19.5 肯定应答词白名单：'需要/要/可以/没问题' 等 yes/no 问句短回答 → continue_last");
+  {
+    // 复用用户压测截图中的真实 agent 问句："需要我帮你补充这些 JSON-LD 结构化数据吗？"
+    const lastAgentYesNoAsk = "本次会话共执行了 4 个工具调用：1 次诊断 + 3 次结构化数据检查。需要我帮你补充这些 JSON-LD 结构化数据吗？";
+    // 19.5a. "需要" + yes/no 问句 → continue_last（本轮压测撞出的漏网词）
+    {
+      const r = classifyIntentByRule("需要", lastAgentYesNoAsk);
+      assert(
+        `"需要" + yes/no 问句 → continue_last`,
+        r !== null && r.kind === "continue_last" && r.source === "rule",
+        `got kind=${r?.kind} src=${r?.source}`,
+      );
+    }
+    // 19.5b. "要" + yes/no 问句 → continue_last
+    {
+      const r = classifyIntentByRule("要", lastAgentYesNoAsk);
+      assert(
+        `"要" + yes/no 问句 → continue_last`,
+        r !== null && r.kind === "continue_last" && r.source === "rule",
+        `got kind=${r?.kind} src=${r?.source}`,
+      );
+    }
+    // 19.5c. "没问题" + yes/no 问句 → continue_last
+    {
+      const r = classifyIntentByRule("没问题", lastAgentYesNoAsk);
+      assert(
+        `"没问题" + yes/no 问句 → continue_last`,
+        r !== null && r.kind === "continue_last" && r.source === "rule",
+        `got kind=${r?.kind} src=${r?.source}`,
+      );
+    }
+    // 19.5d. "补吧" + yes/no 问句 → continue_last（含动作倾向的肯定）
+    {
+      const r = classifyIntentByRule("补吧", lastAgentYesNoAsk);
+      assert(
+        `"补吧" + yes/no 问句 → continue_last`,
+        r !== null && r.kind === "continue_last" && r.source === "rule",
+        `got kind=${r?.kind} src=${r?.source}`,
+      );
+    }
+    // 19.5e. 护栏一宽度："需要改品牌名" 带宾语，不是 standalone → NOT continue_last
+    {
+      const r = classifyIntentByRule("需要改品牌名", lastAgentYesNoAsk);
+      assert(
+        `"需要改品牌名" 带宾语 → NOT continue_last`,
+        r === null || r.kind !== "continue_last",
+        `带宾语的"需要"不能错放 continue_last，got kind=${r?.kind}`,
+      );
+    }
+  }
+
   // ── 20. classifyIntent 传 lastAgentMessage / recentContextText → 上下文消歧生效
   console.log("\n■ 20. classifyIntent 带 lastAgentMessage/recentContextText 上下文消歧");
   {

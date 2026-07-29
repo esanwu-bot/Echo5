@@ -103,6 +103,7 @@ async function main() {
       steps: [
         // turn 1 user message: Mock LLM returns assistant + a tool call
         {
+          match: "",
           content: "好，先看这个页面的结构化数据情况。",
           toolCalls: [
             {
@@ -115,6 +116,7 @@ async function main() {
         },
         // turn 2 after tool result → LLM asks "需要我继续吗？" and stops
         {
+          match: "",
           content:
             "结果出来了：Product JSON-LD 缺 gtin/price。需要我继续吗？可以选择：①追踪品牌引用（trace_citations）②提交 sitemap（submit_sitemap）③补全结构化数据（check_schema 写回）😊",
           toolCalls: [],
@@ -153,6 +155,7 @@ async function main() {
     const turn2LLM = new MockLLMClient({
       steps: [
         {
+          match: "",
           content:
             "好，接着上一步：我现在把缺的 Product JSON-LD（gtin/price/availability）用 schema 映射写回渲染层，然后复验一次。",
           toolCalls: [],

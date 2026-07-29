@@ -1,9 +1,11 @@
-﻿# 一键启动完整 B1 真链路 + 租户自服务：siteBase + tenant-api + agent-bridge + web
-# 四个窗口保持开启即可。
+# 一键启动完整 B2 真链路：siteBase + tenant-api + agent-bridge + web(workbench/portal) + tenant-admin(租户后台) + apps/admin(管理后台)
+# 六个窗口保持开启即可。
 # 入口：
-#   - workbench:   http://localhost:3000/workbench
-#   - 租户自服务：  http://localhost:3000/portal   (与 workbench 共享登录态)
-#   - siteBase:    http://localhost:8000
+#   - workbench:        http://localhost:3000/workbench
+#   - 租户自服务(portal): http://localhost:3000/portal   (与 workbench 共享登录态)
+#   - 租户后台:          http://localhost:3001           (v0 / tianqixin-admin  Next.js turbo)
+#   - 管理后台:          http://localhost:4319           (apps/admin  Vite/React/Antd)
+#   - siteBase:         http://localhost:8000
 
 # ─────────────────────────────────────────────
 # 中文不乱码 · 四锁齐下（Windows PowerShell 5.x 必需）
@@ -32,25 +34,25 @@ function Start-ServiceWindow {
     Start-Process -FilePath "cmd.exe" -ArgumentList $arguments -WindowStyle Normal
 }
 
-Write-Host "[1/5] 启动 siteBase backend (http://localhost:8000) ..."
+Write-Host "[1/7] 启动 siteBase backend (http://localhost:8000) ..."
 Start-ServiceWindow -Title "siteBase" `
     -WorkingDirectory "$root\siteBase\backend\ElectronicPart" `
     -Command "php think run --host 0.0.0.0 --port 8000"
 
-Write-Host "[2/5] 等待 siteBase 就绪 ..."
+Write-Host "[2/7] 等待 siteBase 就绪 ..."
 Start-Sleep -Seconds 5
 
-Write-Host "[3/5] 启动 tenant-api (port 4318) ..."
+Write-Host "[3/7] 启动 tenant-api (port 4318) ..."
 Write-Host "    TENANT_ADMIN_TOKEN = dev-admin-token-change-in-prod"
 Write-Host "    TENANT_JWT_KEY     = dev-jwt-key-change-in-prod"
 Start-ServiceWindow -Title "tenant-api" `
     -WorkingDirectory "$root\hutian-seo-geo-agent\apps\tenant-api" `
     -Command "set TENANT_ADMIN_TOKEN=dev-admin-token-change-in-prod && set TENANT_JWT_KEY=dev-jwt-key-change-in-prod && go run ."
 
-Write-Host "[4/5] 等待 tenant-api 就绪 ..."
+Write-Host "[4/7] 等待 tenant-api 就绪 ..."
 Start-Sleep -Seconds 4
 
-Write-Host "[5/5] 启动 agent-bridge (http://localhost:4317) + web (http://localhost:3000) ..."
+Write-Host "[5/7] 启动 agent-bridge (http://localhost:4317) + web(workbench/portal) (http://localhost:3000) ..."
 Start-ServiceWindow -Title "agent-bridge" `
     -WorkingDirectory "$root\hutian-seo-geo-agent" `
     -Command "pnpm --filter @hutian/agent-bridge run dev"
@@ -59,17 +61,33 @@ Start-ServiceWindow -Title "web" `
     -WorkingDirectory "$root\hutian-seo-geo-agent" `
     -Command "pnpm --filter @hutian/web run dev"
 
-Write-Host ""
-Write-Host "等待服务就绪后打开浏览器 ..."
-Start-Sleep -Seconds 8
-Start-Process "http://localhost:3000/workbench"
+Write-Host "[6/7] 等待 agent-bridge & web 启动 ..."
+Start-Sleep -Seconds 6
+
+Write-Host "[7/7] 启动 租户后台 tenant-admin (Next.js turbo, http://localhost:3001) + 管理后台 apps/admin (Vite, http://localhost:4319) ..."
+Start-ServiceWindow -Title "tenant-admin" `
+    -WorkingDirectory "$root\siteBase\tianqixin-admin" `
+    -Command "pnpm run dev"
+
+Start-ServiceWindow -Title "apps-admin" `
+    -WorkingDirectory "$root\hutian-seo-geo-agent\apps\admin" `
+    -Command "pnpm run dev"
 
 Write-Host ""
-Write-Host "完成。四个窗口保持开启："
+Write-Host "等待服务就绪后打开浏览器 ..."
+Start-Sleep -Seconds 6
+Start-Process "http://localhost:3000/workbench"
+Start-Process "http://localhost:3001"
+Start-Process "http://localhost:4319"
+
+Write-Host ""
+Write-Host "完成。六个窗口保持开启："
 Write-Host "  - siteBase 窗口：    ThinkPHP 内置服务器 (8000)"
 Write-Host "  - tenant-api 窗口：  租户元数据 / 自服务接口 (4318)"
 Write-Host "  - agent-bridge 窗口：MCP / LLM 调用日志 (4317)"
 Write-Host "  - web 窗口：         Next.js 开发服务器，workbench + portal 同 app (3000)"
+Write-Host "  - tenant-admin 窗口：租户后台（v0 / tianqixin-admin，Next.js turbo，3001）"
+Write-Host "  - apps-admin 窗口：  管理后台（apps/admin，Vite/React/Antd，4319）"
 Write-Host ""
 Write-Host "按 Enter 键退出此窗口（服务窗口不受影响）..."
 Read-Host

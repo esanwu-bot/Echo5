@@ -92,16 +92,59 @@ Windows PowerShell 5.x 运行 `start_all_web_with_sitebase.ps1` 时，所有中�
   3. `$OutputEncoding = UTF8`：PowerShell 管道发外部程序也 UTF-8
   4. 每个 `Start-Process cmd.exe` 的命令串最前面先 `chcp 65001>nul`，**4 个服务子 cmd 窗口继承 UTF-8 代码页**，php think run / go run / pnpm dev 输出中文不乱。
 
-#### 3.2 `start_all_web_with_sitebase.bat`（CP936 存盘 + 首行切 65001）
-- cmd.exe 对 BOM 反而会显示首字乱，**bat 直接存 GBK/CP936**（echo/REM 的中文按 CP936 原生写），cmd 读 bat 必不乱。
-- 命令执行开头先 `chcp 65001 >nul` + 每个 `start "xxx" cmd /k` 内也先 `chcp 65001>nul` → 子进程（php/go/node/pnpm）UTF-8 输出同样正常显示。
+#### 3.2 `start_all_web_with_sitebase.bat`（UTF-8 no BOM 中转 stub，无中文）
+- cmd.exe 对 UTF-8 BOM 会显示首字乱、对 GBK/CP936 存盘又在运行时切 65001 会 echo 乱码；干脆把 bat 改成**纯中转 stub**，里面只有英文 REM + 一行 `powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0start_all_web_with_sitebase.ps1"`。
+- 所有中文输出、服务窗口管理、代码页切换全部集中在 ps1 中维护，避免 bat/cmd 代码页不一致导致的中文乱码。
 
 ### 4. 验收
-- ps1 存盘后让 PS5 立读立验：前 4 行 `# 一键启动完整 B1 真链路...` 中文显示正常，无乱码。
-- bat 立读立验：`Get-Content -Encoding Default -TotalCount 4` 中文预览正常。
+- ps1 存盘后让 PS5 立读立验：前 8 行中文（包括新增的租户后台/管理后台端口）显示正常，无乱码。
+- bat 立读立验：内容为英文 REM + 一行 powershell 调用，无中文，双击直接拉起 ps1。
 - 运行态压测你工作台跑真两轮时一起验，子窗口日志若全中文正常即可闭环。
 
 ### 5. 附带修复改动清单
-- `start_all_web_with_sitebase.ps1` —— 4 处编码锁 + 子窗口联动切 65001 + 以 UTF-8 BOM 存盘
-- `start_all_web_with_sitebase.bat` —— 首行 chcp 65001 + 4 个 start 子窗口同样切 65001 + 以 GBK/CP936 存盘
+- `start_all_web_with_sitebase.ps1` —— 4 处编码锁 + 子窗口联动切 65001 + 以 UTF-8 BOM 存盘 + 追加租户后台(3001)与管理后台(4319)
+- `start_all_web_with_sitebase.bat` —— 改为 UTF-8 no BOM 中转 stub，内部无中文，仅调用 ps1
 - `docs/bug修复日志.md` —— 本附带修复条目
+
+---
+
+## 2026-07-29 · 修正：承接词白名单漏了"需要"这类 yes/no 问句肯定应答词
+
+### 1. 现象（不是 context 又丢了）
+压测第二轮：用户第一轮诊断后 Agent 问"需要我帮你补充这些 JSON-LD 结构化数据吗？"，本轮只回"需要"两个字，Agent **没有续上一步**，而是反问了上一轮表格的内容——但反问里**原样引用了上一轮表格**，且**没有重播那套带 emoji 的首轮回旋欢迎菜单**。
+
+### 2. 根因判定（两层硬证据切开了"记忆"和"词表"）
+| 证据 | 说明 |
+| --- | --- |
+| 反问引用了上轮表格，且本轮无 tool_start/tool_end | **history 在、context 没掉**。如果是 session/history 丢了，反问不可能引用上轮表格。 |
+| 反问是"上下文感知反问"，不是欢迎菜单 | 上轮 `buildClarifyQuestion` 的"有 recentContextText 时不播欢迎模板"修复生效了。 |
+| 所以根因只能是 | **白名单漏了"需要"** —— 它不是承接词，是对 yes/no 问句的肯定应答；上一轮问句"需要我帮你补...吗"，用户回"需要"=yes，但 `CONTINUATION_STANDALONE` 里只有"继续/好的/对/是的..."，没有"需要"。 |
+
+### 3. 修复
+- `apps/agent-bridge/src/loop/intent.ts`：
+  - 新增 `AFFIRMATIVE_STANDALONE` 白名单子集，收录对 yes/no 问句的短肯定回答：`需要、要、没问题、可以、补吧、加吧、做吧、搞吧、来吧、上吧、整吧、开干、开搞、好嘞、行啊、嗯嗯、对对、please、plz` 等。
+  - 在 `classifyIntentByRule` 中把 `AFFIRMATIVE_STANDALONE` 与 `CONTINUATION_STANDALONE` 合并匹配，命中且 `looksLikeAgentPromptedChoice(lastAgentMessage)` 通过 → `continue_last`。
+  - **双护栏原封不动**：
+    - 护栏一 standalone 窄匹配仍在 —— "需要改品牌名""要补 JSON-LD""可以帮我换个 URL"这种带宾语的，不会命中；
+    - 护栏二 `looksLikeAgentPromptedChoice` 仍在 —— 上一轮不是问句/没给选项，单说"需要"不会放行。
+- `apps/agent-bridge/src/loop/verify-intent.ts`：新增 ■19.5，5 条断言：
+  - `"需要" + yes/no 问句 → continue_last`（复用用户截图真实问句）
+  - `"要" + yes/no 问句 → continue_last`
+  - `"没问题" + yes/no 问句 → continue_last`
+  - `"补吧" + yes/no 问句 → continue_last`
+  - `"需要改品牌名" 带宾语 → NOT continue_last`（护栏一宽度守门）
+- `apps/agent-bridge/src/loop/probe-continue-amnesia.ts`：顺手补 `MockScriptStep` 必填字段 `match: ""`（之前 typecheck 绿是误打误撞，这次补上正交类型修复）。
+
+### 4. 验收
+- `verify-intent`：**62/62 GREEN**（原 57 + 新增 5）。
+- `typecheck`：**通过**。
+- 运行态：你下一轮工作台真 HTTP 两轮，第一轮诊断出"需要我帮你补...吗"，第二轮只回"需要"，应直接续上 JSON-LD 补齐，不再反问。
+
+### 5. 后续方向（v2，不进这单）
+靠枚举肯定词永远补不全（"中""整一个""来呗""你看着办"）。v2 可对"上一轮是 yes/no 问句"做**预期式解析**：短回复默认按 confirm/continue 处理，显式否定词→cancel，显式新意图动词+宾语→新指令。但需额外护栏防止"短新话题被默认续接"，所以单独排 v2。
+
+### 6. 改动文件清单
+- `hutian-seo-geo-agent/apps/agent-bridge/src/loop/intent.ts` —— 加 AFFIRMATIVE_STANDALONE 肯定应答词子集，与承接词并列、双护栏不变
+- `hutian-seo-geo-agent/apps/agent-bridge/src/loop/verify-intent.ts` —— 新增 ■19.5 共 5 条断言
+- `hutian-seo-geo-agent/apps/agent-bridge/src/loop/probe-continue-amnesia.ts` —— MockScriptStep 补 `match: ""`（typecheck 正交修复）
+- `docs/bug修复日志.md` —— 本条

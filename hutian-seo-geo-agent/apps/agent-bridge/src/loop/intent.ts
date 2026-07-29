@@ -75,6 +75,13 @@ const CONTINUATION_STANDALONE = [
   /^\s*(继续|好的|好吧|行|下一步|然后呢|然后|可以|嗯|对|是的|没错|好|好嘞|好的吧|可以可以|行行行|对的|好啊|接着|继续吧|就这样|那就这样|继续做|接着来|go\s*on|next|proceed|continue|yep|yeah|sure|okay|fine)(?:[，。、！!？?；;、\s])*$/i,
 ];
 
+/** 肯定应答词白名单：上一轮 agent 是 yes/no 问句（"需要我帮你补...吗"），本轮用户只回一个肯定词，等价于 continue_last。
+ *  与承接词并列，但语义不同：承接词是"续"，肯定词是"对问句做 yes 回答"。
+ *  同样受 standalone 窄匹配 + looksLikeAgentPromptedChoice 双重护栏保护，"需要改品牌名"这种带宾语的不会命中。 */
+const AFFIRMATIVE_STANDALONE = [
+  /^\s*(需要|要|没问题|可以|补吧|加吧|做吧|搞吧|来吧|上吧|整吧|开干|开搞|好嘞|行啊|嗯嗯|对对|是的|没错|please|plz|好的|好|行)(?:[，。、！!？?；;、\s])*$/i,
+];
+
 /** 上一轮 agent 消息是否是问句或提供了选项（承接词放行的第二重护栏） */
 function looksLikeAgentPromptedChoice(text: string | undefined): boolean {
   if (!text) return false;
@@ -157,9 +164,10 @@ export function classifyIntentByRule(
     }
   }
 
-  // 1b. 承接词白名单（双重护栏：白名单命中 + 上一轮 agent 是问句/给了选项）
+  // 1b. 承接词 / 肯定应答词白名单（双重护栏：白名单命中 + 上一轮 agent 是问句/给了选项）
   //    放行则跳过重分类，主 loop 带历史继续
-  for (const p of CONTINUATION_STANDALONE) {
+  const continuationPatterns = [...CONTINUATION_STANDALONE, ...AFFIRMATIVE_STANDALONE];
+  for (const p of continuationPatterns) {
     if (p.test(trimmed) && looksLikeAgentPromptedChoice(lastAgentMessage)) {
       return {
         kind: "continue_last",

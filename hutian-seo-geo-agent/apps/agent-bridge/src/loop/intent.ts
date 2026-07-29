@@ -21,7 +21,7 @@ import type { LLMClient } from "../llm/types.ts";
 // ───────────────────────────────────────────────────────────────
 
 export type IntentKind =
-  | "confirm" // 破坏性闸门：是/确认/执行/继续
+  | "confirm" // 破坏性闸门：是/确认/执行（破坏性写操作专用）
   | "cancel" // 取消/中止
   | "rename" // 品牌更名
   | "diagnose" // SEO/GEO 诊断
@@ -30,6 +30,7 @@ export type IntentKind =
   | "check_schema" // 结构化数据补齐
   | "cms" // 建站 / 创建页面 / 添加商品
   | "chitchat" // 闲聊 / 问候
+  | "continue_last" // 承接词：续上一意图，跳过重分类，主 loop 带历史继续
   | "ambiguous"; // 低置信反问
 
 export interface IntentSlots {
@@ -62,11 +63,27 @@ export interface Intent {
 // 圈 1 · 规则快通道
 // ───────────────────────────────────────────────────────────────
 
-/** 破坏性闸门确认词（只信这些，LLM 说的不算） */
+/** 破坏性闸门确认词（只信这些，LLM 说的不算）。注：纯承接词"继续"不再算破坏性确认，以区分"续非破坏性任务"和"确认写入破坏性操作"。破坏性闸门通过要用户明确说"确认/执行" */
 const CONFIRM_PATTERNS = [
-  /^\s*(确认|确定|执行|继续|同意|yes|y|ok|确认执行|确认写入|干吧|就这么办)/i,
+  /^\s*(确认|确定|执行|同意|确认执行|确认写入|干吧|就这么办)(?:\s|$|[，。、！!？?])/i,
+  /^\s*(yes|y|ok)(?:\s|$|[，。、！!？?])/i,
   /^\s*(dry[_\s-]?run\s*=\s*false|dry[_\s-]?run\s*关闭)/i,
 ];
+
+/** 承接词白名单（封闭可枚举，语义完全依赖上一轮上下文 → 跳过重分类，续主 loop）。规则：只有这个词（+标点，无其他内容）才算 standalone continuation。搭配上下文双重确认：上一轮 agent 末尾是问句/提供了选项才放行 */
+const CONTINUATION_STANDALONE = [
+  /^\s*(继续|好的|好吧|行|下一步|然后呢|然后|可以|嗯|对|是的|没错|好|好嘞|好的吧|可以可以|行行行|对的|好啊|接着|继续吧|就这样|那就这样|继续做|接着来|go\s*on|next|proceed|continue|yep|yeah|sure|okay|fine)(?:[，。、！!？?；;、\s])*$/i,
+];
+
+/** 上一轮 agent 消息是否是问句或提供了选项（承接词放行的第二重护栏） */
+function looksLikeAgentPromptedChoice(text: string | undefined): boolean {
+  if (!text) return false;
+  if (/[？?]/.test(text)) return true;
+  if (/(需要我|是否|还是|可以|或者|选项|要不要|请选择|你想|下一步(可以|要)?|建议|可以选择|以下|例如|比如).{0,80}/i.test(text)) return true;
+  // 中文句末"？"或"：" + 列举
+  if (/[：:]\s*(①|②|③|④|1\.|2\.|3\.|4\.|•|-|\*|🔍|📊|📝|🏗️|💱|📡)/.test(text)) return true;
+  return false;
+}
 
 const CANCEL_PATTERNS = [
   /^\s*(取消|中止|停止|算了|不要了|cancel|stop|abort|no|n)(?:\s|$|[，。、！!？?])/i,
@@ -102,9 +119,14 @@ const CHITCHAT_KEYWORDS = /^(你好|您好|hi|hello|hey|谢谢|感谢|bye|再见
 /**
  * 规则快通道分类器 —— 廉价、可信、用于破坏性闸门。
  *
+ * @param input 用户输入
+ * @param lastAgentMessage 上一轮 agent 消息文本（可选；承接词双重护栏用）
  * @returns Intent with source="rule"；未命中返回 null（交给 LLM 圈）
  */
-export function classifyIntentByRule(input: string): Intent | null {
+export function classifyIntentByRule(
+  input: string,
+  lastAgentMessage?: string,
+): Intent | null {
   const raw = input ?? "";
   const trimmed = raw.trim();
   if (!trimmed) return null;
@@ -127,6 +149,20 @@ export function classifyIntentByRule(input: string): Intent | null {
     if (p.test(trimmed)) {
       return {
         kind: "cancel",
+        confidence: 0.95,
+        slots,
+        source: "rule",
+        raw,
+      };
+    }
+  }
+
+  // 1b. 承接词白名单（双重护栏：白名单命中 + 上一轮 agent 是问句/给了选项）
+  //    放行则跳过重分类，主 loop 带历史继续
+  for (const p of CONTINUATION_STANDALONE) {
+    if (p.test(trimmed) && looksLikeAgentPromptedChoice(lastAgentMessage)) {
+      return {
+        kind: "continue_last",
         confidence: 0.95,
         slots,
         source: "rule",
@@ -256,18 +292,26 @@ const INTENT_CLASSIFY_PROMPT = `你是壶天 SEO/GEO Agent 的意图分类器。
 /**
  * LLM enum 分类器 —— 规则未命中或低置信时调用。
  * 廉价：enum 几值 + structured output，不让 LLM 写散文。
+ *
+ * @param recentContextText 可选：最近 2-3 轮的紧凑文本（用于消歧；不传时与旧行为一致）。
+ *                          格式示例："[Agent]: xxx\n[User]: yyy\n[Agent]: 需要我继续吗？"
+ *                          注意：只传最近几轮摘要，不传完整历史（分类是廉价操作）。
  */
 export async function classifyIntentByLLM(
   input: string,
   llm: LLMClient,
   signal?: AbortSignal,
+  recentContextText?: string,
 ): Promise<Intent> {
   let parsed: { kind?: string; confidence?: number; slots?: IntentSlots };
   try {
+    const userPrompt = recentContextText
+      ? `最近对话上下文（用于消歧，仅作参考）:\n${recentContextText}\n\n当前用户输入：${input}`
+      : input;
     const res = await llm.chat({
       messages: [
         { role: "system", content: INTENT_CLASSIFY_PROMPT },
-        { role: "user", content: input },
+        { role: "user", content: userPrompt },
       ],
       signal,
     });
@@ -299,7 +343,7 @@ export async function classifyIntentByLLM(
       slots,
       source: "llm",
       needsClarify: true,
-      clarifyQuestion: buildClarifyQuestion(input, slots),
+      clarifyQuestion: buildClarifyQuestion(input, slots, recentContextText),
       raw: input,
     };
   }
@@ -329,7 +373,19 @@ function parseIntentJson(text: string): {
   }
 }
 
-function buildClarifyQuestion(input: string, slots: IntentSlots): string {
+function buildClarifyQuestion(
+  input: string,
+  slots: IntentSlots,
+  recentContextText?: string,
+): string {
+  // 有最近上下文但仍 ambiguous → 引导用户回到上一轮语境，不要播欢迎菜单
+  if (recentContextText && recentContextText.length > 0) {
+    const lastAgent = extractLastAgentText(recentContextText);
+    if (lastAgent) {
+      const short = lastAgent.length > 60 ? lastAgent.slice(0, 60) + "…" : lastAgent;
+      return `我刚才问：「${short}」——你是想接着上一步继续（回复「继续/好的」），还是要改做别的（请直接说要诊断什么/改什么）？`;
+    }
+  }
   if (!slots.url && !slots.brand) {
     return "你想做什么？比如「诊断 example.com 的 SEO」「把品牌从 X 改为 Y」「提交 sitemap」「建一篇关于三轮车的文章页」";
   }
@@ -337,6 +393,17 @@ function buildClarifyQuestion(input: string, slots: IntentSlots): string {
     return `针对 ${slots.url}，你想诊断 SEO、追踪 AI 引用、还是补 JSON-LD？`;
   }
   return "能补充一下细节吗？比如目标 URL、品牌名、时间窗口，或要建的页面/商品信息";
+}
+
+/** 从 recentContextText 中抽取最后一条 [Agent] 的文本（用于上下文感知反问） */
+function extractLastAgentText(context: string): string | null {
+  // 格式约定：每行 "[Agent]: ..." 或 "[User]: ..."
+  const lines = context.split(/\n/);
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const m = lines[i].match(/^\s*\[Agent\][:：]\s*(.*)$/i);
+    if (m && m[1].trim()) return m[1].trim();
+  }
+  return null;
 }
 
 // ───────────────────────────────────────────────────────────────
@@ -348,16 +415,20 @@ export interface ClassifyOptions {
   signal?: AbortSignal;
   /** 规则置信度阈值，>= 此值不调 LLM（默认 0.8） */
   ruleConfidenceThreshold?: number;
+  /** 上一轮 agent 消息文本（承接词双重护栏用；空字符串或 undefined 表示无历史） */
+  lastAgentMessage?: string;
+  /** 最近 2-3 轮紧凑文本（消歧用）。格式："[Agent]: xxx\n[User]: yyy\n[Agent]: ..."；传最近几轮即可，不要整段历史（分类是廉价操作） */
+  recentContextText?: string;
 }
 
 /**
  * 统一 intent 分类入口。
  *
  * 流程：
- *   1. 规则快通道先跑
+ *   1. 规则快通道先跑（含上下文：lastAgentMessage 对承接词做双重护栏）
  *   2. 命中且 confidence ≥ 阈值 → 直接返回（不调 LLM，省钱）
- *   3. 否则调 LLM enum 分类
- *   4. LLM 也低置信 → ambiguous + 反问
+ *   3. 否则调 LLM enum 分类，带 recentContextText（若有）作最近 N 轮消歧
+ *   4. LLM 也低置信 → ambiguous + 反问（反问也感知上下文避免播欢迎菜单）
  *
  * 红线：返回的 Intent.source 标明判定方，
  *      破坏性闸门（isDestructiveAuthorized）只信 source="rule" && kind="confirm"
@@ -366,7 +437,7 @@ export async function classifyIntent(
   input: string,
   opts: ClassifyOptions = {},
 ): Promise<Intent> {
-  const rule = classifyIntentByRule(input);
+  const rule = classifyIntentByRule(input, opts.lastAgentMessage);
   const threshold = opts.ruleConfidenceThreshold ?? 0.8;
 
   // 规则高置信 → 直接返回
@@ -382,13 +453,22 @@ export async function classifyIntent(
       slots: rule?.slots ?? extractSlots(input),
       source: "rule",
       needsClarify: true,
-      clarifyQuestion: buildClarifyQuestion(input, rule?.slots ?? {}),
+      clarifyQuestion: buildClarifyQuestion(
+        input,
+        rule?.slots ?? {},
+        opts.recentContextText,
+      ),
       raw: input,
     };
   }
 
-  // 调 LLM 圈
-  const llmIntent = await classifyIntentByLLM(input, opts.llm, opts.signal);
+  // 调 LLM 圈（带最近 N 轮消歧文本，若提供）
+  const llmIntent = await classifyIntentByLLM(
+    input,
+    opts.llm,
+    opts.signal,
+    opts.recentContextText,
+  );
 
   // 双轨 OR：规则命中但置信度不够时，规则与 LLM 结果一致 → 提升置信度
   if (rule && rule.kind === llmIntent.kind && llmIntent.source === "llm") {

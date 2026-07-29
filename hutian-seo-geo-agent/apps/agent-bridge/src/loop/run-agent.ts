@@ -58,6 +58,10 @@ export interface AgentLoopInput {
   systemPrompt?: string;
   /** 可选：从外部传入已分类好的 intent（skip classifyIntent，用于测试/续作） */
   intent?: Intent;
+  /** 可选：会话历史（不含 system 消息）。即上一轮及更早的 user/assistant/tool 对话消息。传了则主 LLM 和 intent 围栏都感知语境。 */
+  history?: Message[];
+  /** 可选：每次 messages 数组变化（新 assistant/tool/user 消息 push 后）触发回调，用于把最新会话写回 session 存储。MVP 用于跨回合保持历史。 */
+  onMessagesUpdated?: (latestMessages: Message[]) => void;
 }
 
 /**
@@ -68,36 +72,71 @@ export interface AgentLoopInput {
  *   meta(totalTools) → thinking(on) → [message + plan]
  *   → 每轮: tool_start → tool_end → plan_update
  *   → thinking(off) → message(总结) → done
+ *
+ * 会话记忆（§ 继续失忆修复）：
+ *   input.history 含所有 prior turn（不含 system），拼到 messages 中。
+ *   classifyIntent 同时传入 lastAgentMessage（承接词双重护栏）+ recentContextText
+ *   （最近 2-3 轮文本，消歧用）。ambiguous 分支产出的反问消息也写入 messages，
+ *   下一轮围栏能识别"我刚问了个问题，用户说继续"的承接语义。
  */
 export async function* runAgentLoop(
   input: AgentLoopInput,
   deps: AgentLoopDeps,
 ): AsyncIterable<AgentEvent> {
+  // 0. 派生分类上下文（从历史提取 lastAgentMessage + 最近 2-3 轮消歧文本）
+  const lastAgentMessage = extractLastAssistantText(input.history);
+  const recentContextText = buildRecentContextText(input.history);
+
   // 1. 派生工具 schema（T4.2）
   const tools: ToolSchema[] = await deps.mcp.listToolSchemas();
 
-  // 2. intent 围栏：分类（圈 1 规则快通道 + 圈 2 LLM enum）
+  // 2. intent 围栏：分类（圈 1 规则快通道 + 圈 2 LLM enum）—— 带历史上下文
   const intent =
     input.intent ??
-    (await classifyIntent(input.prompt, { llm: deps.llm, signal: deps.signal }));
+    (await classifyIntent(input.prompt, {
+      llm: deps.llm,
+      signal: deps.signal,
+      lastAgentMessage,
+      recentContextText,
+    }));
 
-  // 3. ambiguous → 直接反问，不进 loop
+  // 4. before guardrail：注入硬约束到 system prompt
+  const before = GuardrailPipeline.before(intent);
+  const systemContent = `${input.systemPrompt ?? SYSTEM_PROMPT}${before.systemPromptSuffix}`;
+
+  // 构造 messages：system + history（不含 system，若有）+ 本轮 user prompt
+  const history = input.history && input.history.length > 0 ? [...input.history] : [];
+  const messages: Message[] = [
+    { role: "system", content: systemContent },
+    ...history,
+    { role: "user", content: input.prompt },
+  ];
+
+  // 判官：入口 log，每轮 loop 打一条 —— 确认历史带上、续没续对（肉眼即判）
+  {
+    const n = messages.length;
+    const last = messages[n - 2]; // 倒数第二条（最后一条是本轮 user prompt）
+    const lastRole = last?.role ?? "-";
+    const lastSnippet = (last?.content ?? "").toString().replace(/\s+/g, " ").slice(0, 30);
+    console.log(
+      `[agent-loop] classify kind=${intent.kind} src=${intent.source} | messages.len=${n} | last=${lastRole}«${lastSnippet}»`,
+    );
+  }
+  // 回调：第一次 snapshot（已有 system + history + user）
+  input.onMessagesUpdated?.([...messages]);
+
+  // 3. ambiguous → 直接反问，不进 loop（但反问消息写入 messages，下一轮可承接）
   if (intent.needsClarify && intent.clarifyQuestion) {
     yield { type: "meta", totalTools: tools.length };
     yield { type: "thinking", on: true };
     yield { type: "thinking", on: false };
     yield { type: "message", role: "agent", content: intent.clarifyQuestion };
+    // 把这次反问作为 assistant 消息写入，供下一轮承接词识别"上一轮 agent 是问句"
+    messages.push({ role: "assistant", content: intent.clarifyQuestion });
+    input.onMessagesUpdated?.([...messages]);
     yield { type: "done" };
     return;
   }
-
-  // 4. before guardrail：注入硬约束到 system prompt
-  const before = GuardrailPipeline.before(intent);
-  const systemContent = `${input.systemPrompt ?? SYSTEM_PROMPT}${before.systemPromptSuffix}`;
-  const messages: Message[] = [
-    { role: "system", content: systemContent },
-    { role: "user", content: input.prompt },
-  ];
 
   // 5. 发开场事件（对齐 demo 节奏）
   yield { type: "meta", totalTools: tools.length };
@@ -116,7 +155,10 @@ export async function* runAgentLoop(
   while (turn < MAX_TURNS) {
     turn++;
     if (deps.signal?.aborted) {
-      yield { type: "message", role: "agent", content: "已中止。" };
+      const abortMsg = "已中止。";
+      messages.push({ role: "assistant", content: abortMsg });
+      input.onMessagesUpdated?.([...messages]);
+      yield { type: "message", role: "agent", content: abortMsg };
       break;
     }
 
@@ -127,12 +169,11 @@ export async function* runAgentLoop(
     try {
       res = await deps.llm.chat({ messages, tools, signal: deps.signal });
     } catch (e) {
+      const errContent = `⚠️ LLM 调用失败：${(e as Error).message}`;
+      messages.push({ role: "assistant", content: errContent });
+      input.onMessagesUpdated?.([...messages]);
       yield { type: "thinking", on: false };
-      yield {
-        type: "message",
-        role: "agent",
-        content: `⚠️ LLM 调用失败：${(e as Error).message}`,
-      };
+      yield { type: "message", role: "agent", content: errContent };
       break;
     }
 
@@ -145,6 +186,8 @@ export async function* runAgentLoop(
         yield { type: "plan", items: planItems };
       }
       if (res.content) {
+        messages.push({ role: "assistant", content: res.content });
+        input.onMessagesUpdated?.([...messages]);
         yield { type: "message", role: "agent", content: res.content };
       }
       break;
@@ -156,6 +199,7 @@ export async function* runAgentLoop(
       content: res.content ?? "",
       tool_calls: res.toolCalls,
     });
+    input.onMessagesUpdated?.([...messages]);
 
     // 第一轮有 content → 推 message + plan
     if (turn === 1 && res.content) {
@@ -187,20 +231,21 @@ export async function* runAgentLoop(
         if (gate.events) {
           for (const ev of gate.events) yield ev;
         }
-        yield {
-          type: "message",
-          role: "agent",
-          content: `⚠️ 即将执行破坏性操作 \`${call.name}\`，参数：\n\`\`\`json\n${JSON.stringify(call.args, null, 2)}\n\`\`\`\n\n回复「确认」继续，「取消」中止。`,
-        };
-        // 拒绝结果喂回 LLM
+        const gateMsg = `⚠️ 即将执行破坏性操作 \`${call.name}\`，参数：\n\`\`\`json\n${JSON.stringify(call.args, null, 2)}\n\`\`\`\n\n回复「确认」继续，「取消」中止。`;
+        yield { type: "message", role: "agent", content: gateMsg };
+        // 拒绝结果喂回 LLM（同时保留到 messages 供下一轮承接词识别）
+        const toolRejectContent = JSON.stringify({
+          error: "destructive_gate_blocked",
+          note: gate.rejectReason ?? "用户需回复规则判定的 confirm 词",
+        });
         messages.push({
           role: "tool",
           tool_call_id: call.id,
-          content: JSON.stringify({
-            error: "destructive_gate_blocked",
-            note: gate.rejectReason ?? "用户需回复规则判定的 confirm 词",
-          }),
+          content: toolRejectContent,
         });
+        // 同时把即将执行的提示作为 assistant 消息写入（承接词可识别"我刚问用户确认还是取消"）
+        messages.push({ role: "assistant", content: gateMsg });
+        input.onMessagesUpdated?.([...messages]);
         continue; // 继续下一个 toolCall
       }
 
@@ -225,6 +270,7 @@ export async function* runAgentLoop(
         tool_call_id: call.id,
         content: JSON.stringify(result.output),
       });
+      input.onMessagesUpdated?.([...messages]);
 
       // after guardrail：派生 stats + 触发复验（传 ctx，可能更新 lastUrl/brand）
       const after = GuardrailPipeline.after(call.name, call.args, result, ctx);
@@ -241,14 +287,50 @@ export async function* runAgentLoop(
   // 11. 收尾
   if (turn >= MAX_TURNS) {
     yield { type: "thinking", on: false };
+    const maxTurnMsg = `⚠️ 已达最大轮次 (${MAX_TURNS})，自动收工。已执行 ${toolCallCount} 个工具调用。`;
+    messages.push({ role: "assistant", content: maxTurnMsg });
+    input.onMessagesUpdated?.([...messages]);
     yield {
       type: "message",
       role: "agent",
-      content: `⚠️ 已达最大轮次 (${MAX_TURNS})，自动收工。已执行 ${toolCallCount} 个工具调用。`,
+      content: maxTurnMsg,
     };
   }
 
   yield { type: "done" };
+}
+
+// ── 历史上下文辅助（继续失忆修复 · 判官 + 分类上下文） ──────────────
+
+/** 从 history 提取最后一条 assistant 消息的纯文本（用于承接词双重护栏）。空或无 assistant 消息返回 undefined。 */
+function extractLastAssistantText(history: Message[] | undefined): string | undefined {
+  if (!history || history.length === 0) return undefined;
+  for (let i = history.length - 1; i >= 0; i--) {
+    const m = history[i];
+    if (m.role === "assistant" && typeof m.content === "string" && m.content.trim()) {
+      return m.content.trim();
+    }
+  }
+  return undefined;
+}
+
+/**
+ * 从 history 构造最近 N 轮的紧凑文本（用于 classifyIntent 的消歧，廉价：最多最近 4 条非 system/tool 消息，各截断 120 字）。
+ * 格式："[Agent]: xxx\n[User]: yyy\n[Agent]: ..." 按出现先后。
+ * 不传整段历史，保持分类操作成本恒定。
+ */
+function buildRecentContextText(history: Message[] | undefined): string | undefined {
+  if (!history || history.length === 0) return undefined;
+  const lines: string[] = [];
+  for (let i = history.length - 1; i >= 0 && lines.length < 4; i--) {
+    const m = history[i];
+    if (m.role === "system" || m.role === "tool") continue;
+    const label = m.role === "assistant" ? "Agent" : "User";
+    const content = (m.content ?? "").toString().replace(/\s+/g, " ").slice(0, 120);
+    if (!content) continue;
+    lines.unshift(`[${label}]: ${content}`);
+  }
+  return lines.length > 0 ? lines.join("\n") : undefined;
 }
 
 /**

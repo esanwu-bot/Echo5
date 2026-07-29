@@ -4,12 +4,20 @@ import { GrokClient } from "./llm/grok-client.ts";
 import { MockLLMClient, seoDemoScript } from "./llm/mock-client.ts";
 import { StdioMcpClient } from "./mcp/client.ts";
 import { runAgentLoop } from "./loop/run-agent.ts";
-import type { LLMClient } from "./llm/types.ts";
+import type { LLMClient, Message } from "./llm/types.ts";
 import type { McpToolClient } from "./mcp/client.ts";
 import type { AgentEvent } from "@hutian/agent-protocol";
 
 type Sub = (data: string) => void;
 const sessions = new Map<string, Set<Sub>>();
+/**
+ * 会话级历史消息（不含 system message，与 runAgentLoop 接口约定一致）。
+ * 每个 session 对应一条 user/assistant/tool 消息的有序列表：
+ *   - POST /sessions 创建时空数组
+ *   - POST /messages 每轮：读旧 history → 传 runAgentLoop → 回调写回最新 messages（剔除 system）
+ *   - 修复「2 分钟后继续失忆」：history 不落盘但在 bridge 进程存活期间跨 turn 保留
+ */
+const sessionHistories = new Map<string, Message[]>();
 
 function sseHead(res: ServerResponse) {
   res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "Access-Control-Allow-Origin": "*" });
@@ -339,6 +347,7 @@ async function route(req: IncomingMessage, res: ServerResponse) {
   if (req.method === "POST" && url === "/sessions") {
     const id = crypto.randomUUID();
     sessions.set(id, new Set());
+    sessionHistories.set(id, []);
     res.writeHead(200, { "Content-Type": "application/json" });
     return res.end(JSON.stringify({ id }));
   }
@@ -347,6 +356,7 @@ async function route(req: IncomingMessage, res: ServerResponse) {
   if (req.method === "GET" && eventsMatch) {
     const id = eventsMatch[1];
     if (!sessions.has(id)) sessions.set(id, new Set());
+    if (!sessionHistories.has(id)) sessionHistories.set(id, []);
     const subs = sessions.get(id)!;
     sseHead(res);
     const sub: Sub = (data) => res.write(`data: ${data}\n\n`);
@@ -363,6 +373,7 @@ async function route(req: IncomingMessage, res: ServerResponse) {
   if (req.method === "POST" && demoMatch) {
     const id = demoMatch[1];
     if (!sessions.has(id)) sessions.set(id, new Set());
+    if (!sessionHistories.has(id)) sessionHistories.set(id, []);
     startDemo(id);
     res.writeHead(200, { "Content-Type": "application/json" });
     return res.end(JSON.stringify({ ok: true, id, events: demoEvents.length }));
@@ -373,6 +384,7 @@ async function route(req: IncomingMessage, res: ServerResponse) {
   if (req.method === "POST" && msgMatch) {
     const id = msgMatch[1];
     if (!sessions.has(id)) sessions.set(id, new Set());
+    if (!sessionHistories.has(id)) sessionHistories.set(id, []);
     const body = await readBody(req);
     let prompt = "";
     try {
@@ -403,12 +415,26 @@ async function route(req: IncomingMessage, res: ServerResponse) {
 async function startAgentLoop(sessionId: string, prompt: string) {
   const llm = await buildLLM();
   const mcp = getMcp();
-  console.log(`[agent-bridge] session ${sessionId} start loop (llm=${llm.name})`);
+  const prevHistory = sessionHistories.get(sessionId) ?? [];
+  console.log(
+    `[agent-bridge] session ${sessionId} start loop (llm=${llm.name}) | prevHistory.len=${prevHistory.length}`,
+  );
 
   // 先推一条 user message（前端 chat 栏显示用户输入）
   broadcast(sessionId, { type: "message", role: "user", content: prompt });
 
-  for await (const ev of runAgentLoop({ prompt }, { llm, mcp })) {
+  for await (const ev of runAgentLoop(
+    {
+      prompt,
+      history: prevHistory,
+      // loop 每次 messages 变动时写回 —— 存 NON-SYSTEM 消息（messages[0] 永远是 system，过滤掉）
+      onMessagesUpdated: (msgs) => {
+        const nonSystem = msgs.filter((m) => m.role !== "system");
+        sessionHistories.set(sessionId, nonSystem);
+      },
+    },
+    { llm, mcp },
+  )) {
     broadcast(sessionId, ev);
   }
 }

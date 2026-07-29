@@ -349,6 +349,141 @@ async function run() {
     );
   }
 
+  // ── 18. 承接词白名单 + 双重护栏（上一轮 agent 问句 → continue_last）
+  console.log("\n■ 18. 承接词白名单：有上下文问句时 continue_last，无上下文时不跳接");
+  {
+    const lastAgentAsk = "这样不仅能提升 GEO 评分（当前 0 分），还能让 AI 搜索引擎更容易引用。需要我继续吗？ 😊";
+    // 18a. 继续 + 上一轮是问句 → continue_last（双护栏通过）
+    {
+      const r = classifyIntentByRule("继续", lastAgentAsk);
+      assert(
+        `"继续" + agent 问句 → continue_last`,
+        r !== null && r.kind === "continue_last" && r.source === "rule",
+        `got kind=${r?.kind} src=${r?.source}`,
+      );
+    }
+    // 18b. 好的 + 上一轮是问句 → continue_last
+    {
+      const r = classifyIntentByRule("好的", lastAgentAsk);
+      assert(
+        `"好的" + agent 问句 → continue_last`,
+        r !== null && r.kind === "continue_last" && r.source === "rule",
+        `got kind=${r?.kind} src=${r?.source}`,
+      );
+    }
+    // 18c. 下一步！ → continue_last（带标点）
+    {
+      const r = classifyIntentByRule("下一步！", lastAgentAsk);
+      assert(
+        `"下一步！" + 问句 → continue_last`,
+        r !== null && r.kind === "continue_last",
+        `got kind=${r?.kind}`,
+      );
+    }
+    // 18d. 继续 + 无 lastAgentMessage（空会话首词） → 不能是 continue_last（护栏拦截）
+    {
+      const r = classifyIntentByRule("继续");
+      assert(
+        `"继续" + 无上下文 → 不触发 continue_last`,
+        r === null || r.kind !== "continue_last",
+        `空上下文必须不能放行 continue_last，got kind=${r?.kind}`,
+      );
+    }
+    // 18e. 继续 + 上一轮 agent 不是问句（陈述句） → 不触发（护栏 2）
+    {
+      const r = classifyIntentByRule("继续", "诊断完毕，SEO 64 分，GEO 92 分。本次共执行 5 个工具调用。");
+      assert(
+        `"继续" + 非问句 → 不触发 continue_last`,
+        r === null || r.kind !== "continue_last",
+        `非问句上下文不能放行，got kind=${r?.kind}`,
+      );
+    }
+  }
+
+  // ── 19. 承接词白名单宽度：窄匹配（非 standalone 的"可以帮我…"不能错放成 continue_last）
+  console.log("\n■ 19. 承接词白名单窄匹配：防止短新话题错续旧任务（护栏一宽度守门）");
+  {
+    const lastAgentAsk = "需要我继续吗？ 😊";
+    // 19a. "可以帮我换个 URL 诊断" 含"可以"但不是 standalone → NOT continue_last
+    {
+      const r = classifyIntentByRule("可以帮我换个 URL 诊断", lastAgentAsk);
+      assert(
+        `"可以帮我换个 URL 诊断" → NOT continue_last`,
+        r === null || r.kind !== "continue_last",
+        `带宾语的"可以"不能错放 continue_last，got kind=${r?.kind}`,
+      );
+    }
+    // 19b. "对了，改品牌名" 含"对"但非独立 → NOT continue_last
+    {
+      const r = classifyIntentByRule("对了，改品牌名", lastAgentAsk);
+      assert(
+        `"对了，改品牌名" → NOT continue_last`,
+        r === null || r.kind !== "continue_last",
+        `"对了" 非独立承接，got kind=${r?.kind}`,
+      );
+    }
+    // 19c. "然后补 JSON-LD" 含"然后"非独立 → NOT continue_last
+    {
+      const r = classifyIntentByRule("然后补 JSON-LD", lastAgentAsk);
+      assert(
+        `"然后补 JSON-LD" → NOT continue_last`,
+        r === null || r.kind !== "continue_last",
+        `"然后补" 是新指令非承接，got kind=${r?.kind}`,
+      );
+    }
+    // 19d. 纯"然后呢" → standalone continue_last
+    {
+      const r = classifyIntentByRule("然后呢", lastAgentAsk);
+      assert(
+        `"然后呢" standalone → continue_last`,
+        r !== null && r.kind === "continue_last",
+        `got kind=${r?.kind}`,
+      );
+    }
+  }
+
+  // ── 20. classifyIntent 传 lastAgentMessage / recentContextText → 上下文消歧生效
+  console.log("\n■ 20. classifyIntent 带 lastAgentMessage/recentContextText 上下文消歧");
+  {
+    // 20a. "继续" + 无 LLM + 有上下文问句（双重护通过）→ continue_last 不降级 ambiguous
+    const lastAsk = "需要我继续吗？ 😊";
+    const withCtx = await classifyIntent("继续", { lastAgentMessage: lastAsk });
+    assert(
+      "无 LLM：'继续' + 问句上下文 → continue_last（非 ambiguous）",
+      withCtx.kind === "continue_last" && withCtx.source === "rule",
+      `got kind=${withCtx.kind} clarify=${withCtx.needsClarify}`,
+    );
+    // 20b. "继续" + 无上下文 + 无 LLM → 降级 ambiguous（但反问不播欢迎菜单，改为问要做什么）
+    const noCtx = await classifyIntent("继续", { llm: undefined });
+    assert(
+      "无 LLM 无上下文 → 降级 ambiguous + 带反问问题",
+      noCtx.kind === "ambiguous" && noCtx.needsClarify === true && Boolean(noCtx.clarifyQuestion),
+      `got kind=${noCtx.kind} clarify=${noCtx.needsClarify} q=${noCtx.clarifyQuestion}`,
+    );
+  }
+
+  // ── 21. buildClarifyQuestion 带 recentContextText → 不播欢迎菜单，回到上一轮语境
+  console.log("\n■ 21. clarifyQuestion 上下文感知：有历史时不播欢迎模板（防失忆欢迎菜单复现）");
+  {
+    const ctx = [
+      "[Agent]: 诊断完成。传统 SEO 100，生成式 GEO 0。需要我继续吗？ 😊",
+    ].join("\n");
+    const r = await classifyIntent("那个啥来着", {
+      llm: undefined, // 降级走兜底 clarify
+      recentContextText: ctx,
+    });
+    const q = r.clarifyQuestion ?? "";
+    const doesNotBroadcastWelcome =
+      !q.includes("例如「诊断") &&
+      !q.includes("建一篇关于三轮车") &&
+      (q.includes("继续") || q.includes("我刚才问") || q.includes("上一步"));
+    assert(
+      "有上下文 ambiguous → 反问不播欢迎菜单（'需要我继续吗/刚才问/上一步' 语义）",
+      r.kind === "ambiguous" && doesNotBroadcastWelcome,
+      `未做上下文感知反问，got q="${q}"`,
+    );
+  }
+
   // ── 汇总
   console.log("\n=== 汇总 ===");
   console.log(`通过: ${pass}`);

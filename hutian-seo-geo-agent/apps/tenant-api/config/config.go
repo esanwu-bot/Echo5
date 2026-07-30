@@ -6,7 +6,10 @@
 //   - 两库物理隔离，DSN 不串
 package config
 
-import "os"
+import (
+	"os"
+	"strings"
+)
 
 // Config 多租户后端配置
 type Config struct {
@@ -33,8 +36,8 @@ func Load() Config {
 		Port:      envOrDefault("TENANT_API_PORT", "4318"),
 		MetaDBDSN: envOrDefault("TENANT_META_DSN", "root:root@tcp(localhost:3306)/hutian?charset=utf8mb4&parseTime=True&loc=Local"),
 		Dev:       os.Getenv("TENANT_API_DEV") != "false",
-		AdminToken: os.Getenv("TENANT_ADMIN_TOKEN"),
-		JWTKey:     os.Getenv("TENANT_JWT_KEY"),
+		AdminToken: strings.TrimSpace(os.Getenv("TENANT_ADMIN_TOKEN")),
+		JWTKey:     strings.TrimSpace(os.Getenv("TENANT_JWT_KEY")),
 	}
 	return c
 }

@@ -47,7 +47,7 @@ Write-Host "    TENANT_ADMIN_TOKEN = dev-admin-token-change-in-prod"
 Write-Host "    TENANT_JWT_KEY     = dev-jwt-key-change-in-prod"
 Start-ServiceWindow -Title "tenant-api" `
     -WorkingDirectory "$root\hutian-seo-geo-agent\apps\tenant-api" `
-    -Command "set TENANT_ADMIN_TOKEN=dev-admin-token-change-in-prod && set TENANT_JWT_KEY=dev-jwt-key-change-in-prod && go run ."
+    -Command "set `"TENANT_ADMIN_TOKEN=dev-admin-token-change-in-prod`" && set `"TENANT_JWT_KEY=dev-jwt-key-change-in-prod`" && go run ."
 
 Write-Host "[4/7] 等待 tenant-api 就绪 ..."
 Start-Sleep -Seconds 4

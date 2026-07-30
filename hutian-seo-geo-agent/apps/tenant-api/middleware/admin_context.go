@@ -17,6 +17,7 @@ import (
 	"crypto/subtle"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -32,7 +33,7 @@ const (
 // 缺/错 → 401；通过 → 注入 CtxAdminAuthenticated，handler 可用 RawRepo 跨租户查
 func AdminContext(expectedToken string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		got := c.GetHeader("X-Admin-Token")
+		got := strings.TrimSpace(c.GetHeader("X-Admin-Token"))
 		if expectedToken == "" {
 			// env 未配 admin token — admin 路由全 401（NFR-T01 红线），
 			// 让前端统一走 401 清 token + 跳登录，避免 503 被吞掉无反馈。

@@ -3,7 +3,8 @@
 // 接缝：
 //   - 所有请求自动注入 X-Admin-Token 头（从 localStorage 读）
 //   - dev 环境走 vite proxy（/admin/api/* → localhost:4318），无 CORS
-//   - 401 → 清 token + 跳登录页
+//   - 401 →  normally 清 token + 跳登录页
+//   - DEBUG(2026-07-30): 临时屏蔽 401 自动跳转，便于观察调试信息
 //   - 错误响应统一抛 ApiError，含 {status, error, reason}
 
 import axios, { AxiosError } from "axios";
@@ -55,11 +56,13 @@ api.interceptors.response.use(
     const body = err.response?.data as { error?: string; reason?: string } | undefined;
     console.error("[admin-api] response error", status, body || err.message);
     if (status === 401) {
-      clearAdminToken();
-      // 跳登录页（如果不在登录页）
-      if (!window.location.pathname.endsWith("/login")) {
-        window.location.href = "/login";
-      }
+      // DEBUG(2026-07-30): 临时屏蔽自动清 token + 跳转，便于在页面上看错误详情和 Console 日志。
+      // 确认 admin 登录问题修复后，恢复下面两行。
+      console.error("[admin-api] DEBUG: 401 detected but NOT clearing token / redirecting");
+      // clearAdminToken();
+      // if (!window.location.pathname.endsWith("/login")) {
+      //   window.location.href = "/login";
+      // }
     }
     const apiErr: ApiError = {
       status,

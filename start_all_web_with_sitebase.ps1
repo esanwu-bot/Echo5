@@ -1,4 +1,4 @@
-# 一键启动完整 B2 真链路：siteBase + tenant-api + agent-bridge + web(workbench/portal) + tenant-admin(租户后台) + apps/admin(管理后台)
+﻿# 一键启动完整 B2 真链路：siteBase + tenant-api + agent-bridge + web(workbench/portal) + tenant-admin(租户后台) + apps/admin(管理后台)
 # 六个窗口保持开启即可。
 # 入口：
 #   - workbench:        http://localhost:3000/workbench

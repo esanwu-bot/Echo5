@@ -234,3 +234,71 @@ client.ts 只对 HTTP 401 执行清 token 跳转，所以服务端返回的是 4
 - `hutian-seo-geo-agent/apps/admin/src/App.tsx` —— 登录 token trim
 - `hutian-seo-geo-agent/apps/tenant-api/middleware/admin_context.go` —— 503 改 401 + mismatch 日志
 - `docs/bug修复日志.md` —— 本条
+
+---
+
+## 2026-07-30 · 真根因：cmd.exe `set VAR=value && next` 尾随空格被吃进变量值，导致 admin token 恒定 mismatch
+
+### 1. 现象
+上一条（2026-07-29 admin 登录 401）的修复（headers.set + 前端 trim + 503→401 + mismatch 日志）上线后，问题仍复现：登录后进入 /overview，Console 打印 `[admin-api] response error 401 {error:"admin token invalid", reason:"token mismatch"}`，tenant-api 控制台打印 `[admin-auth] token mismatch: got len=33, expected len=34`——**后端期望的 token 比前端发的多 1 个字符**。
+
+### 2. 根因（cmd.exe `set` 经典陷阱，不是 Go/axios/编码问题）
+
+`start_all_web_with_sitebase.ps1` 通过 `Start-ServiceWindow` 最终在 cmd.exe 里执行：
+```
+set TENANT_ADMIN_TOKEN=dev-admin-token-change-in-prod && set TENANT_JWT_KEY=dev-jwt-key-change-in-prod && go run .
+```
+
+cmd.exe 的 `set VAR=value && next` 语法中，**`&&` 前的那个空格会被 `set` 吃进变量值尾部**。所以后端进程实际拿到的 env 是：
+```
+TENANT_ADMIN_TOKEN=dev-admin-token-change-in-prod<空格>   ← len=34
+```
+
+而前端通过 HTTP header 发送的 token 会被 Go `net/http` 自动 trim 首尾空白：
+```
+X-Admin-Token: dev-admin-token-change-in-prod              ← len=33
+```
+
+`subtle.ConstantTimeCompare([]byte("...prod"), []byte("...prod "))` 永远返回 0 → **恒定 mismatch，无论前端 token 输得多对都踢回登录**。
+
+> 为什么上一条修复没堵住：上一条只在**前端**侧 trim token 和改 header 写法，但根因在**后端 env 被注入了尾随空格**，前端怎么 trim 都对不上。`subtle.ConstantTimeCompare` 严格字节比较，一个空格都不能差。
+
+### 3. 修复（三层堵，根治 + 防御 + 源头）
+
+#### 3.1 后端 config.go — 从根源 trim env（根治层）
+- `config.Load()` 里 `AdminToken` 和 `JWTKey` 读取时包 `strings.TrimSpace(os.Getenv(...))`。
+- 即使 cmd.exe 把空格注入 env，Go 进程内部用的 token 已经是干净的，恒定时间比较能对上。
+- 这是根治层——不依赖启动脚本的写法是否正确。
+
+#### 3.2 后端 admin_context.go — 防御性 trim header（防御层）
+- `AdminContext` 中间件读 header 时也 `strings.TrimSpace(c.GetHeader("X-Admin-Token"))`。
+- 双保险：即便 config 层漏了 trim，header 侧也 trim，两边都干净才能比较。
+
+#### 3.3 ps1 启动脚本 — `set "VAR=value"` 引号包裹（源头层）
+- `start_all_web_with_sitebase.ps1` 第 50 行 tenant-api 启动命令改为引号包裹写法：
+  ```
+  set "TENANT_ADMIN_TOKEN=dev-admin-token-change-in-prod" && set "TENANT_JWT_KEY=dev-jwt-key-change-in-prod" && go run .
+  ```
+- cmd.exe 的 `set "VAR=value"` 语法中，引号界定变量值的边界，**`&&` 前的空格不会被吃进变量值**。
+- 这是源头层——从注入点堵住，env 一开始就是干净的。
+
+#### 3.4 前端 client.ts — 恢复 401 跳转逻辑
+- 根因已修，撤回上一轮的 DEBUG 临时屏蔽（注释掉的 `clearAdminToken()` + 跳转 `/login`），恢复正常 401 处理。
+- 保留请求/响应的 `console.log/console.error` 调试日志（生产可注释，dev 有用）。
+
+### 4. 验收
+- `apps/admin`: `pnpm tsc --noEmit` —— 通过，0 error。
+- `apps/tenant-api`: `go build .` —— 通过。
+- 运行态：重启 tenant-api 后，登录 /overview 应返回 200，Console 不再出现 401 token mismatch。
+
+### 5. 教训（写进红线避免重犯）
+- **cmd.exe `set VAR=value && next` 的尾随空格陷阱**：Windows 启动脚本里拼接多命令时，`set` 必须用 `set "VAR=value"` 引号包裹，否则 `&&` 前的空格进变量值。这条对 Go env、Java -D、Node process.env 同样适用——只要宿主是 cmd.exe。
+- **恒定时间比较对空白零容忍**：`subtle.ConstantTimeCompare` 是字节级严格比较，env/header 的尾随空格不会被自动忽略。安全比较前必须先 trim 两边。
+- **根因分层不要只修症状层**：上一条只修了前端 trim + header 写法，没碰到后端 env 注入点，所以必复发。这次三层堵（config 根治 + 中间件防御 + 脚本源头）才真正封箱。
+
+### 6. 改动文件清单
+- `hutian-seo-geo-agent/apps/tenant-api/config/config.go` —— AdminToken/JWTKey 读取时 TrimSpace（根治层）
+- `hutian-seo-geo-agent/apps/tenant-api/middleware/admin_context.go` —— header 读取时 TrimSpace（防御层）
+- `start_all_web_with_sitebase.ps1` —— `set "VAR=value"` 引号包裹写法（源头层）
+- `hutian-seo-geo-agent/apps/admin/src/api/client.ts` —— 恢复 401 跳转逻辑，撤回 DEBUG 屏蔽
+- `docs/bug修复日志.md` —— 本条

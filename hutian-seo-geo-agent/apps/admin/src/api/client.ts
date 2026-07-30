@@ -56,13 +56,10 @@ api.interceptors.response.use(
     const body = err.response?.data as { error?: string; reason?: string } | undefined;
     console.error("[admin-api] response error", status, body || err.message);
     if (status === 401) {
-      // DEBUG(2026-07-30): 临时屏蔽自动清 token + 跳转，便于在页面上看错误详情和 Console 日志。
-      // 确认 admin 登录问题修复后，恢复下面两行。
-      console.error("[admin-api] DEBUG: 401 detected but NOT clearing token / redirecting");
-      // clearAdminToken();
-      // if (!window.location.pathname.endsWith("/login")) {
-      //   window.location.href = "/login";
-      // }
+      clearAdminToken();
+      if (!window.location.pathname.endsWith("/login")) {
+        window.location.href = "/login";
+      }
     }
     const apiErr: ApiError = {
       status,

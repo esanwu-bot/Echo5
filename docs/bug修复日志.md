@@ -147,4 +147,43 @@ Windows PowerShell 5.x 运行 `start_all_web_with_sitebase.ps1` 时，所有中�
 - `hutian-seo-geo-agent/apps/agent-bridge/src/loop/intent.ts` —— 加 AFFIRMATIVE_STANDALONE 肯定应答词子集，与承接词并列、双护栏不变
 - `hutian-seo-geo-agent/apps/agent-bridge/src/loop/verify-intent.ts` —— 新增 ■19.5 共 5 条断言
 - `hutian-seo-geo-agent/apps/agent-bridge/src/loop/probe-continue-amnesia.ts` —— MockScriptStep 补 `match: ""`（typecheck 正交修复）
+
+---
+
+## 2026-07-29 · 修复：Workbench 左侧“新建会话”按钮点击无响应
+
+### 1. 现象
+在 `http://localhost:3000/workbench` 页面，左侧橙色“+ 新建会话”按钮点击后没有任何反应：不跳转、不刷新聊天区、不创建新 session。
+
+### 2. 根因
+`Sidebar.tsx` 里的“新建会话”按钮是一个**纯静态 `<button>`，没有绑定 `onClick` 处理器**；同时：
+- `useAgentSession` 没有提供“新建会话 / 重置会话”的方法；
+- `streamReducer` 没有对应的 `reset` UI action；
+- `WorkbenchPage` 也没有把重置能力传给 `Sidebar`。
+
+按钮从 UI 到状态管理整条链路都是断的，所以点击无反应。
+
+### 3. 修复
+- `hutian-seo-geo-agent/apps/web/lib/streamReducer.ts`：
+  - `UiAction` 增加 `{ type: "reset" }`。
+  - reducer 处理 `reset` 时返回 `initialStreamState`，清空消息、工具、timeline、右栏等全部状态。
+- `hutian-seo-geo-agent/apps/web/lib/useAgentSession.ts`：
+  - 新增 `reset()` 回调：关闭当前 SSE EventSource、清空 `sessionId`、清空 pending 队列、dispatch `reset`。
+  - 将 `reset` 暴露给调用方。
+- `hutian-seo-geo-agent/apps/web/components/workbench/Sidebar.tsx`：
+  - `SidebarProps` 增加可选 `onNewSession?: () => void`。
+  - “新建会话”按钮绑定 `onClick={onNewSession}`，并加 `active:scale-[0.98]` 按下反馈。
+- `hutian-seo-geo-agent/apps/web/app/(workbench)/workbench/page.tsx`：
+  - 从 `useAgentSession` 解构 `reset`。
+  - 给 `Sidebar` 传 `onNewSession={() => { reset(); addToast("已新建会话", "violet"); setSidebarOpen(false); }}`。
+
+### 4. 验收
+- `pnpm tsc --noEmit`（web 包）：**通过，0 error**。
+- 运行态：启动 web dev server 后，点击“新建会话”按钮，聊天区应清空为初始空状态；在 SSE 模式下输入新消息后应 lazy 创建全新 session，不再复用旧 session。
+
+### 5. 改动文件清单
+- `hutian-seo-geo-agent/apps/web/lib/streamReducer.ts` —— 加 `reset` UI action
+- `hutian-seo-geo-agent/apps/web/lib/useAgentSession.ts` —— 加 `reset()` 方法并暴露
+- `hutian-seo-geo-agent/apps/web/components/workbench/Sidebar.tsx` —— 按钮加 onClick 与 onNewSession prop
+- `hutian-seo-geo-agent/apps/web/app/(workbench)/workbench/page.tsx` —— 串联 reset 与 Sidebar
 - `docs/bug修复日志.md` —— 本条

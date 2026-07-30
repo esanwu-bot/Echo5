@@ -85,8 +85,10 @@ const now = () =>
     ? new Date().toTimeString().slice(0, 5)
     : "";
 
-/** UI 派发动作（非 AgentEvent，仅前端使用，如手动切换右栏标签） */
-export type UiAction = { type: "set_panel"; tab: PanelTab };
+/** UI 派发动作（非 AgentEvent，仅前端使用，如手动切换右栏标签 / 新建会话） */
+export type UiAction =
+  | { type: "set_panel"; tab: PanelTab }
+  | { type: "reset" };
 
 /** reducer 接受 AgentEvent（流式事件）或 UiAction（本地 UI 动作） */
 export function streamReducer(
@@ -96,6 +98,9 @@ export function streamReducer(
   switch (event.type) {
     case "set_panel":
       return { ...state, activePanel: event.tab };
+    case "reset":
+      // 新建会话：清空所有状态，回到 initialStreamState
+      return initialStreamState;
     case "meta":
       return {
         ...state,

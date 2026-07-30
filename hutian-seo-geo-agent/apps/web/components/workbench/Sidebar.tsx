@@ -27,6 +27,7 @@ interface SidebarProps {
   modelLabel: string;
   isOpen: boolean;
   onClose: () => void;
+  onNewSession?: () => void;
 }
 
 export default function Sidebar({
@@ -34,6 +35,7 @@ export default function Sidebar({
   modelLabel,
   isOpen,
   onClose,
+  onNewSession,
 }: SidebarProps) {
   const completedTools = state.tools.filter((t) => t.status === "done").length;
   const ctxUsed = Math.min(38 + state.tools.length * 6, 96);
@@ -55,7 +57,10 @@ export default function Sidebar({
       >
         {/* 新建会话 */}
         <div className="p-3">
-          <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-amber to-amber2 px-3 py-2.5 text-[13px] font-semibold text-white shadow-glow transition hover:brightness-110">
+          <button
+            onClick={onNewSession}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-amber to-amber2 px-3 py-2.5 text-[13px] font-semibold text-white shadow-glow transition hover:brightness-110 active:scale-[0.98]"
+          >
             <svg className="h-4 w-4"><use href="#w-plus" /></svg>
             新建会话
           </button>

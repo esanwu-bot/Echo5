@@ -37,7 +37,7 @@ export default function WorkbenchPage() {
       ? "mock"
       : "sse";
   })();
-  const { state, send, setPanel, startMock } = useAgentSession(mode);
+  const { state, send, setPanel, startMock, reset } = useAgentSession(mode);
   const [model, setModel] = useState("deepseek-v4-flash");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -79,6 +79,12 @@ export default function WorkbenchPage() {
           modelLabel={MODEL_LABELS[model] ?? "DeepSeek V4 Flash"}
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
+          onNewSession={() => {
+            reset();
+            addToast("已新建会话", "violet");
+            // 移动端点新建后顺手收起抽屉
+            setSidebarOpen(false);
+          }}
         />
 
         {/* 中栏 */}

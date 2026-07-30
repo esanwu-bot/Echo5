@@ -154,6 +154,18 @@ export function useAgentSession(
     dispatch({ type: "set_panel", tab });
   }, []);
 
+  /** 新建会话：断开当前 SSE、清空 sessionId、重置 reducer 状态。 */
+  const reset = useCallback(() => {
+    esRef.current?.close();
+    esRef.current = null;
+    cancelRef.current?.();
+    cancelRef.current = null;
+    setSseReady(false);
+    setSessionId(null);
+    pendingRef.current = [];
+    dispatch({ type: "reset" });
+  }, []);
+
   useEffect(() => {
     return () => {
       esRef.current?.close();
@@ -169,5 +181,6 @@ export function useAgentSession(
     connect,
     send,
     setPanel,
+    reset,
   };
 }

@@ -15,6 +15,7 @@ package middleware
 
 import (
 	"crypto/subtle"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -31,15 +32,16 @@ const (
 // 缺/错 → 401；通过 → 注入 CtxAdminAuthenticated，handler 可用 RawRepo 跨租户查
 func AdminContext(expectedToken string) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		got := c.GetHeader("X-Admin-Token")
 		if expectedToken == "" {
-			// env 未配 admin token — admin 路由全 401（NFR-T01 红线）
-			c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{
+			// env 未配 admin token — admin 路由全 401（NFR-T01 红线），
+			// 让前端统一走 401 清 token + 跳登录，避免 503 被吞掉无反馈。
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"error":  "admin disabled",
 				"reason": "TENANT_ADMIN_TOKEN env not configured",
 			})
 			return
 		}
-		got := c.GetHeader("X-Admin-Token")
 		if got == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"error":  "admin token required",
@@ -49,6 +51,7 @@ func AdminContext(expectedToken string) gin.HandlerFunc {
 		}
 		// 恒定时间比较防时序攻击
 		if subtle.ConstantTimeCompare([]byte(got), []byte(expectedToken)) != 1 {
+			log.Printf("[admin-auth] token mismatch: got len=%d, expected len=%d", len(got), len(expectedToken))
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"error":  "admin token invalid",
 				"reason": "token mismatch",

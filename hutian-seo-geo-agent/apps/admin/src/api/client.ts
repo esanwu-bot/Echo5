@@ -35,9 +35,14 @@ export const api = axios.create({
 
 // 请求拦截器：注入 X-Admin-Token
 api.interceptors.request.use((config) => {
-  const token = getAdminToken();
+  const token = getAdminToken().trim();
   if (token) {
-    config.headers["X-Admin-Token"] = token;
+    // 使用 headers.set 确保在 axios 1.x 的 AxiosHeaders 上稳定写入
+    config.headers.set("X-Admin-Token", token);
+    // dev 调试用：确认 token 已带上（生产可注释）
+    console.log("[admin-api] outgoing", config.method?.toUpperCase(), config.url, "token-present:", true);
+  } else {
+    console.warn("[admin-api] outgoing without X-Admin-Token — will likely 401");
   }
   return config;
 });
@@ -46,15 +51,16 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (resp) => resp,
   (err: AxiosError) => {
-    if (err.response?.status === 401) {
+    const status = err.response?.status || 0;
+    const body = err.response?.data as { error?: string; reason?: string } | undefined;
+    console.error("[admin-api] response error", status, body || err.message);
+    if (status === 401) {
       clearAdminToken();
       // 跳登录页（如果不在登录页）
       if (!window.location.pathname.endsWith("/login")) {
         window.location.href = "/login";
       }
     }
-    const status = err.response?.status || 0;
-    const body = err.response?.data as { error?: string; reason?: string } | undefined;
     const apiErr: ApiError = {
       status,
       error: body?.error || err.message || "request failed",

@@ -55,14 +55,14 @@ export default function App() {
   if (location.pathname === "/login") {
     return (
       <LoginCard
-        onLogin={(t) => { setAdminToken(t); setTokenModalOpen(false); navigate("/"); }}
+        onLogin={(t) => { const token = t.trim(); setAdminToken(token); setTokenModalOpen(false); navigate("/"); }}
       />
     );
   }
   if (!getAdminToken()) {
     return (
       <LoginCard
-        onLogin={(t) => { setAdminToken(t); navigate("/"); }}
+        onLogin={(t) => { const token = t.trim(); setAdminToken(token); navigate("/"); }}
       />
     );
   }
@@ -156,7 +156,7 @@ export default function App() {
         title="平台超管登录"
         open={tokenModalOpen}
         onCancel={() => setTokenModalOpen(false)}
-        onOk={() => { if (tokenInput) { setAdminToken(tokenInput); setTokenModalOpen(false); navigate("/"); } }}
+        onOk={() => { const token = tokenInput.trim(); if (token) { setAdminToken(token); setTokenModalOpen(false); navigate("/"); } }}
         okText="登录"
         cancelText="取消"
       >
@@ -167,7 +167,7 @@ export default function App() {
           placeholder="X-Admin-Token"
           value={tokenInput}
           onChange={(e) => setTokenInput(e.target.value)}
-          onPressEnter={() => { if (tokenInput) { setAdminToken(tokenInput); setTokenModalOpen(false); navigate("/"); } }}
+          onPressEnter={() => { const token = tokenInput.trim(); if (token) { setAdminToken(token); setTokenModalOpen(false); navigate("/"); } }}
         />
       </Modal>
     </Layout>

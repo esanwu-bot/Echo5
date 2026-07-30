@@ -187,3 +187,50 @@ Windows PowerShell 5.x 运行 `start_all_web_with_sitebase.ps1` 时，所有中�
 - `hutian-seo-geo-agent/apps/web/components/workbench/Sidebar.tsx` —— 按钮加 onClick 与 onNewSession prop
 - `hutian-seo-geo-agent/apps/web/app/(workbench)/workbench/page.tsx` —— 串联 reset 与 Sidebar
 - `docs/bug修复日志.md` —— 本条
+
+---
+
+## 2026-07-29 · 修复：管理后台 admin 登录后 overview 接口 401 被踢回登录页
+
+### 1. 现象
+`http://localhost:4319/login` 登录后进入总览（/overview），页面闪一下红色错误提示，然后 URL 被重定向回 `/login`。
+
+### 2. 根因分析（401 被踢回登录 = client.ts 拦截器执行了 clearAdminToken + window.location.href = /login）
+client.ts 只对 HTTP 401 执行清 token 跳转，所以服务端返回的是 401。401 只可能来自 `middleware/admin_context.go` 的三种情况：
+- `TENANT_ADMIN_TOKEN` env 未配 → 原返回 503（不会被 client.ts 处理，不会跳登录），现改成 401；
+- 请求没带 `X-Admin-Token` → 说明 axios 没成功写 header 或 localStorage 没 token；
+- token 不匹配 → 说明前端发的 token 和后端 env 不一致。
+
+代码审查发现几个高概率问题：
+- `client.ts` 用 `config.headers["X-Admin-Token"] = token` 索引赋值，在 axios 1.x 的 AxiosHeaders 上不如 `headers.set()` 稳定；
+- 登录输入框未 trim，可能把首尾空格写进 localStorage；
+- env 未配时返回 503，前端不处理，用户看不到明确原因。
+
+### 3. 修复
+- `hutian-seo-geo-agent/apps/admin/src/api/client.ts`：
+  - token 读取后 `.trim()`；
+  - header 写入改为 `config.headers.set("X-Admin-Token", token)`；
+  - 请求/响应加 `console.log/console.error`，方便浏览器 Network/Console 直接看到 token 是否带上、服务端返回什么。
+- `hutian-seo-geo-agent/apps/tenant-api/middleware/admin_context.go`：
+  - `expectedToken == ""` 时从 503 改为 401，reason 仍为 `TENANT_ADMIN_TOKEN env not configured`；
+  - token mismatch 时加后端日志 `got len=%d, expected len=%d`。
+- `hutian-seo-geo-agent/apps/admin/src/App.tsx`：
+  - LoginCard 两处 onLogin、Modal 的 onOk/onPressEnter 全部对 token `trim()` 后再存。
+
+### 4. 验收
+- `apps/admin`: `pnpm tsc --noEmit` —— 通过，0 error。
+- `apps/tenant-api`: `go build .` —— 通过。
+- 运行态：登录后打开浏览器 DevTools Console，应看到 `[admin-api] outgoing GET /overview token-present: true`；
+  如果仍失败，Console 会打印具体 status 和 reason，tenant-api 控制台会打印 `token mismatch` 或 `admin disabled`。
+
+### 5. 若仍失败的最小排查清单
+1. 看 tenant-api 启动窗口的 env：`set TENANT_ADMIN_TOKEN` 是否等于你输入的 token（默认 `dev-admin-token-change-in-prod`）。
+2. 看浏览器 Console 的 `[admin-api] outgoing` 行：token-present 是 true 还是 false。
+3. 看 tenant-api 控制台：有没有 `[admin-auth] token mismatch: got len=... expected len=...`。
+4. 如果 Console 报 0 / Network Error，检查 tenant-api（:4318）是否真启动了；如果报 401 + `admin disabled`，说明 env 没配成功。
+
+### 6. 改动文件清单
+- `hutian-seo-geo-agent/apps/admin/src/api/client.ts` —— headers.set + trim + 日志
+- `hutian-seo-geo-agent/apps/admin/src/App.tsx` —— 登录 token trim
+- `hutian-seo-geo-agent/apps/tenant-api/middleware/admin_context.go` —— 503 改 401 + mismatch 日志
+- `docs/bug修复日志.md` —— 本条

@@ -179,6 +179,11 @@ func main() {
 	//   - P0-2：admin 不直连 hutian 库，走本服务 handler（用 RawRepo）
 	// 所有 handler 在 handlers/admin.go，写操作落 audit_logs（NFR-T03）
 	// ────────────────────────────────────────────────
+	if cfg.AdminToken == "" {
+		log.Printf("[admin] WARN: TENANT_ADMIN_TOKEN not configured — /admin/api/v1/* will reject all requests with 401")
+	} else {
+		log.Printf("[admin] OK: TENANT_ADMIN_TOKEN configured (len=%d)", len(cfg.AdminToken))
+	}
 	admin := r.Group("/admin/api/v1")
 	admin.Use(func(c *gin.Context) { c.Set("db", gormDB); c.Next() }) // 注入 db 到 context
 	admin.Use(middleware.AdminContext(cfg.AdminToken))

@@ -3,7 +3,7 @@
 // KPI 5 指标 + 状态分布 + 本月工具调用
 
 import { useState, useEffect, useCallback } from "react";
-import { Card, Col, Row, Statistic, Tag, Typography, App as AntdApp, Spin, Table } from "antd";
+import { Button, Card, Col, Empty, Row, Statistic, Tag, Typography, App as AntdApp, Spin, Table } from "antd";
 import {
   TeamOutlined, CheckCircleOutlined, ClockCircleOutlined, PauseCircleOutlined, ToolOutlined,
 } from "@ant-design/icons";
@@ -38,14 +38,17 @@ export default function OverviewPage() {
   const { message } = AntdApp.useApp();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<OverviewData | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const resp = await api.get("/overview");
       setData(resp.data.data);
     } catch (e) {
       const err = e as ApiError;
+      setError(err);
       message.error(`总览加载失败：${err.error}${err.reason ? ` — ${err.reason}` : ""}`);
     } finally {
       setLoading(false);
@@ -59,7 +62,24 @@ export default function OverviewPage() {
   }
 
   if (!data) {
-    return null;
+    return (
+      <Empty
+        description={
+          <div style={{ textAlign: "center" }}>
+            <Typography.Text type="danger">
+              {error
+                ? `总览加载失败：${error.status} ${error.error}${error.reason ? ` — ${error.reason}` : ""}`
+                : "总览数据为空"}
+            </Typography.Text>
+            <div style={{ marginTop: 12 }}>
+              <Button type="primary" onClick={fetchData} loading={loading}>
+                重试
+              </Button>
+            </div>
+          </div>
+        }
+      />
+    );
   }
 
   return (

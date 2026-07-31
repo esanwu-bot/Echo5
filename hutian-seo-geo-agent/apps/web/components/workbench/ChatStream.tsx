@@ -17,9 +17,11 @@ import StatCards from "./StatCards";
 
 interface ChatStreamProps {
   state: StreamState;
+  /** 当前 sessionId（null=全新会话未发送；非 null=已创建/切到历史会话） */
+  sessionId?: string | null;
 }
 
-export default function ChatStream({ state }: ChatStreamProps) {
+export default function ChatStream({ state, sessionId }: ChatStreamProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -37,27 +39,49 @@ export default function ChatStream({ state }: ChatStreamProps) {
       className="flex-1 overflow-y-auto"
     >
       <div className="mx-auto max-w-3xl space-y-3 py-4">
-        {/* 空状态：可输入的空工作台（不再 auto-send 烧钱） */}
+        {/* 空状态：两种情况分别渲染 */}
         {state.timeline.length === 0 && (
-          <div className="animate-fade-in-up px-4 py-8 text-center">
-            <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-amber to-amber2 text-white shadow-glow">
-              <svg className="h-6 w-6" width="24" height="24"><use href="#w-logo" /></svg>
+          sessionId ? (
+            // 切到历史会话但 messages 为空（bridge 重启/内存蒸发）
+            <div className="animate-fade-in-up px-4 py-8 text-center">
+              <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-bg3 text-faint">
+                <svg className="h-6 w-6" width="24" height="24"><use href="#w-clock" /></svg>
+              </div>
+              <h2 className="font-grotesk text-base font-semibold text-dim">
+                该会话的对话内容未持久化
+              </h2>
+              <p className="mt-1.5 text-[12px] text-faint">
+                侧栏保留了标题、时间和工具数摘要，但对话正文存在 Agent 服务的内存里。
+              </p>
+              <p className="mt-0.5 text-[12px] text-faint">
+                服务重启后正文会丢失——完整历史持久化（跨设备同步）待后续版本。
+              </p>
+              <p className="mt-3 text-[12px] text-dim">
+                你可以在下方输入框继续对话，Agent 会基于当前 session 续接。
+              </p>
             </div>
-            <h2 className="font-grotesk text-lg font-bold text-text">
-              壶天 SEO/GEO 工作台
-            </h2>
-            <p className="mt-1.5 text-[13px] text-dim">
-              用一句话下达意图，Agent 自主完成诊断—修复—提交—验证闭环
-            </p>
-            <div className="mt-4 rounded-lg border border-line bg-bg1 px-3 py-2 text-left text-[12px] text-faint">
-              <div className="mb-1 font-medium text-dim">试试这些：</div>
-              <ul className="space-y-1">
-                <li>· 诊断 https://example.com 的 SEO 情况</li>
-                <li>· 追踪「壶天」在 AI 引擎里的引用</li>
-                <li>· 把品牌从「天启芯」改为「壶天」</li>
-              </ul>
+          ) : (
+            // 全新会话（未发送首轮）
+            <div className="animate-fade-in-up px-4 py-8 text-center">
+              <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-amber to-amber2 text-white shadow-glow">
+                <svg className="h-6 w-6" width="24" height="24"><use href="#w-logo" /></svg>
+              </div>
+              <h2 className="font-grotesk text-lg font-bold text-text">
+                壶天 SEO/GEO 工作台
+              </h2>
+              <p className="mt-1.5 text-[13px] text-dim">
+                用一句话下达意图，Agent 自主完成诊断—修复—提交—验证闭环
+              </p>
+              <div className="mt-4 rounded-lg border border-line bg-bg1 px-3 py-2 text-left text-[12px] text-faint">
+                <div className="mb-1 font-medium text-dim">试试这些：</div>
+                <ul className="space-y-1">
+                  <li>· 诊断 https://example.com 的 SEO 情况</li>
+                  <li>· 追踪「壶天」在 AI 引擎里的引用</li>
+                  <li>· 把品牌从「天启芯」改为「壶天」</li>
+                </ul>
+              </div>
             </div>
-          </div>
+          )
         )}
 
         {state.timeline.map((entry, i) => {

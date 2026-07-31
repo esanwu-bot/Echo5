@@ -267,7 +267,13 @@ func main() {
 		portal.POST("/credentials/:id/revoke", handlers.TenantRevokeCredential)
 
 		// 7. 操作日志
-		portal.GET("/audit-logs", handlers.TenantListAuditLogs)
+	portal.GET("/audit-logs", handlers.TenantListAuditLogs)
+
+	// 8. 会话历史（跨设备持久化：workbench 登录后会话列表落 DB）
+	portal.GET("/sessions", handlers.TenantListSessions)
+	portal.POST("/sessions", handlers.TenantUpsertSession)
+	portal.PATCH("/sessions", handlers.TenantUpsertSession) // 同 upsert 语义，PATCH 用于更新 tool_count
+	portal.DELETE("/sessions/:sessionId", handlers.TenantDeleteSession)
 	}
 
 	log.Printf("[tenant-api] listening on :%s (dev=%v, db=hutian, admin=%v, jwt=%v)", cfg.Port, cfg.Dev, cfg.AdminToken != "", cfg.JWTKey != "")

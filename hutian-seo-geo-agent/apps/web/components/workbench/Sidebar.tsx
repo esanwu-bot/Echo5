@@ -1,12 +1,15 @@
 "use client";
 
+import { useMemo } from "react";
 import type { StreamState } from "@/lib/streamReducer";
+import type { SessionListItem } from "@/lib/sessionList";
+import { formatRelativeTime } from "@/lib/sessionList";
 
 /**
  * 左栏.  ← PRD IA / FR-W01 会话与运行时可视
  *
  * 顶部：新建会话 + 搜索。
- * 中部：会话列表（mock 数据，演示用）。
+ * 中部：会话列表（从 hutian_session_list_v1 读取，localStorage 持久化）。
  * 底部：运行时卡片（上下文窗口 / 模型路由 / 工具数 / MCP / 沙箱）。
  *
  * 响应式（NFR-03）：
@@ -14,20 +17,21 @@ import type { StreamState } from "@/lib/streamReducer";
  * - <900px：抽屉模式，由 isOpen 控制滑入/滑出
  */
 
-const SESSIONS = [
-  { id: "s1", title: "壶天品牌实体更名 + GEO 诊断", time: "进行中", active: true, toolCount: 5 },
-  { id: "s2", title: "产品页 Schema 补齐（gtin/price）", time: "2 小时前", active: false, toolCount: 3 },
-  { id: "s3", title: "IndexNow 提交 + 收录验证", time: "昨天", active: false, toolCount: 2 },
-  { id: "s4", title: "FAQPage 结构化数据生成", time: "3 天前", active: false, toolCount: 4 },
-  { id: "s5", title: "AI 引用追踪周报", time: "上周", active: false, toolCount: 1 },
-];
-
 interface SidebarProps {
   state: StreamState;
   modelLabel: string;
   isOpen: boolean;
   onClose: () => void;
   onNewSession?: () => void;
+  /** 会话列表（localStorage 真相源，父组件管理） */
+  sessions: SessionListItem[];
+  /** 当前选中 sessionId（null = 空工作台/新建会话未发送首轮消息） */
+  currentSessionId: string | null;
+  /** 点击会话列表项时的回调：切换到该 sessionId */
+  onSelectSession?: (sessionId: string) => void;
+  /** 搜索关键词（父组件受控，便于后续加真搜索） */
+  searchKeyword?: string;
+  onSearchChange?: (kw: string) => void;
 }
 
 export default function Sidebar({
@@ -36,9 +40,25 @@ export default function Sidebar({
   isOpen,
   onClose,
   onNewSession,
+  sessions,
+  currentSessionId,
+  onSelectSession,
+  searchKeyword,
+  onSearchChange,
 }: SidebarProps) {
   const completedTools = state.tools.filter((t) => t.status === "done").length;
   const ctxUsed = Math.min(38 + state.tools.length * 6, 96);
+
+  const nowMs = useMemo(() => Date.now(), [sessions.length]);
+  const filteredSessions = useMemo(() => {
+    const kw = searchKeyword?.trim();
+    if (!kw) return sessions;
+    const lower = kw.toLowerCase();
+    return sessions.filter((s) => s.title.toLowerCase().includes(lower));
+  }, [sessions, searchKeyword]);
+
+  /** 当前正在进行的 session：有 agentRunning=true 且 currentSessionId 匹配才显示 pulse 动画 */
+  const activeRunningId = state.agentRunning && !state.done ? currentSessionId : null;
 
   return (
     <>
@@ -72,6 +92,8 @@ export default function Sidebar({
             <svg className="h-3.5 w-3.5 text-faint"><use href="#w-search" /></svg>
             <input
               placeholder="搜索会话…"
+              value={searchKeyword ?? ""}
+              onChange={(e) => onSearchChange?.(e.target.value)}
               className="w-full bg-transparent text-[12px] text-text placeholder:text-faint focus:outline-none"
             />
           </div>
@@ -82,31 +104,48 @@ export default function Sidebar({
           <div className="px-2 py-1.5 font-mono text-[10px] tracking-wider text-faint">
             会话历史
           </div>
-          {SESSIONS.map((s) => (
-            <button
-              key={s.id}
-              className={`mb-0.5 flex w-full flex-col gap-1 rounded-lg px-2.5 py-2 text-left transition ${
-                s.active ? "bg-bg3" : "hover:bg-bg2"
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <span
-                  className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                    s.active ? "bg-amber animate-[pulse-amber_1.4s_infinite]" : "bg-faint"
+          {filteredSessions.length === 0 ? (
+            <div className="px-3 py-8 text-center text-[11px] text-faint">
+              {searchKeyword?.trim() ? "无匹配会话" : "暂无历史会话，发送第一条消息即可记录"}
+            </div>
+          ) : (
+            filteredSessions.map((s) => {
+              const isSelected = s.id === currentSessionId;
+              const isRunning = s.id === activeRunningId;
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => onSelectSession?.(s.id)}
+                  className={`mb-0.5 flex w-full flex-col gap-1 rounded-lg px-2.5 py-2 text-left transition ${
+                    isSelected ? "bg-bg3" : "hover:bg-bg2"
                   }`}
-                />
-                <span className="line-clamp-1 flex-1 text-[12.5px] font-medium text-text">
-                  {s.title}
-                </span>
-              </div>
-              <div className="flex items-center justify-between pl-3.5">
-                <span className="text-[10.5px] text-faint">{s.time}</span>
-                <span className="font-mono text-[10px] text-faint">
-                  {s.toolCount} tools
-                </span>
-              </div>
-            </button>
-          ))}
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                        isRunning
+                          ? "bg-amber animate-[pulse-amber_1.4s_infinite]"
+                          : isSelected
+                            ? "bg-amber/70"
+                            : "bg-faint"
+                      }`}
+                    />
+                    <span className="line-clamp-1 flex-1 text-[12.5px] font-medium text-text">
+                      {s.title}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between pl-3.5">
+                    <span className="text-[10.5px] text-faint">
+                      {formatRelativeTime(s.lastActiveAt, nowMs)}
+                    </span>
+                    <span className="font-mono text-[10px] text-faint">
+                      {s.toolCount} tools
+                    </span>
+                  </div>
+                </button>
+              );
+            })
+          )}
         </div>
 
         {/* 运行时卡片 FR-W01 */}

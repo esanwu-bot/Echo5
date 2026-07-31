@@ -816,3 +816,117 @@ func TenantListAuditLogs(c *gin.Context) {
 	rotateNonce(c, !cfgDev)
 	c.JSON(http.StatusOK, gin.H{"data": resp, "tenant_id": tenantID, "workspace_id": workspaceID})
 }
+
+// ────────────────────────────────────────────────
+// 8. 会话历史（跨设备持久化）
+//    workbench 登录后，会话列表从 localStorage 迁到 user_sessions 表
+//    session_id 是 agent-bridge 返回的 id；title/tool_count 由前端注册/更新
+//    联合唯一 tenant_id+user_id+session_id：同租户同用户不重复
+// ────────────────────────────────────────────────
+
+type UpsertSessionRequest struct {
+	SessionID string `json:"session_id" binding:"required"`
+	Title     string `json:"title"`
+	ToolCount int    `json:"tool_count"`
+}
+
+// TenantListSessions 列出当前用户的会话历史（按 updated_at 倒序，最多 50 条）
+func TenantListSessions(c *gin.Context) {
+	_, db, userID, _, tenantID, _ := portalCtx(c)
+	devOnly, _ := c.Get("cfg.dev")
+	cfgDev, _ := devOnly.(bool)
+
+	var sessions []models.UserSession
+	if err := db.Where("tenant_id = ? AND user_id = ?", tenantID, userID).
+		Order("updated_at DESC").
+		Limit(50).
+		Find(&sessions).Error; err != nil {
+		writePortalError(c, cfgDev, http.StatusInternalServerError, "list sessions failed", "")
+		return
+	}
+	writePortalOK(c, cfgDev, sessions)
+}
+
+// TenantUpsertSession 注册/更新会话（首次发消息时注册，后续刷新 title/tool_count/updated_at）
+func TenantUpsertSession(c *gin.Context) {
+	_, db, userID, _, tenantID, workspaceID := portalCtx(c)
+	devOnly, _ := c.Get("cfg.dev")
+	cfgDev, _ := devOnly.(bool)
+
+	var req UpsertSessionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		writePortalError(c, cfgDev, http.StatusBadRequest, "invalid request body", err.Error())
+		return
+	}
+
+	// 查是否已存在（同 tenant+user+session_id）
+	var existing models.UserSession
+	err := db.Where("tenant_id = ? AND user_id = ? AND session_id = ?",
+		tenantID, userID, req.SessionID).First(&existing).Error
+
+	if err == gorm.ErrRecordNotFound {
+		// 新建
+		sess := models.UserSession{
+			TenantID:    tenantID,
+			UserID:      userID,
+			WorkspaceID: workspaceID,
+			SessionID:   req.SessionID,
+			Title:       req.Title,
+			ToolCount:   req.ToolCount,
+		}
+		if sess.Title == "" {
+			sess.Title = "新会话"
+		}
+		if err := db.Create(&sess).Error; err != nil {
+			writePortalError(c, cfgDev, http.StatusInternalServerError, "create session failed", "")
+			return
+		}
+		writePortalOK(c, cfgDev, sess)
+		return
+	}
+	if err != nil {
+		writePortalError(c, cfgDev, http.StatusInternalServerError, "query session failed", "")
+		return
+	}
+
+	// 已存在 → 更新 title/tool_count/updated_at
+	updates := map[string]interface{}{
+		"tool_count": req.ToolCount,
+		"updated_at": time.Now(),
+	}
+	if req.Title != "" {
+		updates["title"] = req.Title
+	}
+	if err := db.Model(&existing).Updates(updates).Error; err != nil {
+		writePortalError(c, cfgDev, http.StatusInternalServerError, "update session failed", "")
+		return
+	}
+	// 重新查返回最新数据
+	db.First(&existing, existing.ID)
+	writePortalOK(c, cfgDev, existing)
+}
+
+// TenantDeleteSession 删除单条会话历史（软删）
+func TenantDeleteSession(c *gin.Context) {
+	_, db, userID, _, tenantID, _ := portalCtx(c)
+	devOnly, _ := c.Get("cfg.dev")
+	cfgDev, _ := devOnly.(bool)
+
+	sessionID := c.Param("sessionId")
+	if sessionID == "" {
+		writePortalError(c, cfgDev, http.StatusBadRequest, "session_id required", "")
+		return
+	}
+
+	result := db.Where("tenant_id = ? AND user_id = ? AND session_id = ?",
+		tenantID, userID, sessionID).Delete(&models.UserSession{})
+	if result.Error != nil {
+		writePortalError(c, cfgDev, http.StatusInternalServerError, "delete session failed", "")
+		return
+	}
+	if result.RowsAffected == 0 {
+		writePortalError(c, cfgDev, http.StatusNotFound, "session not found", "")
+		return
+	}
+	writePortalOK(c, cfgDev, gin.H{"deleted": sessionID})
+}

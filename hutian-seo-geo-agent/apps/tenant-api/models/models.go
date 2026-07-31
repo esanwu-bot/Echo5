@@ -324,5 +324,26 @@ func AllModels() []interface{} {
 		&Seat{},
 		&UsageMeter{},
 		&AuditLog{},
+		&UserSession{},
 	}
 }
+
+// ────────────────────────────────────────────────
+// 10. user_sessions — 用户会话历史（跨设备持久化）
+//    workbench 登录后，会话列表从 localStorage 迁到这张表，实现跨设备同步
+//    session_id 是 agent-bridge 返回的 id（字符串），不是自增
+//    联合唯一 tenant_id+user_id+session_id（同租户同用户不重复）
+// ────────────────────────────────────────────────
+
+// UserSession 用户会话历史索引（不含消息正文，正文在 agent-bridge 内存，后续持久化另排）
+type UserSession struct {
+	BaseModel
+	TenantID     int64  `gorm:"uniqueIndex:idx_usession_tenant_user_sid;index;not null" json:"tenant_id"`
+	UserID       int64  `gorm:"uniqueIndex:idx_usession_tenant_user_sid;index;not null" json:"user_id"`
+	WorkspaceID  int64  `gorm:"index;not null" json:"workspace_id"`
+	SessionID    string `gorm:"type:varchar(128);uniqueIndex:idx_usession_tenant_user_sid;not null" json:"session_id"` // agent-bridge 的 sessionId
+	Title        string `gorm:"type:varchar(256);not null;default:新会话" json:"title"`
+	ToolCount    int    `gorm:"not null;default:0" json:"tool_count"`
+}
+
+func (UserSession) TableName() string { return "user_sessions" }

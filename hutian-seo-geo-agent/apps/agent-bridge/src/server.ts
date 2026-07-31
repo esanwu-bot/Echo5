@@ -7,6 +7,7 @@ import { runAgentLoop } from "./loop/run-agent.ts";
 import type { LLMClient, Message } from "./llm/types.ts";
 import type { McpToolClient } from "./mcp/client.ts";
 import type { AgentEvent } from "@hutian/agent-protocol";
+import { verifyTenantToken, isTokenEnforced, type TenantTokenPayload } from "./auth/tenant-token.ts";
 
 type Sub = (data: string) => void;
 const sessions = new Map<string, Set<Sub>>();
@@ -18,6 +19,13 @@ const sessions = new Map<string, Set<Sub>>();
  *   - 修复「2 分钟后继续失忆」：history 不落盘但在 bridge 进程存活期间跨 turn 保留
  */
 const sessionHistories = new Map<string, Message[]>();
+/**
+ * session 级租户上下文（验签后的 token payload，供 MCP 工具路由 siteBase 用）。
+ *   - POST /sessions 时验签 X-Tenant-Token → 存 payload
+ *   - dev 放行（未配 key）→ 存 null（标记"已处理但无 payload"）
+ *   - 后续 MCP 工具调 siteBase 时从此取 sitebase_base_url（下一轮接）
+ */
+const sessionTenants = new Map<string, TenantTokenPayload | null>();
 
 function sseHead(res: ServerResponse) {
   res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "Access-Control-Allow-Origin": "*" });
@@ -345,9 +353,17 @@ async function route(req: IncomingMessage, res: ServerResponse) {
   }
 
   if (req.method === "POST" && url === "/sessions") {
+    // 验签 X-Tenant-Token（生产强制；dev 未配 key 放行）
+    const tokenHead = req.headers["x-tenant-token"] as string | undefined;
+    const verified = verifyTenantToken(tokenHead);
+    if (isTokenEnforced() && !verified.ok) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: "tenant token verification failed", reason: verified.reason }));
+    }
     const id = crypto.randomUUID();
     sessions.set(id, new Set());
     sessionHistories.set(id, []);
+    sessionTenants.set(id, verified.ok ? verified.payload : null);
     res.writeHead(200, { "Content-Type": "application/json" });
     return res.end(JSON.stringify({ id }));
   }
@@ -383,8 +399,17 @@ async function route(req: IncomingMessage, res: ServerResponse) {
   const msgMatch = url.match(/^\/sessions\/([^/]+)\/messages$/);
   if (req.method === "POST" && msgMatch) {
     const id = msgMatch[1];
+    // 验签 X-Tenant-Token（生产强制；dev 未配 key 放行）
+    const tokenHead = req.headers["x-tenant-token"] as string | undefined;
+    const verified = verifyTenantToken(tokenHead);
+    if (isTokenEnforced() && !verified.ok) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: "tenant token verification failed", reason: verified.reason }));
+    }
     if (!sessions.has(id)) sessions.set(id, new Set());
     if (!sessionHistories.has(id)) sessionHistories.set(id, []);
+    // 更新 session 的租户上下文（token 可能已刷新，以最新为准）
+    if (verified.ok) sessionTenants.set(id, verified.payload);
     const body = await readBody(req);
     let prompt = "";
     try {

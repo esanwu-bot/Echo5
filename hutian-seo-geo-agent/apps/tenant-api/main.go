@@ -274,6 +274,10 @@ func main() {
 	portal.POST("/sessions", handlers.TenantUpsertSession)
 	portal.PATCH("/sessions", handlers.TenantUpsertSession) // 同 upsert 语义，PATCH 用于更新 tool_count
 	portal.DELETE("/sessions/:sessionId", handlers.TenantDeleteSession)
+
+	// 9. 跨语言内部 token 签发（链②：BFF 调 → 透传 bridge 验签）
+	//    走 portal JWT 验签；GET 豁免 CSRF 头，BFF 只需转发 cookie
+	portal.GET("/internal/token", handlers.TenantIssueInternalToken)
 	}
 
 	log.Printf("[tenant-api] listening on :%s (dev=%v, db=hutian, admin=%v, jwt=%v)", cfg.Port, cfg.Dev, cfg.AdminToken != "", cfg.JWTKey != "")

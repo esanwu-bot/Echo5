@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getBridgeToken } from "@/lib/bridgeToken";
 
 const BRIDGE_URL = process.env.BRIDGE_URL || "http://localhost:4317";
 
@@ -11,14 +12,9 @@ const BRIDGE_URL = process.env.BRIDGE_URL || "http://localhost:4317";
  *
  * 前端 send(text) 在 SSE 模式调这个；事件回流经 /api/sessions/[id]/stream
  *
- * ════════════════════════════════════════════════════
- * P0 红线：此处绝不能透传明文 X-Tenant-ID / X-Workspace-ID header
- *   违反 ADR：下游签名签 / 单一信任源 / 签名防篡改 / 下游不连 hutian
- *
- * 下一轮接 ADR 内部 token：
- *   BFF 调 tenant-api /api/v1/internal/token → 拿签名 X-Tenant-Token → 透传给 bridge
- *   bridge 只信签名 token，不信任何明文头
- * ════════════════════════════════════════════════════
+ * ADR 内部 token（替代已移除的明文 X-Tenant-ID/X-Workspace-ID header）：
+ *   BFF 调 tenant-api 签发 HMAC token → 设 X-Tenant-Token 头给 bridge 验签
+ *   单一信任源：隔离逻辑只在 Go，BFF 不连 hutian 库
  */
 export async function POST(
   req: NextRequest,
@@ -27,9 +23,14 @@ export async function POST(
   const { id } = params;
   const body = await req.json().catch(() => ({}));
 
+  // ADR 内部 token：每次发消息都带（token 5min 有效，BFF 缓存 4min）
+  const tenantToken = await getBridgeToken(req);
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (tenantToken) headers["X-Tenant-Token"] = tenantToken;
+
   const resp = await fetch(`${BRIDGE_URL}/sessions/${id}/messages`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({ prompt: body.prompt ?? body.message ?? "" }),
   });
 

@@ -22,6 +22,7 @@ import (
 	"hutian-tenant-api/auth"
 	"hutian-tenant-api/middleware"
 	"hutian-tenant-api/models"
+	"hutian-tenant-api/token"
 )
 
 const (
@@ -921,4 +922,59 @@ func TenantDeleteSession(c *gin.Context) {
 		return
 	}
 	writePortalOK(c, cfgDev, gin.H{"deleted": sessionID})
+}
+
+// ────────────────────────────────────────────────
+// 9. 跨语言内部 token 签发（链②：BFF → tenant-api 验签 → bridge 验签）
+//
+// ADR-cross-lang-tenant-context：
+//   - workbench BFF 收用户请求（带 httpOnly cookie JWT）
+//   - BFF 调本端点 GET /portal/api/v1/internal/token（走 TenantJWTContext 四合一验签）
+//   - 本端点查 workspace/sitebase_instance → 签发 HMAC 短期 token（5min）
+//   - BFF 把 token 放 X-Tenant-Token 头给 bridge，bridge 验签后信任 payload
+//
+// 用 GET 不用 POST：签发是幂等操作（基于当前 JWT claims，不改 DB 状态），
+// 且 GET 豁免 CSRF 头校验，BFF 只需转发 cookie JWT 即可，无需转发 nonce。
+// ────────────────────────────────────────────────
+
+// TenantIssueInternalToken 签发 HMAC 内部 token（portal 链②入口）
+func TenantIssueInternalToken(c *gin.Context) {
+	_, db, _, seatID, tenantID, workspaceID := portalCtx(c)
+	devOnly, _ := c.Get("cfg.dev")
+	cfgDev, _ := devOnly.(bool)
+
+	var ws models.Workspace
+	if err := db.First(&ws, workspaceID).Error; err != nil {
+		writePortalError(c, cfgDev, http.StatusNotFound, "workspace not found", "")
+		return
+	}
+	var inst models.SitebaseInstance
+	if err := db.First(&inst, ws.SitebaseInstanceID).Error; err != nil {
+		writePortalError(c, cfgDev, http.StatusInternalServerError, "sitebase instance lookup failed", "")
+		return
+	}
+
+	signer, err := token.NewSigner()
+	if err != nil {
+		writePortalError(c, cfgDev, http.StatusInternalServerError, "token signer not configured", err.Error())
+		return
+	}
+	tok, err := signer.Issue(token.Payload{
+		TenantID:           tenantID,
+		WorkspaceID:        workspaceID,
+		SitebaseInstanceID: inst.ID,
+		SitebaseBaseURL:    inst.BaseURL,
+		SeatID:             seatID,
+	})
+	if err != nil {
+		writePortalError(c, cfgDev, http.StatusInternalServerError, "issue token failed", err.Error())
+		return
+	}
+	writePortalOK(c, cfgDev, gin.H{
+		"token":        tok,
+		"tenant_id":    tenantID,
+		"workspace_id": workspaceID,
+		"sitebase_url": inst.BaseURL,
+		"expires_in":   300,
+	})
 }

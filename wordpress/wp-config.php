@@ -91,7 +91,10 @@ define( 'WP_DEBUG_DISPLAY', false );
 
 /* Add any custom values between this line and the "stop editing" line. */
 
-
+// 壶天 dev：WP REST (posts/media) 的 dev Application Password 后门口令
+// mu-plugins/hutian-dev-wc-basic-auth.php ② 分支用：Basic Auth user=hutian_admin, pw=此常量
+// 生产环境不定义此常量 = 关闭后门，改用真 Application Password (HTTPS)
+define( 'HUTIAN_DEV_APP_PASSWORD', 'hutian-dev-app-pass-2026' );
 
 /* That's all, stop editing! Happy publishing. */
 

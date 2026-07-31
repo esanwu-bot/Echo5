@@ -34,6 +34,8 @@ interface SidebarProps {
   onSearchChange?: (kw: string) => void;
   /** 远程同步状态徽标（synced=云端绿 / offline=离线琥珀 / server_error=后端挂红 / local=未登录本地灰） */
   syncStatus?: "synced" | "offline" | "unauthed" | "server_error" | "local";
+  /** 连续读失败次数（失败状态时显示"x次"在徽标后，让用户知道还在失败而非已恢复） */
+  syncFails?: number;
 }
 
 const SYNC_LABEL: Record<string, { text: string; color: string; dot: string }> = {
@@ -56,6 +58,7 @@ export default function Sidebar({
   searchKeyword,
   onSearchChange,
   syncStatus = "local",
+  syncFails = 0,
 }: SidebarProps) {
   const completedTools = state.tools.filter((t) => t.status === "done").length;
   const ctxUsed = Math.min(38 + state.tools.length * 6, 96);
@@ -118,6 +121,9 @@ export default function Sidebar({
             <span className={`flex items-center gap-1 font-mono text-[9.5px] ${SYNC_LABEL[syncStatus].color}`} title={SYNC_LABEL[syncStatus].text}>
               <span className={`h-1.5 w-1.5 rounded-full ${SYNC_LABEL[syncStatus].dot}`} />
               {SYNC_LABEL[syncStatus].text}
+              {syncFails > 0 && syncStatus !== "synced" && syncStatus !== "local" ? (
+                <span className="ml-0.5">· {syncFails}次</span>
+              ) : null}
             </span>
           </div>
           {filteredSessions.length === 0 ? (

@@ -67,6 +67,7 @@ export default function WorkbenchPage() {
     sessionId,
     sessions,
     syncStatus,
+    syncFails,
     send,
     setPanel,
     startMock,
@@ -105,6 +106,14 @@ export default function WorkbenchPage() {
     }
     // synced 时不打扰用户（正常状态）；unauthed 由 useTenantAuth 处理跳登录
   }, [syncStatus, addToast]);
+
+  // 连续读失败：每 3 次再 toast 一次，避免"第一次提示后用户以为恢复了其实还在失败"
+  // syncFails 在 listSessionsRemote 非 synced 时累加、synced 时清零
+  useEffect(() => {
+    if (syncFails > 0 && syncFails % 3 === 0) {
+      addToast(`已连续 ${syncFails} 次同步失败，仅显示本设备历史`, "amber");
+    }
+  }, [syncFails, addToast]);
 
   const handleModelChange = useCallback(
     (id: string, label: string) => {
@@ -183,6 +192,7 @@ export default function WorkbenchPage() {
           searchKeyword={searchKeyword}
           onSearchChange={setSearchKeyword}
           syncStatus={syncStatus}
+          syncFails={syncFails}
           onSelectSession={(targetId) => {
             switchSession(targetId);
             addToast("已切换会话", "violet");

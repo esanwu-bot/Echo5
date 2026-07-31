@@ -59,6 +59,12 @@ export function useAgentSession(
   const [sessions, setSessions] = useState<SessionListItem[]>([]);
   /** 远程同步状态（synced=云端 / offline=离线 / unauthed=cookie失效 / server_error=后端挂 / local=未登录本地） */
   const [syncStatus, setSyncStatus] = useState<SessionSyncStatus | "local">("local");
+  /**
+   * 连续读失败次数（listSessionsRemote 返回非 synced 时累加，synced 时清零）。
+   * 用途：避免"第一次 toast 后用户以为恢复了其实还在失败"——
+   *   workbench 监听此值，达 3 的倍数时再 toast 一次，让用户知道"还在失败"。
+   */
+  const [syncFails, setSyncFails] = useState(0);
   const esRef = useRef<EventSource | null>(null);
   const cancelRef = useRef<(() => void) | null>(null);
   // pending messages waiting for SSE to be ready (queued during lazy init)
@@ -77,6 +83,8 @@ export function useAgentSession(
       listSessionsRemote(userId).then(({ list, status }) => {
         setSessions(list);
         setSyncStatus(status);
+        // 连续读失败计数：synced 清零，非 synced 累加（驱动 workbench 重复 toast）
+        setSyncFails(status === "synced" ? 0 : (n) => n + 1);
       });
     } else {
       // 未登录：直接读 localStorage
@@ -292,6 +300,8 @@ export function useAgentSession(
     sessions,
     /** 远程同步状态（synced/offline/unauthed/server_error/local），UI 徽标用 */
     syncStatus,
+    /** 连续读失败次数（synced 清零；非 synced 累加），驱动 workbench 重复 toast 提示 */
+    syncFails,
     /** 强制刷新 sessions（register/touchSession 后已自动刷，但外部如需手动触发可用） */
     refreshSessions,
     startMock,

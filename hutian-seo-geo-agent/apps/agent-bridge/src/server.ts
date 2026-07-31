@@ -8,7 +8,10 @@ import { runAgentLoop } from "./loop/run-agent.ts";
 import type { LLMClient, Message } from "./llm/types.ts";
 import type { McpToolClient } from "./mcp/client.ts";
 import type { AgentEvent } from "@hutian/agent-protocol";
-import { verifyTenantToken, isTokenEnforced, type TenantTokenPayload } from "./auth/tenant-token.ts";
+import { verifyTenantToken, isTokenEnforced } from "./auth/tenant-token.ts";
+import { setTenantContext, resolveTenantForMcp } from "./auth/tenant-context.ts";
+// 雷四债：clearTenantContext 已在 tenant-context.ts 实现 export，当前 bridge 无 session 清理逻辑
+// （同 sessionHistories，M5 持久化债）；session 清理接入时调 clearTenantContext(sessionId)
 
 type Sub = (data: string) => void;
 const sessions = new Map<string, Set<Sub>>();
@@ -20,13 +23,8 @@ const sessions = new Map<string, Set<Sub>>();
  *   - 修复「2 分钟后继续失忆」：history 不落盘但在 bridge 进程存活期间跨 turn 保留
  */
 const sessionHistories = new Map<string, Message[]>();
-/**
- * session 级租户上下文（验签后的 token payload，供 MCP 工具路由 siteBase 用）。
- *   - POST /sessions 时验签 X-Tenant-Token → 存 payload
- *   - dev 放行（未配 key）→ 存 null（标记"已处理但无 payload"）
- *   - 后续 MCP 工具调 siteBase 时从此取 sitebase_base_url（下一轮接）
- */
-const sessionTenants = new Map<string, TenantTokenPayload | null>();
+// session 级租户上下文（sessionTenants）已抽到 src/auth/tenant-context.ts，
+// 验签后 setTenantContext 写入，startAgentLoop 用 resolveTenantForMcp 取（未命中 hard fail）
 
 function sseHead(res: ServerResponse) {
   res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "Access-Control-Allow-Origin": "*" });
@@ -350,7 +348,7 @@ async function route(req: IncomingMessage, res: ServerResponse) {
     const id = crypto.randomUUID();
     sessions.set(id, new Set());
     sessionHistories.set(id, []);
-    sessionTenants.set(id, verified.ok ? verified.payload : null);
+    setTenantContext(id, verified.ok ? verified.payload : null);
     res.writeHead(200, { "Content-Type": "application/json" });
     return res.end(JSON.stringify({ id }));
   }
@@ -396,7 +394,7 @@ async function route(req: IncomingMessage, res: ServerResponse) {
     if (!sessions.has(id)) sessions.set(id, new Set());
     if (!sessionHistories.has(id)) sessionHistories.set(id, []);
     // 更新 session 的租户上下文（token 可能已刷新，以最新为准）
-    if (verified.ok) sessionTenants.set(id, verified.payload);
+    if (verified.ok) setTenantContext(id, verified.payload);
     const body = await readBody(req);
     let prompt = "";
     try {
@@ -426,13 +424,26 @@ async function route(req: IncomingMessage, res: ServerResponse) {
 /** T4.5 · 启动 agent loop，把 AgentEvent 推到 session 的 SSE 订阅者 */
 async function startAgentLoop(sessionId: string, prompt: string) {
   const llm = await buildLLM();
-  // ADR 路由隔离：从 sessionTenants 取验签 payload 的 sitebase_base_url，
-  // 按 url 取对应 MCP 实例（不同租户 → 不同 Python 子进程 → 不同 siteBase）
-  const tenantPayload = sessionTenants.get(sessionId);
-  const mcp = getMcpForTenant(tenantPayload?.sitebase_base_url);
+  // ADR 路由隔离 + 雷三：从 sessionTenants 解析租户上下文
+  //   - undefined（未命中）→ hard fail，不调 MCP（防"未验证 session 走默认实例串数据"）
+  //   - null（dev 放行）→ 走默认实例
+  //   - payload → 走 payload.sitebase_base_url 对应实例
+  const resolved = resolveTenantForMcp(sessionId);
+  if (!resolved.ok) {
+    console.error(`[agent-bridge] session ${sessionId} hard fail: ${resolved.reason}`);
+    broadcast(sessionId, {
+      type: "message",
+      role: "agent",
+      content: `⚠️ 租户上下文缺失，拒绝执行：${resolved.reason}`,
+    });
+    broadcast(sessionId, { type: "done" });
+    return;
+  }
+  const mcp = getMcpForTenant(resolved.sitebaseUrl);
   const prevHistory = sessionHistories.get(sessionId) ?? [];
+  const sitebaseLog = resolved.sitebaseUrl ?? "default(dev)";
   console.log(
-    `[agent-bridge] session ${sessionId} start loop (llm=${llm.name}) | prevHistory.len=${prevHistory.length} | sitebase=${tenantPayload?.sitebase_base_url ?? "default"}`,
+    `[agent-bridge] session ${sessionId} start loop (llm=${llm.name}) | prevHistory.len=${prevHistory.length} | sitebase=${sitebaseLog}`,
   );
 
   // 先推一条 user message（前端 chat 栏显示用户输入）

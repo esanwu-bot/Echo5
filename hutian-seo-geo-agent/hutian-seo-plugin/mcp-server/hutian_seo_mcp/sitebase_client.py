@@ -33,6 +33,18 @@ class SiteBaseClient:
 
     MVP 假设单 workspace（从 env 取 URL + 账号）。
     多 workspace 阶段：实例化时传 workspace_id，从映射表查 URL + 账号。
+
+    多租户路由（ADR-cross-lang）：
+      base_url 从 env SITEBASE_ADMIN_URL 读，由 bridge 实例池在 spawn 时注入。
+      bridge 按 session 验签 payload 的 sitebase_base_url 维护独立 Python 子进程，
+      不同租户 → 不同子进程 → 不同 env → 路由到不同 siteBase 实例。
+
+    信任边界（stdio 同域前提）：
+      MCP 信任 bridge 经 stdio 传入的 env 路由，自身不验签——前提是 stdio 同信任域
+      （bridge 已验过 HMAC 签名，验签后的可信 payload 通过 stdio 内部传给 MCP）。
+      若 MCP 将来独立部署/走网络，必须在此补 HMAC 验签：
+      不能信任网络传入的 env，必须自己验签 tenant token 后才取 base_url。
+      这个"不验签"的正确性绑定在 stdio 同域这个前提上，前提一变就要补。
     """
 
     def __init__(

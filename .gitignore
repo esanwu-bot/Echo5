@@ -51,3 +51,14 @@ tmp/
 *.test
 /apps/tenant-api/tenant-api
 
+# WordPress 第三方核心 + WooCommerce（仅追踪壶天自定义配置/脚本，force-track 见下）
+# wp-config.php / router.php / mu-plugins 自定义插件是我们的代码，需进版本控制
+wordpress/*
+!wordpress/wp-config.php
+!wordpress/router.php
+!wordpress/wp-content/
+wordpress/wp-content/*
+!wordpress/wp-content/mu-plugins/
+wordpress/wp-content/mu-plugins/*
+!wordpress/wp-content/mu-plugins/hutian-dev-wc-basic-auth.php
+

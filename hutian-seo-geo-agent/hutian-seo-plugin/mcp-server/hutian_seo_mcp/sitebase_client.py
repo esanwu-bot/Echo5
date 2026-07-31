@@ -1,4 +1,8 @@
-"""SiteBaseClient · admin JWT 客户端（建站腿写链路）
+"""SitebaseAdapter · siteBase CMS 适配器（建站腿写链路）
+
+T8.0 重构：SiteBaseClient → SitebaseAdapter(CmsAdapter)，实现底座无关的 CmsAdapter 接口。
+siteBase 特有字段假设（category_id/brand_id/is_on_sale 等）全部隔离在此适配器内，
+接口本身底座无关（ADR-cms-adapter 第 1 层）。
 
 设计原则（Qwen 清单 #3）：
   - admin JWT，token 缓存 + 401 自动重登
@@ -7,7 +11,7 @@
 
 读写分链路（γ 红线）：
   - SiteBaseReader（TS 侧 lib/sites/reader.ts）只读 v1 public GET
-  - SiteBaseClient（本模块）只写 admin API，不读 v1
+  - SitebaseAdapter（本模块）只写 admin API，不读 v1
 
 证据：route/admin.php 全部 admin 路由在 /api/admin/* 下，
        统一 AdminAuthMiddleware 保护（JWT Bearer Token，HS256，30 天过期）
@@ -16,20 +20,66 @@
 
 from __future__ import annotations
 
-import json
 import os
 import time
 from typing import Any
 
 import requests
 
+from .cms_adapter import CmsAdapter, PageInput, ProductInput
+
 
 class SiteBaseAuthError(RuntimeError):
     """admin 鉴权失败（登录失败 / token 失效且重登失败）"""
 
 
-class SiteBaseClient:
-    """siteBase backend admin API 客户端
+# ─────────────────────────────────────────────
+# Mock fixtures（与 reader.ts 的 MOCK_ARTICLE/MOCK_PRODUCT 对齐）
+# ─────────────────────────────────────────────
+
+_MOCK_ARTICLE_ID = 1
+_MOCK_PRODUCT_ID = 1
+
+
+def _mock_article_response(title: str, summary: str, content: str) -> dict[str, Any]:
+    return {
+        "ok": True,
+        "data": {
+            "id": _MOCK_ARTICLE_ID,
+            "title": title,
+            "summary": summary,
+            "content": content,
+            "category_id": 1,
+            "status": 1,
+            "publish_time": "2026-07-26 10:00:00",
+        },
+        "source": "mock",
+        "note": "siteBase backend not available, returned mock data",
+    }
+
+
+def _mock_product_response(name: str, product_code: str, price: float) -> dict[str, Any]:
+    return {
+        "ok": True,
+        "data": {
+            "id": _MOCK_PRODUCT_ID,
+            "name": name,
+            "product_code": product_code,
+            "description": f"{name} - 自动生成的商品描述",
+            "price": price,
+            "stock": 1000,
+            "images": "/uploads/mock-product.jpg",
+            "category_id": 1,
+            "brand_id": 1,
+            "is_on_sale": 1,
+        },
+        "source": "mock",
+        "note": "siteBase backend not available, returned mock data",
+    }
+
+
+class SitebaseAdapter(CmsAdapter):
+    """siteBase CMS 适配器（实现 CmsAdapter 接口）
 
     MVP 假设单 workspace（从 env 取 URL + 账号）。
     多 workspace 阶段：实例化时传 workspace_id，从映射表查 URL + 账号。
@@ -186,32 +236,187 @@ class SiteBaseClient:
             return {"ok": True, "data": data.get("data"), "msg": data.get("msg")}
         return {"ok": False, "error": "business error", "body": data}
 
+    # ─────────────────────────────────────────────
+    # CmsAdapter 接口实现（逻辑从 cms_tools.py 搬来，零行为变化）
+    # siteBase 特有字段假设全部隔离在此，接口本身底座无关
+    # ─────────────────────────────────────────────
+
+    def is_available(self) -> bool:
+        """探活 siteBase backend（用于 mock fallback 判断）
+
+        红线：探活验 admin login 拿 token，不验 public 读接口。
+        原因：public v1 接口可能有既有 bug（如 /api/v1/products/:id 返回 500），
+        但 admin 写链路仍可用；验 public 会让 cms 工具误判"siteBase 不可用"走 mock。
+        admin login 是写链路的真实前置，验它才准确。
+        """
+        try:
+            token = self._get_token()
+            return token is not None
+        except SiteBaseAuthError:
+            return False
+
+    def create_page(self, input: PageInput) -> dict[str, Any]:
+        """创建页面/文章 → POST /api/admin/articles"""
+        body: dict[str, Any] = {
+            "title": input.title,
+            "summary": input.summary,
+            "content": input.content,
+            "status": input.status,
+        }
+        if input.category_id:
+            body["category_id"] = input.category_id
+        if input.publish_time:
+            body["publish_time"] = input.publish_time
+
+        if not self.is_available():
+            mock = _mock_article_response(input.title, input.summary, input.content)
+            return mock
+
+        result = self.request("POST", "/articles", json_body=body)
+        if not result.get("ok"):
+            if result.get("error") == "business error":
+                return {
+                    "ok": False,
+                    "retryable": False,
+                    "error": "business error",
+                    "detail": result.get("body"),
+                    "hint": "siteBase 拒绝了请求（如分类不存在、字段非法），请修正参数后重试",
+                }
+            mock = _mock_article_response(input.title, input.summary, input.content)
+            mock["live_error"] = result.get("error")
+            return mock
+
+        return {"ok": True, "data": result.get("data"), "source": "live"}
+
+    def update_content(self, id: int, input: PageInput) -> dict[str, Any]:
+        """编辑页面 → PUT /api/admin/articles/:id"""
+        body: dict[str, Any] = {}
+        if input.title:
+            body["title"] = input.title
+        if input.summary:
+            body["summary"] = input.summary
+        if input.content:
+            body["content"] = input.content
+        if input.category_id:
+            body["category_id"] = input.category_id
+
+        if not self.is_available():
+            return {"ok": True, "data": {"id": id, **body}, "source": "mock"}
+
+        result = self.request("PUT", f"/articles/{id}", json_body=body)
+        return {"ok": result.get("ok", False), "data": result.get("data"), "source": "live"}
+
+    def configure_product(self, input: ProductInput) -> dict[str, Any]:
+        """创建/编辑商品 → POST/PUT /api/admin/products"""
+        body: dict[str, Any] = {
+            "name": input.name,
+            "product_code": input.product_code,
+            "description": input.description,
+            "price": input.price,
+            "stock": input.stock,
+            "is_on_sale": input.is_on_sale,
+        }
+        if input.images:
+            body["images"] = input.images
+        if input.category_id:
+            body["category_fk_id"] = input.category_id
+        if input.brand_id:
+            body["brand_id"] = input.brand_id
+
+        if not self.is_available():
+            mock = _mock_product_response(input.name, input.product_code, input.price)
+            if input.product_id:
+                mock["data"]["id"] = input.product_id
+            return mock
+
+        if input.product_id:
+            result = self.request("PUT", f"/products/{input.product_id}", json_body=body)
+        else:
+            result = self.request("POST", "/products", json_body=body)
+
+        if not result.get("ok"):
+            if result.get("error") == "business error":
+                return {
+                    "ok": False,
+                    "retryable": False,
+                    "error": "business error",
+                    "detail": result.get("body"),
+                    "hint": "siteBase 拒绝了请求（如分类不存在、字段非法），请修正参数后重试",
+                }
+            mock = _mock_product_response(input.name, input.product_code, input.price)
+            mock["live_error"] = result.get("error")
+            return mock
+
+        return {"ok": True, "data": result.get("data"), "source": "live"}
+
+    def upload_media(self, file_path: str, type: str = "image") -> dict[str, Any]:
+        """上传媒体 → POST /api/admin/upload/image"""
+        import os as _os
+
+        if not _os.path.exists(file_path):
+            return {"ok": False, "error": f"file not found: {file_path}"}
+
+        if not self.is_available():
+            mock_url = f"/uploads/mock-{_os.path.basename(file_path)}"
+            return {
+                "ok": True,
+                "data": {"url": mock_url, "filename": _os.path.basename(file_path), "path": mock_url},
+                "source": "mock",
+            }
+
+        endpoint = "/upload/images" if type == "image" else "/upload/file"
+        try:
+            with open(file_path, "rb") as f:
+                files = {"file": (_os.path.basename(file_path), f)}
+                result = self.request("POST", endpoint, files=files)
+        except OSError as exc:
+            return {"ok": False, "error": f"read file error: {exc}"}
+
+        return {"ok": result.get("ok", False), "data": result.get("data"), "source": "live"}
+
+    def publish(self, id: int, type: str, status: int = 1) -> dict[str, Any]:
+        """发布/下线 → PUT status 字段切换"""
+        if type == "article":
+            path = f"/articles/{id}"
+            body: dict[str, Any] = {"status": status}
+        elif type == "product":
+            path = f"/products/{id}"
+            body = {"is_on_sale": status}
+        else:
+            return {"ok": False, "error": f"unsupported type: {type}"}
+
+        if not self.is_available():
+            return {"ok": True, "data": {"id": id, "type": type, "status": status}, "source": "mock"}
+
+        result = self.request("PUT", path, json_body=body)
+        return {"ok": result.get("ok", False), "data": {"id": id, "type": type, "status": status}, "source": "live"}
+
 
 # ─────────────────────────────────────────────
-# 模块级单例（MVP 单 workspace）
+# 模块级单例（MVP 单 workspace）+ 工厂函数
 # ─────────────────────────────────────────────
 
-_client: SiteBaseClient | None = None
+_adapter: SitebaseAdapter | None = None
 
 
-def get_client() -> SiteBaseClient:
-    global _client
-    if _client is None:
-        _client = SiteBaseClient()
-    return _client
+def get_adapter() -> SitebaseAdapter:
+    """获取当前 CMS 适配器单例（MVP 只有 siteBase）。
+
+    T8.5 升级：按 cms_instances.cms_type 分发到 SitebaseAdapter 或 WordpressAdapter。
+    当前 MVP 只有 siteBase，直接返回 SitebaseAdapter 单例。
+    """
+    global _adapter
+    if _adapter is None:
+        _adapter = SitebaseAdapter()
+    return _adapter
+
+
+# 向后兼容：cms_tools.py 旧代码可能还调 get_client/is_sitebase_available
+def get_client() -> SitebaseAdapter:
+    """向后兼容别名 → get_adapter()（T8.0 重构后统一走适配器）"""
+    return get_adapter()
 
 
 def is_sitebase_available() -> bool:
-    """探活 siteBase backend（用于 mock fallback 判断）
-
-    红线：探活验 admin login 拿 token，不验 public 读接口。
-    原因：public v1 接口可能有既有 bug（如 /api/v1/products/:id 返回 500），
-    但 admin 写链路仍可用；验 public 会让 cms 工具误判"siteBase 不可用"走 mock。
-    admin login 是写链路的真实前置，验它才准确。
-    """
-    try:
-        client = get_client()
-        token = client._get_token()
-        return token is not None
-    except SiteBaseAuthError:
-        return False
+    """向后兼容别名 → get_adapter().is_available()"""
+    return get_adapter().is_available()

@@ -43,21 +43,25 @@ CREATE TABLE IF NOT EXISTS `tenants` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ────────────────────────────────────────────────
--- 2. sitebase_instances — siteBase 实例池（无 tenant_id，平台级）
+-- 2. cms_instances — CMS 实例池（多底座：sitebase | wordpress，无 tenant_id，平台级）
+--    T8.0 从 sitebase_instances 升级：加 cms_type 字段，按类型路由到不同 CmsAdapter
+--    ADR-cms-adapter 第 2 层：cms_instances.cms_type 决定用 SitebaseAdapter 还是 WordpressAdapter
 -- ────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS `sitebase_instances` (
+CREATE TABLE IF NOT EXISTS `cms_instances` (
   `id`             BIGINT       NOT NULL AUTO_INCREMENT,
   `created_at`     DATETIME(3)  DEFAULT NULL,
   `updated_at`     DATETIME(3)  DEFAULT NULL,
   `deleted_at`     DATETIME(3)  DEFAULT NULL,
-  `base_url`       VARCHAR(255) NOT NULL,
-  `provision_kind` VARCHAR(32)  NOT NULL DEFAULT 'preset',  -- enum: preset/container
-  `capacity`       BIGINT       NOT NULL DEFAULT 1,         -- M6=1，预留共享模式
-  `health`         VARCHAR(32)  NOT NULL DEFAULT 'healthy', -- enum: healthy/degraded/down
+  `cms_type`       VARCHAR(32)  NOT NULL DEFAULT 'sitebase', -- enum: sitebase/wordpress（T8.0 起）
+  `base_url`       VARCHAR(255) NOT NULL,                    -- siteBase=admin_url, WordPress=wp_url
+  `provision_kind` VARCHAR(32)  NOT NULL DEFAULT 'preset',   -- enum: preset/container
+  `capacity`       BIGINT       NOT NULL DEFAULT 1,          -- M6=1，预留共享模式
+  `health`         VARCHAR(32)  NOT NULL DEFAULT 'healthy',  -- enum: healthy/degraded/down
   PRIMARY KEY (`id`),
-  KEY `idx_sitebase_instances_created_at` (`created_at`),
-  KEY `idx_sitebase_instances_deleted_at` (`deleted_at`),
-  KEY `idx_sitebase_instances_health` (`health`)
+  KEY `idx_cms_instances_cms_type` (`cms_type`),
+  KEY `idx_cms_instances_created_at` (`created_at`),
+  KEY `idx_cms_instances_deleted_at` (`deleted_at`),
+  KEY `idx_cms_instances_health` (`health`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ────────────────────────────────────────────────
@@ -81,7 +85,8 @@ CREATE TABLE IF NOT EXISTS `plan_quotas` (
 
 -- ────────────────────────────────────────────────
 -- 4. workspaces — 品牌/站主体（tenant 1:N）← FR-T03 品牌派生落点
---    跨租户外键：sitebase_instance_id 指向 sitebase_instances（平台级，无 tenant_id 语义，靠应用层校验归属）
+--    跨租户外键：sitebase_instance_id 指向 cms_instances（T8.0 起表名升级；列名留 T8.5 升级）
+--    平台级，无 tenant_id 语义，靠应用层校验归属
 -- ────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS `workspaces` (
   `id`                   BIGINT       NOT NULL AUTO_INCREMENT,

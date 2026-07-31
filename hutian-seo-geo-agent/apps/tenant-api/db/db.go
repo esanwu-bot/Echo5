@@ -68,11 +68,12 @@ func Migrate(db *gorm.DB) error {
 		return fmt.Errorf("auto migrate: %w", err)
 	}
 	// 验证 11 张表都建好（M7 T7.1 起 +users；跨设备持久化 +user_sessions）
+	// T8.0：sitebase_instances → cms_instances（加 cms_type，多底座路由）
 	var tableCount int64
 	if err := db.Raw(`
 		SELECT COUNT(*) FROM information_schema.tables
 		WHERE table_schema = 'hutian'
-		AND table_name IN ('users','tenants','workspaces','sitebase_instances','tenant_credentials','subscriptions','seats','usage_meters','plan_quotas','audit_logs','user_sessions')
+		AND table_name IN ('users','tenants','workspaces','cms_instances','tenant_credentials','subscriptions','seats','usage_meters','plan_quotas','audit_logs','user_sessions')
 	`).Scan(&tableCount).Error; err != nil {
 		return fmt.Errorf("verify tables: %w", err)
 	}

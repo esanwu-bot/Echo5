@@ -109,31 +109,46 @@ type Workspace struct {
 func (Workspace) TableName() string { return "workspaces" }
 
 // ────────────────────────────────────────────────
-// 3. sitebase_instances — siteBase 实例池
+// 3. cms_instances — CMS 实例池（多底座：siteBase | WordPress | ...）
+//    T8.0 从 sitebase_instances 升级为 cms_instances，加 cms_type 字段
+//    ADR-cms-adapter.md 第 2 层：按 cms_type 路由到不同 CmsAdapter 实现
 // ────────────────────────────────────────────────
 
 type ProvisionKind string
 type InstanceHealth string
+type CmsType string
 
 const (
-	ProvisionKindPreset   ProvisionKind = "preset"
-	ProvisionKindContainer ProvisionKind = "container"
+	ProvisionKindPreset    ProvisionKind  = "preset"
+	ProvisionKindContainer ProvisionKind  = "container"
 
 	InstanceHealthHealthy  InstanceHealth = "healthy"
 	InstanceHealthDegraded InstanceHealth = "degraded"
 	InstanceHealthDown     InstanceHealth = "down"
+
+	// CmsType 多底座类型（T8.0 起支持 sitebase；T8.1+ 加 wordpress）
+	CmsTypeSitebase  CmsType = "sitebase"
+	CmsTypeWordpress CmsType = "wordpress"
 )
 
-// SitebaseInstance siteBase 实例（M6 起步 1:1 workspace, capacity=1）
-type SitebaseInstance struct {
+// CmsInstance CMS 实例（M6 起步 1:1 workspace, capacity=1）
+// T8.0：从 SitebaseInstance 改名，加 CmsType 字段
+// siteBase 特有字段（base_url/provision_kind/capacity）保留，未来 WordpressInstance
+// 也可复用 base_url（存 wp_url）；connection_config 留 T8.5 升级（现 MVP 用 base_url）
+type CmsInstance struct {
 	BaseModel
-	BaseURL       string         `gorm:"type:varchar(255);not null" json:"base_url"`
+	CmsType       CmsType        `gorm:"type:varchar(32);index;not null;default:sitebase" json:"cms_type"`
+	BaseURL       string         `gorm:"type:varchar(255);not null" json:"base_url"` // siteBase=admin_url, WordPress=wp_url
 	ProvisionKind ProvisionKind  `gorm:"type:varchar(32);not null;default:preset" json:"provision_kind"`
 	Capacity      int            `gorm:"not null;default:1" json:"capacity"` // M6=1，预留共享模式
 	Health        InstanceHealth `gorm:"type:varchar(32);index;not null;default:healthy" json:"health"`
 }
 
-func (SitebaseInstance) TableName() string { return "sitebase_instances" }
+func (CmsInstance) TableName() string { return "cms_instances" }
+
+// SitebaseInstance 向后兼容别名（让现有引用渐进迁移，T8.5 全部改名后删除）
+// 注意：这是 type alias，不是新类型，GORM 表名/字段一致
+type SitebaseInstance = CmsInstance
 
 // ────────────────────────────────────────────────
 // 4. tenant_credentials — 每 workspace 的 siteBase 凭证（加密）← NFR-T02

@@ -1,11 +1,15 @@
 """建站工具集 · 写 admin，全现成 endpoint（沿用 trace 覆盖度表）
 
+T8.0 重构：工具函数改为调 CmsAdapter 接口（get_adapter()），不再直接调 sitebase_client。
+按 cms_type 分发适配器（当前只有 siteBase，T8.5 升级 WordPress 后按 cms_instances.cms_type 分发）。
+工具 schema 不变，LLM 完全无感底座差异（ADR-cms-adapter 决策 2）。
+
 5 个建站工具（Qwen 清单 #2）：
-  - cms_create_page       → POST /api/admin/articles
-  - cms_update_content    → PUT  /api/admin/articles/:id
-  - cms_configure_product → POST/PUT /api/admin/products
-  - cms_upload_media      → POST /api/admin/upload/image
-  - cms_publish           → PUT status 切换（MVP 接受"切换即发布"）
+  - cms_create_page       → adapter.create_page(PageInput)
+  - cms_update_content    → adapter.update_content(id, PageInput)
+  - cms_configure_product → adapter.configure_product(ProductInput)
+  - cms_upload_media      → adapter.upload_media(file_path, type)
+  - cms_publish           → adapter.publish(id, type, status)
 
 入参通用 schema（红线 11）：
   - 商品专用字段 mpn_prefix/spec_summary/rohs_compliant 标"先忽略"
@@ -17,9 +21,7 @@ single source 纪律（Qwen 纪律 #1）：
   - schema 由渲染器 SSR 注入，check_schema 复验认同一套结构
   - 若将来加 cms_write_schema，必须复用 schema-mapping.ts，禁止第二份
 
-mock fallback（与 SiteBaseReader 同构）：
-  - siteBase 不可达时返回 mock 数据（含 id），让 loop 能继续跑 check_schema
-  - 生产期关闭 mock（SITEBASE_ALLOW_MOCK=false）
+mock fallback：已搬进 SitebaseAdapter（T8.0），工具函数不再处理 mock。
 """
 
 from __future__ import annotations
@@ -33,56 +35,12 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 from .tools import mcp  # 复用 SEO 腿的 mcp 实例
-from .sitebase_client import get_client, is_sitebase_available
+from .sitebase_client import get_adapter
+from .cms_adapter import PageInput, ProductInput
 
 
 # ─────────────────────────────────────────────
-# Mock fixtures（与 reader.ts 的 MOCK_ARTICLE/MOCK_PRODUCT 对齐）
-# ─────────────────────────────────────────────
-
-_MOCK_ARTICLE_ID = 1
-_MOCK_PRODUCT_ID = 1
-
-
-def _mock_article_response(title: str, summary: str, content: str) -> dict[str, Any]:
-    return {
-        "ok": True,
-        "data": {
-            "id": _MOCK_ARTICLE_ID,
-            "title": title,
-            "summary": summary,
-            "content": content,
-            "category_id": 1,
-            "status": 1,
-            "publish_time": "2026-07-26 10:00:00",
-        },
-        "source": "mock",
-        "note": "siteBase backend not available, returned mock data",
-    }
-
-
-def _mock_product_response(name: str, product_code: str, price: float) -> dict[str, Any]:
-    return {
-        "ok": True,
-        "data": {
-            "id": _MOCK_PRODUCT_ID,
-            "name": name,
-            "product_code": product_code,
-            "description": f"{name} - 自动生成的商品描述",
-            "price": price,
-            "stock": 1000,
-            "images": "/uploads/mock-product.jpg",
-            "category_id": 1,
-            "brand_id": 1,
-            "is_on_sale": 1,
-        },
-        "source": "mock",
-        "note": "siteBase backend not available, returned mock data",
-    }
-
-
-# ─────────────────────────────────────────────
-# 工具实现
+# 工具实现（调 CmsAdapter 接口，按 cms_type 分发）
 # ─────────────────────────────────────────────
 
 
@@ -97,7 +55,7 @@ def cms_create_page(
 ) -> str:
     """创建页面/文章（建站腿 · 写 admin）。
 
-    调 POST /api/admin/articles（trace 覆盖度表第 1 行）。
+    调 adapter.create_page(PageInput)（trace 覆盖度表第 1 行）。
     入参通用 CMS 字段；电子零件专用字段不在此工具（红线 11）。
 
     Args:
@@ -126,47 +84,16 @@ def cms_create_page(
     # LLM prompt 已约束，此处兜底
     content = re.sub(r"^#\s+.+\n?", "", content, count=1)
 
-    body: dict[str, Any] = {
-        "title": title,
-        "summary": summary,
-        "content": content,
-        "status": status,
-    }
-    if category_id:
-        body["category_id"] = category_id
-    if publish_time:
-        body["publish_time"] = publish_time
-
-    if not is_sitebase_available():
-        mock = _mock_article_response(title, summary, content)
-        return json.dumps(mock, ensure_ascii=False, indent=2)
-
-    client = get_client()
-    result = client.request("POST", "/articles", json_body=body)
-    if not result.get("ok"):
-        # 类3（business error）：原样返回，不 mock，让 LLM 修正参数
-        if result.get("error") == "business error":
-            return json.dumps(
-                {
-                    "ok": False,
-                    "retryable": False,
-                    "error": "business error",
-                    "detail": result.get("body"),
-                    "hint": "siteBase 拒绝了请求（如分类不存在、字段非法），请修正参数后重试",
-                },
-                ensure_ascii=False,
-                indent=2,
-            )
-        # 类1（network/5xx）：fallback mock，保证 loop 能继续跑复验
-        mock = _mock_article_response(title, summary, content)
-        mock["live_error"] = result.get("error")
-        return json.dumps(mock, ensure_ascii=False, indent=2)
-
-    return json.dumps(
-        {"ok": True, "data": result.get("data"), "source": "live"},
-        ensure_ascii=False,
-        indent=2,
+    input = PageInput(
+        title=title,
+        summary=summary,
+        content=content,
+        category_id=category_id,
+        status=status,
+        publish_time=publish_time,
     )
+    result = get_adapter().create_page(input)
+    return json.dumps(result, ensure_ascii=False, indent=2)
 
 
 @mcp.tool()
@@ -179,7 +106,7 @@ def cms_update_content(
 ) -> str:
     """编辑页面正文/字段（建站腿 · 写 admin）。
 
-    调 PUT /api/admin/articles/:id（trace 覆盖度表第 2 行）。
+    调 adapter.update_content(id, PageInput)（trace 覆盖度表第 2 行）。
 
     Args:
         id: 文章 ID
@@ -188,30 +115,14 @@ def cms_update_content(
     Returns:
         JSON 字符串，含 { ok, data: {...}, source }
     """
-    body: dict[str, Any] = {}
-    if title:
-        body["title"] = title
-    if summary:
-        body["summary"] = summary
-    if content:
-        body["content"] = content
-    if category_id:
-        body["category_id"] = category_id
-
-    if not is_sitebase_available():
-        return json.dumps(
-            {"ok": True, "data": {"id": id, **body}, "source": "mock"},
-            ensure_ascii=False,
-            indent=2,
-        )
-
-    client = get_client()
-    result = client.request("PUT", f"/articles/{id}", json_body=body)
-    return json.dumps(
-        {"ok": result.get("ok", False), "data": result.get("data"), "source": "live"},
-        ensure_ascii=False,
-        indent=2,
+    input = PageInput(
+        title=title,
+        summary=summary,
+        content=content,
+        category_id=category_id,
     )
+    result = get_adapter().update_content(id, input)
+    return json.dumps(result, ensure_ascii=False, indent=2)
 
 
 @mcp.tool()
@@ -229,8 +140,8 @@ def cms_configure_product(
 ) -> str:
     """创建或编辑商品（建站腿 · 写 admin）。
 
-    product_id=0 → POST /api/admin/articles（新建）
-    product_id>0 → PUT  /api/admin/products/:id（编辑）
+    调 adapter.configure_product(ProductInput)。
+    product_id=0 → 新建，product_id>0 → 编辑。
 
     入参通用 schema（红线 11）：
       - 电子零件专用字段 mpn_prefix/spec_summary/rohs_compliant 不在此工具
@@ -252,64 +163,27 @@ def cms_configure_product(
         JSON 字符串，含 { ok, data: {id, ...}, source }
         afterGuardrail 会据 data.id 自动触发 check_schema 复验渲染器 URL
     """
-    body: dict[str, Any] = {
-        "name": name,
-        "product_code": product_code,
-        "description": description,
-        "price": price,
-        "stock": stock,
-        "is_on_sale": is_on_sale,
-    }
-    if images:
-        body["images"] = images
-    if category_id:
-        body["category_fk_id"] = category_id
-    if brand_id:
-        body["brand_id"] = brand_id
-
-    if not is_sitebase_available():
-        mock = _mock_product_response(name, product_code, price)
-        if product_id:
-            mock["data"]["id"] = product_id
-        return json.dumps(mock, ensure_ascii=False, indent=2)
-
-    client = get_client()
-    if product_id:
-        result = client.request("PUT", f"/products/{product_id}", json_body=body)
-    else:
-        result = client.request("POST", "/products", json_body=body)
-
-    if not result.get("ok"):
-        # 类3（business error）：原样返回，不 mock，让 LLM 修正参数
-        if result.get("error") == "business error":
-            return json.dumps(
-                {
-                    "ok": False,
-                    "retryable": False,
-                    "error": "business error",
-                    "detail": result.get("body"),
-                    "hint": "siteBase 拒绝了请求（如分类不存在、字段非法），请修正参数后重试",
-                },
-                ensure_ascii=False,
-                indent=2,
-            )
-        # 类1（network/5xx）：fallback mock，保证 loop 能继续跑复验
-        mock = _mock_product_response(name, product_code, price)
-        mock["live_error"] = result.get("error")
-        return json.dumps(mock, ensure_ascii=False, indent=2)
-
-    return json.dumps(
-        {"ok": True, "data": result.get("data"), "source": "live"},
-        ensure_ascii=False,
-        indent=2,
+    input = ProductInput(
+        name=name,
+        product_code=product_code,
+        description=description,
+        price=price,
+        stock=stock,
+        images=images,
+        category_id=category_id,
+        brand_id=brand_id,
+        is_on_sale=is_on_sale,
+        product_id=product_id,
     )
+    result = get_adapter().configure_product(input)
+    return json.dumps(result, ensure_ascii=False, indent=2)
 
 
 @mcp.tool()
 def cms_upload_media(file_path: str, type: str = "image") -> str:
     """上传媒体文件（建站腿 · 写 admin）。
 
-    调 POST /api/admin/upload/image（trace 覆盖度表第 8 行）。
+    调 adapter.upload_media(file_path, type)（trace 覆盖度表第 8 行）。
     MVP 仅支持本地文件路径；URL 下载后上传留作后续。
 
     Args:
@@ -319,47 +193,8 @@ def cms_upload_media(file_path: str, type: str = "image") -> str:
     Returns:
         JSON 字符串，含 { ok, data: {url, filename, path}, source }
     """
-    if not os.path.exists(file_path):
-        return json.dumps(
-            {"ok": False, "error": f"file not found: {file_path}"},
-            ensure_ascii=False,
-            indent=2,
-        )
-
-    if not is_sitebase_available():
-        mock_url = f"/uploads/mock-{os.path.basename(file_path)}"
-        return json.dumps(
-            {
-                "ok": True,
-                "data": {
-                    "url": mock_url,
-                    "filename": os.path.basename(file_path),
-                    "path": mock_url,
-                },
-                "source": "mock",
-            },
-            ensure_ascii=False,
-            indent=2,
-        )
-
-    client = get_client()
-    endpoint = "/upload/images" if type == "image" else "/upload/file"
-    try:
-        with open(file_path, "rb") as f:
-            files = {"file": (os.path.basename(file_path), f)}
-            result = client.request("POST", endpoint, files=files)
-    except OSError as exc:
-        return json.dumps(
-            {"ok": False, "error": f"read file error: {exc}"},
-            ensure_ascii=False,
-            indent=2,
-        )
-
-    return json.dumps(
-        {"ok": result.get("ok", False), "data": result.get("data"), "source": "live"},
-        ensure_ascii=False,
-        indent=2,
-    )
+    result = get_adapter().upload_media(file_path, type)
+    return json.dumps(result, ensure_ascii=False, indent=2)
 
 
 @mcp.tool()
@@ -367,7 +202,7 @@ def cms_publish(id: int, type: str, status: int = 1) -> str:
     """发布/上线/下线（建站腿 · 写 admin）。
 
     MVP 接受"切换即发布"（无草稿/定时，trace 第 3 节）。
-    调 PUT status 字段切换（trace 覆盖度表第 9 行）。
+    调 adapter.publish(id, type, status)（trace 覆盖度表第 9 行）。
 
     Args:
         id: 业务实体 ID
@@ -377,31 +212,5 @@ def cms_publish(id: int, type: str, status: int = 1) -> str:
     Returns:
         JSON 字符串，含 { ok, data: {id, type, status}, source }
     """
-    if type == "article":
-        path = f"/articles/{id}"
-        body = {"status": status}
-    elif type == "product":
-        # 商品用 batch-status 或直接 PUT is_on_sale
-        path = f"/products/{id}"
-        body = {"is_on_sale": status}
-    else:
-        return json.dumps(
-            {"ok": False, "error": f"unsupported type: {type}"},
-            ensure_ascii=False,
-            indent=2,
-        )
-
-    if not is_sitebase_available():
-        return json.dumps(
-            {"ok": True, "data": {"id": id, "type": type, "status": status}, "source": "mock"},
-            ensure_ascii=False,
-            indent=2,
-        )
-
-    client = get_client()
-    result = client.request("PUT", path, json_body=body)
-    return json.dumps(
-        {"ok": result.get("ok", False), "data": {"id": id, "type": type, "status": status}, "source": "live"},
-        ensure_ascii=False,
-        indent=2,
-    )
+    result = get_adapter().publish(id, type, status)
+    return json.dumps(result, ensure_ascii=False, indent=2)

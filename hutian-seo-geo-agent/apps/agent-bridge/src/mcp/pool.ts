@@ -37,11 +37,12 @@ function buildChildEnv(adminUrlOverride?: string): Record<string, string> {
 
 /**
  * public api url → admin api url 转换。
- * sitebase_instances.BaseURL 存 public 路径（/api/v1），Python SITEBASE_ADMIN_URL 期望 admin 路径（/api/admin）。
+ * cms_instances.BaseURL 存 public 路径（/api/v1），Python SITEBASE_ADMIN_URL 期望 admin 路径（/api/admin）。
+ * （T8.0 起 sitebase_instances 表升级为 cms_instances；本池子逻辑不变，T8.5 再升级 key 维度）
  *
  * 设计债（review 校准）：admin url 不在签名 payload 里，是签名值的派生猜测——
  *   原则上"实际连接的 url 应该是签名值本身、不该是签名值的派生"。
- *   正解是 sitebase_instances 表直接存 admin url、或 payload 直接签 MCP 要用的 admin url，
+ *   正解是 cms_instances 表直接存 admin url、或 payload 直接签 MCP 要用的 admin url，
  *   让"哪个 url 给 MCP 用"在签发端（Go）就定死，消除 bridge 的 toAdminUrl 猜测。
  *   生产 siteBase 若 public/admin 不同域，"同 host 仅 path 不同"假设直接崩，这条债到那时必还。
  */

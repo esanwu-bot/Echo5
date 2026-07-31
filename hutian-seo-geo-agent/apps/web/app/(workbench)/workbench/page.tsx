@@ -12,7 +12,7 @@ import Toasts, { type Toast } from "@/components/workbench/Toasts";
 import LoginCard from "@/components/workbench/LoginCard";
 import { useTenantAuth } from "@/lib/portal/useTenantAuth";
 import type { LoginCredentials } from "@/lib/portal/auth";
-import { mergeUnloggedTo } from "@/lib/sessionList";
+import { migrateLocalToRemote } from "@/lib/sessionList";
 
 /**
  * 工作台主页.  ← PRD §6.2 / 技术方案 §8
@@ -62,21 +62,17 @@ export default function WorkbenchPage() {
   const bypassAuth = mode === "mock"; // mock 模式免登录
   const gated = !bypassAuth && !isAuthed && !authLoading;
 
-  // 多租户上下文：从登录态解出 tenant_id + workspace_id，传给 useAgentSession 注入 header
-  const tenantContext = user && !bypassAuth
-    ? { tenant_id: user.tenant_id, workspace_id: user.workspace_id }
-    : null;
-
   const {
     state,
     sessionId,
     sessions,
+    syncStatus,
     send,
     setPanel,
     startMock,
     reset,
     switchSession,
-  } = useAgentSession(mode, "", userId, tenantContext);
+  } = useAgentSession(mode, "", userId);
 
   const [model, setModel] = useState("deepseek-v4-flash");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -100,6 +96,16 @@ export default function WorkbenchPage() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
+  // syncStatus 变化时提示用户（offline/server_error 时让用户知道"仅显示本设备历史"）
+  useEffect(() => {
+    if (syncStatus === "offline") {
+      addToast("会话同步失败：无法连接租户服务，仅显示本设备历史", "amber");
+    } else if (syncStatus === "server_error") {
+      addToast("会话同步失败：租户服务异常，仅显示本设备历史", "amber");
+    }
+    // synced 时不打扰用户（正常状态）；unauthed 由 useTenantAuth 处理跳登录
+  }, [syncStatus, addToast]);
+
   const handleModelChange = useCallback(
     (id: string, label: string) => {
       setModel(id);
@@ -118,12 +124,16 @@ export default function WorkbenchPage() {
       setLoginError(null);
       try {
         const u = await authLogin(creds);
-        // unlogged → 新用户桶 合入（有重复 id 跳过，最多 50 条）
-        const merged = mergeUnloggedTo(u.user_id);
-        addToast(
-          merged > 0 ? `登录成功，已迁移 ${merged} 条未登录会话` : "登录成功",
-          "teal",
-        );
+        // 未登录→登录：把本地会话批量迁移到远程 user_sessions 表
+        // 先合入 unlogged→userId localStorage 桶，再逐条 POST 到远程
+        const { migrated, failed } = await migrateLocalToRemote(u.user_id);
+        if (migrated > 0 && failed === 0) {
+          addToast(`登录成功，已同步 ${migrated} 条会话到云端`, "teal");
+        } else if (migrated > 0 && failed > 0) {
+          addToast(`登录成功，${migrated} 条已同步、${failed} 条同步失败（本地仍保留）`, "amber");
+        } else {
+          addToast("登录成功", "teal");
+        }
         setShowLoginOverlay(false);
       } catch (e) {
         const msg = (e as Error).message || "登录失败";
@@ -172,6 +182,7 @@ export default function WorkbenchPage() {
           currentSessionId={sessionId}
           searchKeyword={searchKeyword}
           onSearchChange={setSearchKeyword}
+          syncStatus={syncStatus}
           onSelectSession={(targetId) => {
             switchSession(targetId);
             addToast("已切换会话", "violet");

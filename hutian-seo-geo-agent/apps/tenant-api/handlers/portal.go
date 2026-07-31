@@ -17,6 +17,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"hutian-tenant-api/auth"
 	"hutian-tenant-api/middleware"
@@ -848,6 +849,7 @@ func TenantListSessions(c *gin.Context) {
 }
 
 // TenantUpsertSession 注册/更新会话（首次发消息时注册，后续刷新 title/tool_count/updated_at）
+// 并发安全：用 GORM Clauses.OnConflict 做 upsert，避免"查存在→Create"竞态撞联合唯一索引
 func TenantUpsertSession(c *gin.Context) {
 	_, db, userID, _, tenantID, workspaceID := portalCtx(c)
 	devOnly, _ := c.Get("cfg.dev")
@@ -859,51 +861,41 @@ func TenantUpsertSession(c *gin.Context) {
 		return
 	}
 
-	// 查是否已存在（同 tenant+user+session_id）
-	var existing models.UserSession
-	err := db.Where("tenant_id = ? AND user_id = ? AND session_id = ?",
-		tenantID, userID, req.SessionID).First(&existing).Error
-
-	if err == gorm.ErrRecordNotFound {
-		// 新建
-		sess := models.UserSession{
-			TenantID:    tenantID,
-			UserID:      userID,
-			WorkspaceID: workspaceID,
-			SessionID:   req.SessionID,
-			Title:       req.Title,
-			ToolCount:   req.ToolCount,
-		}
-		if sess.Title == "" {
-			sess.Title = "新会话"
-		}
-		if err := db.Create(&sess).Error; err != nil {
-			writePortalError(c, cfgDev, http.StatusInternalServerError, "create session failed", "")
-			return
-		}
-		writePortalOK(c, cfgDev, sess)
-		return
-	}
-	if err != nil {
-		writePortalError(c, cfgDev, http.StatusInternalServerError, "query session failed", "")
-		return
+	title := req.Title
+	if title == "" {
+		title = "新会话"
 	}
 
-	// 已存在 → 更新 title/tool_count/updated_at
-	updates := map[string]interface{}{
-		"tool_count": req.ToolCount,
-		"updated_at": time.Now(),
+	sess := models.UserSession{
+		TenantID:    tenantID,
+		UserID:      userID,
+		WorkspaceID: workspaceID,
+		SessionID:   req.SessionID,
+		Title:       title,
+		ToolCount:   req.ToolCount,
 	}
-	if req.Title != "" {
-		updates["title"] = req.Title
-	}
-	if err := db.Model(&existing).Updates(updates).Error; err != nil {
-		writePortalError(c, cfgDev, http.StatusInternalServerError, "update session failed", "")
+
+	// ON CONFLICT (tenant_id, user_id, session_id) DO UPDATE SET tool_count=?, title=?, updated_at=?
+	// 联合唯一索引 idx_usession_tenant_user_sid 作为冲突判定列
+	result := db.Clauses(clause.OnConflict{
+		Columns: []clause.Column{
+			{Name: "tenant_id"},
+			{Name: "user_id"},
+			{Name: "session_id"},
+		},
+		DoUpdates: clause.AssignmentColumns([]string{"tool_count", "title", "updated_at"}),
+	}).Create(&sess)
+
+	if result.Error != nil {
+		writePortalError(c, cfgDev, http.StatusInternalServerError, "upsert session failed", result.Error.Error())
 		return
 	}
-	// 重新查返回最新数据
-	db.First(&existing, existing.ID)
-	writePortalOK(c, cfgDev, existing)
+
+	// 重新查返回最新数据（不管新建还是更新，都返回最新行）
+	var ret models.UserSession
+	db.Where("tenant_id = ? AND user_id = ? AND session_id = ?",
+		tenantID, userID, req.SessionID).First(&ret)
+	writePortalOK(c, cfgDev, ret)
 }
 
 // TenantDeleteSession 删除单条会话历史（软删）

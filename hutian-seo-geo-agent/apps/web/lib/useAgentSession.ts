@@ -17,6 +17,7 @@ import {
   listSessions,
   listSessionsRemote,
   type SessionListItem,
+  type SessionSyncStatus,
 } from "./sessionList";
 
 /**
@@ -33,27 +34,22 @@ import {
  * 工具/消息产出时 touchSession 更新 lastActiveAt + toolCount 快照。
  * 切会话：reset 当前 → setSessionId(newId) → 连 SSE 拉新 session 的事件（agent-bridge 内存里若有历史会重放）。
  *
- * 多租户入口（P0 接缝）：
- *  - tenantContext = { tenant_id, workspace_id } 时，所有发往 agent-bridge 的请求自动注入
- *    X-Tenant-ID + X-Workspace-ID header（dev rewrites 直连 bridge 时自动透传；生产 BFF Route Handler 也透传）
- *  - agent-bridge 目前不消费这些 header（显式化），下一轮接 ADR 内部 token 透传时读取
- *  - 未传 tenantContext（null）→ 不注入 header，bridge 跑在无租户模式（demo/mock 场景）
+ * ════════════════════════════════════════════════════
+ * P0 红线：workbench → agent-bridge 绝不传明文 X-Tenant-ID / X-Workspace-ID header
+ *   违反 ADR 四条信任源原则：下游签名签 / 单一信任源 / 签名防篡改 / 下游不连 hutian
+ *   下一轮接 ADR 内部 token：workbench BFF → tenant-api /api/v1/internal/token 签 HMAC token
+ *   → 把带签名的 {tenant_id, workspace_id, sitebase_base_url, exp} 给 bridge 验签
+ *   → bridge 只信签名 token，不信任何明文 header
+ * ════════════════════════════════════════════════════
  *
  * Replaces the previous zustand store + useAgentSSE pair with a pure
  * useReducer + streamReducer, per 技术方案 §2/§8 (no zustand).
  */
-export interface TenantContext {
-  tenant_id: number;
-  workspace_id: number;
-}
-
 export function useAgentSession(
   mode: "mock" | "sse" = "mock",
   baseURL: string = "",
   /** 当前登录用户 id（null=未登录 → 用 unlogged 桶）。切换 userId 会自动从对应桶重新刷 sessions。 */
   userId: number | null = null,
-  /** 租户上下文（从登录态 /me 解出）。传入后所有请求自动带 X-Tenant-ID/X-Workspace-ID header */
-  tenantContext: TenantContext | null = null,
 ) {
   const api = (p: string) => `${baseURL}${p}`;
   const [state, dispatch] = useReducer(streamReducer, initialStreamState);
@@ -61,21 +57,14 @@ export function useAgentSession(
   const [sseReady, setSseReady] = useState(false);
   /** localStorage 会话列表（驱动 Sidebar 渲染，每次 send/tool_end 后刷新） */
   const [sessions, setSessions] = useState<SessionListItem[]>([]);
+  /** 远程同步状态（synced=云端 / offline=离线 / unauthed=cookie失效 / server_error=后端挂 / local=未登录本地） */
+  const [syncStatus, setSyncStatus] = useState<SessionSyncStatus | "local">("local");
   const esRef = useRef<EventSource | null>(null);
   const cancelRef = useRef<(() => void) | null>(null);
   // pending messages waiting for SSE to be ready (queued during lazy init)
   const pendingRef = useRef<string[]>([]);
   // 首轮 user prompt 暂存（等 sessionId 回来再注册到列表，避免拿 prompt 时 id 还没 set）
   const firstPromptRef = useRef<string | null>(null);
-
-  /** 构造租户 header（tenantContext 非空时注入，否则空对象） */
-  const tenantHeaders = useCallback((): Record<string, string> => {
-    if (!tenantContext) return {};
-    return {
-      "X-Tenant-ID": String(tenantContext.tenant_id),
-      "X-Workspace-ID": String(tenantContext.workspace_id),
-    };
-  }, [tenantContext]);
 
   /** 是否走远程同步（登录态 + sse 模式） */
   const useRemote = mode === "sse" && userId != null;
@@ -84,11 +73,15 @@ export function useAgentSession(
   const refreshSessions = useCallback(() => {
     if (mode === "mock") return; // mock 不计入历史
     if (useRemote && userId != null) {
-      // 登录态：异步拉远程，失败自动回退 localStorage
-      listSessionsRemote(userId).then((list) => setSessions(list));
+      // 登录态：异步拉远程，返回 {list, status} 驱动 syncStatus 徽标
+      listSessionsRemote(userId).then(({ list, status }) => {
+        setSessions(list);
+        setSyncStatus(status);
+      });
     } else {
       // 未登录：直接读 localStorage
       setSessions(listSessions(userId));
+      setSyncStatus("local");
     }
   }, [mode, userId, useRemote]);
 
@@ -184,10 +177,7 @@ export function useAgentSession(
         pendingRef.current.push(text);
         firstPromptRef.current = text; // 暂存首轮 user prompt，等 setSessionId 后注册到列表
         try {
-          const resp = await fetch(api("/api/sessions"), {
-            method: "POST",
-            headers: { ...tenantHeaders() },
-          });
+          const resp = await fetch(api("/api/sessions"), { method: "POST" });
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
           const data = (await resp.json()) as { id: string };
           const newId = data.id;
@@ -227,10 +217,7 @@ export function useAgentSession(
       try {
         await fetch(api(`/api/sessions/${sessionId}/messages`), {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...tenantHeaders(),
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ prompt: text }),
         });
       } catch (e) {
@@ -242,7 +229,7 @@ export function useAgentSession(
         });
       }
     },
-    [mode, sessionId, sseReady, connect, refreshSessions, tenantHeaders, useRemote],
+    [mode, sessionId, sseReady, connect, refreshSessions, useRemote],
   );
 
   /** 手动切换右栏标签（UI 派发，非 AgentEvent） */
@@ -303,6 +290,8 @@ export function useAgentSession(
     sseReady,
     /** localStorage 里的会话列表（sidebar 用），按 lastActiveAt 倒序 */
     sessions,
+    /** 远程同步状态（synced/offline/unauthed/server_error/local），UI 徽标用 */
+    syncStatus,
     /** 强制刷新 sessions（register/touchSession 后已自动刷，但外部如需手动触发可用） */
     refreshSessions,
     startMock,

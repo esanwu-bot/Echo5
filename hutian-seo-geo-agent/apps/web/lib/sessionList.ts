@@ -21,6 +21,13 @@ export interface SessionListItem {
   createdAt: number;   // 创建时间 ms（Date.now()）
   lastActiveAt: number;// 最后一次活动 ms（任何工具/消息产出都更新，用于相对时间）
   toolCount: number;   // 已完成工具数（streamState.tools.filter(done).length 快照）
+  /**
+   * 未同步标记（登录态专用）：
+   *   - true  = 本地有但远程写入失败/未确认，下次 listSessionsRemote 成功后会比对清除
+   *   - false/undefined = 已同步或未登录态（未登录不关心同步）
+   * UI 侧：Sidebar 在会话项上显示橙色小点提示"未同步"
+   */
+  dirty?: boolean;
 }
 
 const KEY_PREFIX = "hutian_session_list_v1:";
@@ -144,6 +151,22 @@ export function touchSession(
   writeRaw(userId, list);
 }
 
+/**
+ * 标记单条会话 dirty=true/false（登录态远程写入失败时打 true，远程拉成功后清 false）。
+ * 仅改 dirty 字段，不动 lastActiveAt/toolCount，避免污染时间线。
+ */
+export function markSessionDirty(
+  id: string,
+  userId: number | null,
+  dirty: boolean,
+): void {
+  const list = readRaw(userId);
+  const idx = list.findIndex((s) => s.id === id);
+  if (idx < 0) return;
+  list[idx] = { ...list[idx], dirty };
+  writeRaw(userId, list);
+}
+
 /** 单条改标题（用户右键改名预留，目前 UI 不暴露） */
 export function renameSession(
   id: string,
@@ -202,26 +225,61 @@ interface RemoteUserSession {
   updated_at: string;
 }
 
+/** 远程同步状态（UI 可观测性用） */
+export type SessionSyncStatus =
+  | "synced"     // 远程拉成功，列表来自云端
+  | "offline"    // 远程网络错，回退本地（离线）
+  | "unauthed"   // cookie 失效 / 401，回退本地
+  | "server_error"; // 后端 5xx，回退本地
+
+export interface RemoteListResult {
+  list: SessionListItem[];
+  status: SessionSyncStatus;
+}
+
 /**
  * 拉取远程会话列表（登录态专用）。
  *   GET /portal/api/v1/sessions → { data: RemoteUserSession[] }
- * 失败时回退到 localStorage 同 userId 桶（离线降级，不阻断 UI）。
+ * 返回 { list, status }，status 告诉 UI 同步是否成功（用于徽标/toast，避免静默降级=假成功）。
+ *
+ * 比对清除 dirty 标记：远程拉成功后，远程已存在的会话视为"已同步"，清掉本地 dirty=true；
+ * 远程没有但本地有的（dirty=true）保留在返回列表末尾，UI 仍可见但带"未同步"提示。
  */
 export async function listSessionsRemote(
   userId: number,
-): Promise<SessionListItem[]> {
+): Promise<RemoteListResult> {
   try {
     const resp = await fetchWithAuth("/portal/api/v1/sessions", { method: "GET" });
+    if (resp.status === 401) {
+      // 401：fetchWithAuth 已清 user，这里回退本地 + 标记 unauthed
+      return { list: listSessions(userId), status: "unauthed" };
+    }
     if (!resp.ok) {
-      // 401 已被 fetchWithAuth 处理（清 user）；其他错误回退 localStorage
-      return listSessions(userId);
+      return { list: listSessions(userId), status: "server_error" };
     }
     const json = (await resp.json()) as { data?: RemoteUserSession[] };
-    if (!json.data || !Array.isArray(json.data)) return [];
-    return json.data.map(fromRemote).sort((a, b) => b.lastActiveAt - a.lastActiveAt);
+    const remoteList = (json.data ?? []).map(fromRemote);
+    const remoteIds = new Set(remoteList.map((s) => s.id));
+
+    // 远程有的 → 清 dirty（已同步）；远程没有但本地 dirty=true 的 → 追加到列表末尾保留可见
+    const local = readRaw(userId);
+    const localOnlyDirty = local.filter(
+      (s) => !remoteIds.has(s.id) && s.dirty === true,
+    );
+    // 批量清 dirty（远程已确认的会话）
+    for (const s of local) {
+      if (remoteIds.has(s.id) && s.dirty === true) {
+        markSessionDirty(s.id, userId, false);
+      }
+    }
+
+    const merged = [...remoteList, ...localOnlyDirty].sort(
+      (a, b) => b.lastActiveAt - a.lastActiveAt,
+    );
+    return { list: merged, status: "synced" };
   } catch {
-    // 网络错 → 回退 localStorage（离线仍能看到本地缓存）
-    return listSessions(userId);
+    // 网络错 → 回退 localStorage + 标记 offline
+    return { list: listSessions(userId), status: "offline" };
   }
 }
 
@@ -229,6 +287,9 @@ export async function listSessionsRemote(
  * 注册/更新会话到远程（登录态专用）。
  *   POST /portal/api/v1/sessions { session_id, title, tool_count }
  * 同时写 localStorage 做离线缓存（后端挂了本地仍能看到）。
+ *
+ * 失败标记：远程写失败/返回非 2xx 时打 dirty=true，UI 显示"未同步"小点；
+ * 下次 listSessionsRemote 成功后比对远程列表，远程已有则清 dirty。
  */
 export async function registerSessionRemote(
   id: string,
@@ -238,9 +299,9 @@ export async function registerSessionRemote(
   // 先写 localStorage（离线缓存，同步立即可见）
   const local = registerSession(id, userId, opts);
 
-  // 异步推远程（不阻塞 UI；失败时 localStorage 已有数据，下次 listSessionsRemote 会拉到旧的）
+  // 异步推远程（不阻塞 UI；失败时打 dirty 标记，UI 可观测）
   try {
-    await fetchWithAuth("/portal/api/v1/sessions", {
+    const resp = await fetchWithAuth("/portal/api/v1/sessions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -249,8 +310,11 @@ export async function registerSessionRemote(
         tool_count: opts.toolCount ?? 0,
       }),
     });
+    if (!resp.ok) {
+      markSessionDirty(id, userId, true);
+    }
   } catch {
-    // 网络错不阻断——localStorage 已有，后续重试靠 touchSessionRemote
+    markSessionDirty(id, userId, true);
   }
   return local;
 }
@@ -258,6 +322,8 @@ export async function registerSessionRemote(
 /**
  * 刷新远程会话的 tool_count + lastActiveAt（登录态专用）。
  * 防抖策略：调用方节流（如每 5s 最多一次），这里不做。
+ *
+ * 失败标记：同 registerSessionRemote，失败打 dirty=true。
  */
 export async function touchSessionRemote(
   id: string,
@@ -269,7 +335,7 @@ export async function touchSessionRemote(
 
   // 异步推远程
   try {
-    await fetchWithAuth("/portal/api/v1/sessions", {
+    const resp = await fetchWithAuth("/portal/api/v1/sessions", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -277,7 +343,56 @@ export async function touchSessionRemote(
         tool_count: toolCount,
       }),
     });
+    if (!resp.ok) {
+      markSessionDirty(id, userId, true);
+    }
   } catch {
-    // 网络错忽略——localStorage 已更新
+    markSessionDirty(id, userId, true);
   }
+}
+
+/**
+ * 批量迁移未登录桶的会话到远程用户桶（登录成功时调用）。
+ *   - 先调 mergeUnloggedTo(userId) 把 unlogged 桶合入 localStorage 用户桶
+ *   - 再把用户桶里所有会话逐条 POST 到远程（已存在的后端 upsert 跳过）
+ *   - 返回成功迁移的条数
+ *
+ * 失败容忍：单条失败不阻断其他条，最终返回成功数；
+ * 全部失败也不阻断登录（localStorage 已有数据，下次 listSessionsRemote 会拉到本地缓存的）。
+ */
+export async function migrateLocalToRemote(userId: number): Promise<{
+  migrated: number;
+  failed: number;
+}> {
+  // 1. 合并 unlogged → userId 桶
+  mergeUnloggedTo(userId);
+  // 2. 读 userId 桶所有会话
+  const localSessions = listSessions(userId);
+  if (localSessions.length === 0) {
+    return { migrated: 0, failed: 0 };
+  }
+  // 3. 逐条 POST 到远程（容忍单条失败）
+  let migrated = 0;
+  let failed = 0;
+  for (const s of localSessions) {
+    try {
+      const resp = await fetchWithAuth("/portal/api/v1/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: s.id,
+          title: s.title,
+          tool_count: s.toolCount,
+        }),
+      });
+      if (resp.ok) {
+        migrated++;
+      } else {
+        failed++;
+      }
+    } catch {
+      failed++;
+    }
+  }
+  return { migrated, failed };
 }

@@ -32,7 +32,17 @@ interface SidebarProps {
   /** 搜索关键词（父组件受控，便于后续加真搜索） */
   searchKeyword?: string;
   onSearchChange?: (kw: string) => void;
+  /** 远程同步状态徽标（synced=云端绿 / offline=离线琥珀 / server_error=后端挂红 / local=未登录本地灰） */
+  syncStatus?: "synced" | "offline" | "unauthed" | "server_error" | "local";
 }
+
+const SYNC_LABEL: Record<string, { text: string; color: string; dot: string }> = {
+  synced:       { text: "云端已同步", color: "text-green",       dot: "bg-green" },
+  offline:      { text: "离线 · 仅本设备", color: "text-amber",   dot: "bg-amber" },
+  server_error: { text: "同步异常 · 仅本设备", color: "text-red", dot: "bg-red" },
+  unauthed:     { text: "未认证 · 仅本设备", color: "text-amber",  dot: "bg-amber" },
+  local:        { text: "仅本设备", color: "text-faint",          dot: "bg-faint" },
+};
 
 export default function Sidebar({
   state,
@@ -45,6 +55,7 @@ export default function Sidebar({
   onSelectSession,
   searchKeyword,
   onSearchChange,
+  syncStatus = "local",
 }: SidebarProps) {
   const completedTools = state.tools.filter((t) => t.status === "done").length;
   const ctxUsed = Math.min(38 + state.tools.length * 6, 96);
@@ -101,8 +112,13 @@ export default function Sidebar({
 
         {/* 会话列表 */}
         <div className="flex-1 overflow-y-auto px-2 py-1">
-          <div className="px-2 py-1.5 font-mono text-[10px] tracking-wider text-faint">
-            会话历史
+          <div className="flex items-center justify-between px-2 py-1.5">
+            <span className="font-mono text-[10px] tracking-wider text-faint">会话历史</span>
+            {/* 同步状态徽标 */}
+            <span className={`flex items-center gap-1 font-mono text-[9.5px] ${SYNC_LABEL[syncStatus].color}`} title={SYNC_LABEL[syncStatus].text}>
+              <span className={`h-1.5 w-1.5 rounded-full ${SYNC_LABEL[syncStatus].dot}`} />
+              {SYNC_LABEL[syncStatus].text}
+            </span>
           </div>
           {filteredSessions.length === 0 ? (
             <div className="px-3 py-8 text-center text-[11px] text-faint">
@@ -133,6 +149,14 @@ export default function Sidebar({
                     <span className="line-clamp-1 flex-1 text-[12.5px] font-medium text-text">
                       {s.title}
                     </span>
+                    {s.dirty ? (
+                      <span
+                        className="shrink-0 font-mono text-[9px] text-amber"
+                        title="本会话尚未同步到云端（远程写入失败），仅本设备可见"
+                      >
+                        未同步
+                      </span>
+                    ) : null}
                   </div>
                   <div className="flex items-center justify-between pl-3.5">
                     <span className="text-[10.5px] text-faint">

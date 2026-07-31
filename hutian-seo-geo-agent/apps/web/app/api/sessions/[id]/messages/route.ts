@@ -11,10 +11,15 @@ const BRIDGE_URL = process.env.BRIDGE_URL || "http://localhost:4317";
  *
  * 前端 send(text) 在 SSE 模式调这个；事件回流经 /api/sessions/[id]/stream
  *
- * 多租户透传（P0 接缝）：前端注入的 X-Tenant-ID / X-Workspace-ID header 透传给 agent-bridge。
+ * ════════════════════════════════════════════════════
+ * P0 红线：此处绝不能透传明文 X-Tenant-ID / X-Workspace-ID header
+ *   违反 ADR：下游签名签 / 单一信任源 / 签名防篡改 / 下游不连 hutian
+ *
+ * 下一轮接 ADR 内部 token：
+ *   BFF 调 tenant-api /api/v1/internal/token → 拿签名 X-Tenant-Token → 透传给 bridge
+ *   bridge 只信签名 token，不信任何明文头
+ * ════════════════════════════════════════════════════
  */
-const TENANT_HEADERS = ["X-Tenant-ID", "X-Workspace-ID"];
-
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -22,17 +27,9 @@ export async function POST(
   const { id } = params;
   const body = await req.json().catch(() => ({}));
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  for (const h of TENANT_HEADERS) {
-    const v = req.headers.get(h);
-    if (v) headers[h] = v;
-  }
-
   const resp = await fetch(`${BRIDGE_URL}/sessions/${id}/messages`, {
     method: "POST",
-    headers,
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ prompt: body.prompt ?? body.message ?? "" }),
   });
 

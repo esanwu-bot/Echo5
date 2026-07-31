@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
 const BRIDGE_URL = process.env.BRIDGE_URL || "http://localhost:4317";
 
@@ -9,21 +9,18 @@ const BRIDGE_URL = process.env.BRIDGE_URL || "http://localhost:4317";
  *   → bridge POST /sessions (创建空 session，返回 { id })
  * 前端 SSE 模式首次 send 时 lazy 调用。
  *
- * 多租户透传（P0 接缝）：前端注入的 X-Tenant-ID / X-Workspace-ID header 透传给 agent-bridge。
- * agent-bridge 当前不消费（显式化），下一轮接 ADR 内部 token 时读取做 siteBase 路由。
+ * ════════════════════════════════════════════════════
+ * P0 红线：此处绝不能透传明文 X-Tenant-ID / X-Workspace-ID header
+ *   违反 ADR：下游签名签 / 单一信任源 / 签名防篡改 / 下游不连 hutian
+ *
+ * 下一轮接 ADR 内部 token：
+ *   1. BFF 取用户 httpOnly JWT cookie
+ *   2. 调 tenant-api /api/v1/internal/token 验 JWT → 签 HMAC X-Tenant-Token
+ *   3. BFF 把签名 token 给 bridge，bridge 只信签名、不信任何明文头
+ * ════════════════════════════════════════════════════
  */
-const TENANT_HEADERS = ["X-Tenant-ID", "X-Workspace-ID"];
-
-export async function POST(req: NextRequest) {
-  const headers: Record<string, string> = {};
-  for (const h of TENANT_HEADERS) {
-    const v = req.headers.get(h);
-    if (v) headers[h] = v;
-  }
-  const resp = await fetch(`${BRIDGE_URL}/sessions`, {
-    method: "POST",
-    headers,
-  });
+export async function POST() {
+  const resp = await fetch(`${BRIDGE_URL}/sessions`, { method: "POST" });
   if (!resp.ok) {
     return NextResponse.json(
       { error: `Bridge error: ${resp.status}` },

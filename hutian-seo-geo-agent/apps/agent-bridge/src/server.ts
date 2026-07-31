@@ -3,6 +3,7 @@ import { CodeBuddyClient } from "./llm/codebuddy-client.ts";
 import { GrokClient } from "./llm/grok-client.ts";
 import { MockLLMClient, seoDemoScript } from "./llm/mock-client.ts";
 import { StdioMcpClient } from "./mcp/client.ts";
+import { getMcpForTenant } from "./mcp/pool.ts";
 import { runAgentLoop } from "./loop/run-agent.ts";
 import type { LLMClient, Message } from "./llm/types.ts";
 import type { McpToolClient } from "./mcp/client.ts";
@@ -82,22 +83,8 @@ async function buildLLM(): Promise<LLMClient> {
   return new MockLLMClient({ steps: seoDemoScript(), name: "mock-fallback" });
 }
 
-// 共享 MCP client（每个 session 复用，避免每次 spawn hutian-seo-mcp）
-let sharedMcp: McpToolClient | null = null;
-function getMcp(): McpToolClient {
-  if (!sharedMcp) {
-    // 把 Node --env-file 加载进当前进程的环境变量显式传给 Python 子进程，
-    // 否则 hutian-seo-mcp 读不到 SITEBASE_* / CODEBUDDY_API_KEY 等配置。
-    const env: Record<string, string> = {};
-    const keys = Object.keys(process.env);
-    for (const key of keys) {
-      const value = process.env[key];
-      if (value !== undefined) env[key] = value;
-    }
-    sharedMcp = new StdioMcpClient({ env });
-  }
-  return sharedMcp;
-}
+// MCP 实例池逻辑抽到 src/mcp/pool.ts（getMcpForTenant + toAdminUrl），
+// 探针可独立 import 验路由隔离，不触发 server.ts 的 createServer 副作用。
 
 /**
  * Demo event sequence mirroring apps/web/lib/demo-events.ts. Each entry carries a
@@ -439,10 +426,13 @@ async function route(req: IncomingMessage, res: ServerResponse) {
 /** T4.5 · 启动 agent loop，把 AgentEvent 推到 session 的 SSE 订阅者 */
 async function startAgentLoop(sessionId: string, prompt: string) {
   const llm = await buildLLM();
-  const mcp = getMcp();
+  // ADR 路由隔离：从 sessionTenants 取验签 payload 的 sitebase_base_url，
+  // 按 url 取对应 MCP 实例（不同租户 → 不同 Python 子进程 → 不同 siteBase）
+  const tenantPayload = sessionTenants.get(sessionId);
+  const mcp = getMcpForTenant(tenantPayload?.sitebase_base_url);
   const prevHistory = sessionHistories.get(sessionId) ?? [];
   console.log(
-    `[agent-bridge] session ${sessionId} start loop (llm=${llm.name}) | prevHistory.len=${prevHistory.length}`,
+    `[agent-bridge] session ${sessionId} start loop (llm=${llm.name}) | prevHistory.len=${prevHistory.length} | sitebase=${tenantPayload?.sitebase_base_url ?? "default"}`,
   );
 
   // 先推一条 user message（前端 chat 栏显示用户输入）

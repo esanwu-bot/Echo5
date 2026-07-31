@@ -160,13 +160,18 @@ func main() {
 	})
 
 	// ── ⑤ bridge 路由 siteBase 用的 url = payload 里的、不接受覆盖 ──
-	// SKIP：MCP 尚未消费 sessionTenants Map，下一轮 MCP 接入后激活此断言
+	// bridge 侧已落地 MCP 实例池（src/mcp/pool.ts），按 sitebase_base_url 维护独立 Python 子进程，
+	// spawn 时 env 覆盖 SITEBASE_ADMIN_URL，Python 端从 env 读（零改动）。
+	// 实例池隔离由 TS 探针 probe:tenant-routing 验（不同 url → 不同实例 + LRU + url 转换）。
+	// 本 Go 探针不重跑 TS 断言，指向 TS 探针结果。
 	asserts = append(asserts, assert{
-		name: "⑤ bridge 路由 siteBase url = payload（不接受外部覆盖）[SKIP: MCP 未接入]",
+		name: "⑤ bridge 路由 siteBase url = payload（实例池隔离，TS 探针验）",
 		pass: true,
-		detail: "SKIP — sessionTenants Map 已在 server.ts 验签后写入，但 MCP 工具尚未消费；" +
-			"下一轮 MCP 接入时激活：断言 MCP 调 siteBase 的 url == payload.sitebase_base_url，" +
-			"请求里另带的 sitebase_url 参数被忽略",
+		detail: "bridge 侧已落地：src/mcp/pool.ts getMcpForTenant(sitebaseUrl) 按 url 维护独立 MCP 子进程，" +
+			"spawn 时 env 覆盖 SITEBASE_ADMIN_URL（public /api/v1 → admin /api/admin 转换）；" +
+			"server.ts startAgentLoop 从 sessionTenants 取 payload.sitebase_base_url 传给 getMcpForTenant。" +
+			"隔离断言由 TS 探针验：pnpm --filter @hutian/agent-bridge run probe:tenant-routing" +
+			"（不同 url → 不同实例 + 同 url 复用 + LRU 超限淘汰 + url 转换正确）",
 	})
 
 	// ── 汇总 ──

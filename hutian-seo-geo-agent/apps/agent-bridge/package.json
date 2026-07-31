@@ -15,7 +15,8 @@
     "probe:realloop": "node --env-file=../../.env --import tsx src/loop/probe-real-loop.ts",
     "probe:grok-derived": "node --env-file=../../.env --import tsx src/llm/probe-grok-derived.ts",
     "probe:grok-loop": "node --env-file=../../.env --import tsx src/loop/probe-grok-loop.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "probe:tenant-routing": "node --import tsx src/mcp/probe-tenant-routing.ts"
   },
   "dependencies": {
     "@hutian/agent-protocol": "workspace:*",

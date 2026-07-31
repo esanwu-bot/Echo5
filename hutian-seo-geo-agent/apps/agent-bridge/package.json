@@ -16,7 +16,8 @@
     "probe:grok-derived": "node --env-file=../../.env --import tsx src/llm/probe-grok-derived.ts",
     "probe:grok-loop": "node --env-file=../../.env --import tsx src/loop/probe-grok-loop.ts",
     "typecheck": "tsc --noEmit",
-    "probe:tenant-routing": "node --import tsx src/mcp/probe-tenant-routing.ts"
+    "probe:tenant-routing": "node --import tsx src/mcp/probe-tenant-routing.ts",
+    "probe:e2e-routing": "node --import tsx src/mcp/probe-e2e-routing.ts"
   },
   "dependencies": {
     "@hutian/agent-protocol": "workspace:*",

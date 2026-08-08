@@ -3,7 +3,6 @@
 import { useState, type FC } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import rehypeRaw from "rehype-raw";
 
 /**
  * Markdown 渲染器 · SSE 流式适配
@@ -68,7 +67,6 @@ export const MarkdownRenderer: FC<MarkdownRendererProps> = ({ content }) => {
     <div className="md-body text-[13.5px] leading-relaxed text-text">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeRaw]}
         components={{
           // 代码块
           pre: ({ children }) => <>{children}</>,

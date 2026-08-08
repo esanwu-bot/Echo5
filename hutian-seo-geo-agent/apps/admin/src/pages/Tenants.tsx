@@ -237,7 +237,7 @@ export default function TenantsPage() {
       </div>
 
       <Table
-        rowKey="ID"
+        rowKey="id"
         loading={loading}
         dataSource={data}
         columns={columns}

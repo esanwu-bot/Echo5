@@ -52,7 +52,10 @@ export async function getBridgeToken(req: NextRequest): Promise<string | null> {
     return null;
   }
 
-  const cacheKey = jwt.slice(0, 16);
+  // HS256 JWT 结构: header.payload.signature — header 固定，payload 含用户唯一信息
+  // 取 payload 段作缓存 key（不同用户 payload 不同），避免用固定 header 前缀导致所有用户共享缓存
+  const parts = jwt.split(".");
+  const cacheKey = parts.length >= 2 ? parts[1] : jwt;
   const now = Date.now();
   const cached = tokenCache.get(cacheKey);
   if (cached && cached.expireAt > now) {

@@ -117,7 +117,7 @@ function ToolOutput({ output }: { output: unknown }) {
               >
                 <use href={c.ok ? "#w-check" : "#w-x"} />
               </svg>
-              <span className="text-dim" dangerouslySetInnerHTML={{ __html: c.text }} />
+              <span className="text-dim">{c.text}</span>
             </div>
           ))}
         </div>

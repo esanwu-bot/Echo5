@@ -11,6 +11,7 @@ package handlers
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -273,9 +274,14 @@ func TenantLogin(db *gorm.DB, signer *auth.Signer, devOnly bool) gin.HandlerFunc
 			}
 		}
 
-		tok, err := signer.Issue(user.ID, seat.ID, tenant.ID, workspace.ID)
+		tok, err := func() (string, error) {
+			if signer == nil {
+				return "", fmt.Errorf("JWT signer not configured")
+			}
+			return signer.Issue(user.ID, seat.ID, tenant.ID, workspace.ID)
+		}()
 		if err != nil {
-			writePortalError(c, devOnly, http.StatusInternalServerError, "issue token failed", "")
+			writePortalError(c, devOnly, http.StatusServiceUnavailable, "issue token failed", err.Error())
 			return
 		}
 

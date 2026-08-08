@@ -210,9 +210,11 @@ function LoginCard({ onLogin }: { onLogin: (token: string) => void }) {
         >
           登录
         </Button>
-        <Text type="secondary" style={{ display: "block", marginTop: 14, fontSize: 11 }}>
-          dev 默认 token: <code>dev-admin-token-change-in-prod</code>
-        </Text>
+        {import.meta.env.DEV && (
+          <Text type="secondary" style={{ display: "block", marginTop: 14, fontSize: 11 }}>
+            dev 环境：请配置 TENANT_ADMIN_TOKEN 环境变量
+          </Text>
+        )}
       </div>
     </div>
   );

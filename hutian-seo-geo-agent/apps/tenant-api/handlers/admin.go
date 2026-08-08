@@ -13,8 +13,9 @@ package handlers
 
 import (
 	"database/sql"
+	"encoding/json"
+	"log"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -60,35 +61,45 @@ func offset(page, pageSize int) int {
 func writeAudit(c *gin.Context, db *gorm.DB, tenantID, workspaceID, seatID *int64,
 	action, targetKind string, targetID *int64, meta string) {
 	actor := middleware.MustAdminActor(c)
-	log := models.AuditLog{
+
+	// P1 修复：用 json.Marshal 安全注入 actor，防字符串拼接导致 JSON 注入
+	if actor != "" {
+		var metaMap map[string]interface{}
+		if meta != "" {
+			if err := json.Unmarshal([]byte(meta), &metaMap); err != nil {
+				// meta 不是合法 JSON，包裹进新对象
+				metaMap = map[string]interface{}{"raw": meta}
+			}
+		} else {
+			metaMap = make(map[string]interface{})
+		}
+		metaMap["actor"] = actor
+		if b, err := json.Marshal(metaMap); err == nil {
+			meta = string(b)
+		}
+	}
+
+	logEntry := models.AuditLog{
 		ActorKind:  models.ActorKindHuman,
 		Action:     action,
 		TargetKind: targetKind,
 		MetaJSON:   meta,
 	}
 	if tenantID != nil {
-		log.TenantID = sqlNullInt64(*tenantID)
+		logEntry.TenantID = sqlNullInt64(*tenantID)
 	}
 	if workspaceID != nil {
-		log.WorkspaceID = sqlNullInt64(*workspaceID)
+		logEntry.WorkspaceID = sqlNullInt64(*workspaceID)
 	}
 	if seatID != nil {
-		log.SeatID = sqlNullInt64(*seatID)
+		logEntry.SeatID = sqlNullInt64(*seatID)
 	}
 	if targetID != nil {
-		log.TargetID = sqlNullInt64(*targetID)
+		logEntry.TargetID = sqlNullInt64(*targetID)
 	}
-	// actor 写进 meta（admin 操作人）
-	if actor != "" {
-		if meta != "" {
-			meta = strings.TrimSuffix(meta, "}")
-			meta = meta + `,"actor":"` + actor + `"}`
-		} else {
-			meta = `{"actor":"` + actor + `"}`
-		}
-		log.MetaJSON = meta
+	if err := db.Create(&logEntry).Error; err != nil {
+		log.Printf("[audit] WARN: failed to write audit log: %v", err)
 	}
-	db.Create(&log)
 }
 
 // sqlNullInt64 int64 → sql.NullInt64（valid=true）

@@ -356,6 +356,21 @@ async function route(req: IncomingMessage, res: ServerResponse) {
   const eventsMatch = url.match(/^\/sessions\/([^/]+)\/events$/);
   if (req.method === "GET" && eventsMatch) {
     const id = eventsMatch[1];
+    // P1-6 修复：SSE 订阅必须验签，防旁听他人会话
+    const tokenHead = req.headers["x-tenant-token"] as string | undefined;
+    const verified = verifyTenantToken(tokenHead);
+    if (isTokenEnforced() && !verified.ok) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: "tenant token verification failed", reason: verified.reason }));
+    }
+    // P1-7 修复：校验会话归属——已存在的 session 若绑定了不同 tenant，拒绝订阅
+    if (verified.ok && sessions.has(id)) {
+      const existing = resolveTenantForMcp(id);
+      if (existing.ok && existing.payload && existing.payload.tenant_id !== verified.payload!.tenant_id) {
+        res.writeHead(403, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({ error: "session belongs to a different tenant" }));
+      }
+    }
     if (!sessions.has(id)) sessions.set(id, new Set());
     if (!sessionHistories.has(id)) sessionHistories.set(id, []);
     const subs = sessions.get(id)!;
@@ -393,6 +408,14 @@ async function route(req: IncomingMessage, res: ServerResponse) {
     }
     if (!sessions.has(id)) sessions.set(id, new Set());
     if (!sessionHistories.has(id)) sessionHistories.set(id, []);
+    // P1-7 修复：校验会话归属——已有 session 绑定了不同 tenant 时拒绝，防跨租户历史污染
+    if (verified.ok && sessions.has(id)) {
+      const existing = resolveTenantForMcp(id);
+      if (existing.ok && existing.payload && existing.payload.tenant_id !== verified.payload!.tenant_id) {
+        res.writeHead(403, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({ error: "session belongs to a different tenant" }));
+      }
+    }
     // 更新 session 的租户上下文（token 可能已刷新，以最新为准）
     if (verified.ok) setTenantContext(id, verified.payload);
     const body = await readBody(req);

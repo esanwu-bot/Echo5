@@ -28,16 +28,21 @@ type Config struct {
 	// 与 AdminToken、TENANT_INTERNAL_TOKEN_KEY 三者物理隔离
 	// env TENANT_JWT_KEY 配置，空则租户自服务路由全 401（NFR-TS05）
 	JWTKey string
+	// 内部 API 服务密钥（保护 /api/v1/* 路由组）
+	// 仅授权内部服务（如 agent-bridge）可携带此密钥调用
+	// env TENANT_INTERNAL_API_SECRET 配置，空则 /api/v1/* 全拒绝（fail-closed）
+	InternalAPISecret string
 }
 
 // Load 从环境变量加载配置，带默认值
 func Load() Config {
 	c := Config{
-		Port:      envOrDefault("TENANT_API_PORT", "4318"),
-		MetaDBDSN: envOrDefault("TENANT_META_DSN", "root:root@tcp(localhost:3306)/hutian?charset=utf8mb4&parseTime=True&loc=Local"),
-		Dev:       os.Getenv("TENANT_API_DEV") != "false",
-		AdminToken: strings.TrimSpace(os.Getenv("TENANT_ADMIN_TOKEN")),
-		JWTKey:     strings.TrimSpace(os.Getenv("TENANT_JWT_KEY")),
+		Port:              envOrDefault("TENANT_API_PORT", "4318"),
+		MetaDBDSN:         envOrDefault("TENANT_META_DSN", "root:root@tcp(localhost:3306)/hutian?charset=utf8mb4&parseTime=True&loc=Local"),
+		Dev:               os.Getenv("TENANT_API_DEV") == "true",
+		AdminToken:        strings.TrimSpace(os.Getenv("TENANT_ADMIN_TOKEN")),
+		JWTKey:            strings.TrimSpace(os.Getenv("TENANT_JWT_KEY")),
+		InternalAPISecret: strings.TrimSpace(os.Getenv("TENANT_INTERNAL_API_SECRET")),
 	}
 	return c
 }

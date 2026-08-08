@@ -61,11 +61,12 @@ function LoginForm({
 }: {
   onLogin: (creds: LoginCredentials) => Promise<void>;
 }) {
+  const isDev = process.env.NODE_ENV !== "production";
   const [form, setForm] = useState<LoginCredentials>({
-    email: "owner-a@hutian.dev",
-    password: "dev-password-change-in-prod",
-    tenant_slug: "tenant-a",
-    workspace_slug: "ws-a",
+    email: isDev ? "owner-a@hutian.dev" : "",
+    password: isDev ? "dev-password-change-in-prod" : "",
+    tenant_slug: isDev ? "tenant-a" : "",
+    workspace_slug: isDev ? "ws-a" : "",
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);

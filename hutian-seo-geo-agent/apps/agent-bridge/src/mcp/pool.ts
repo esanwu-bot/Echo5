@@ -24,11 +24,16 @@ const DEFAULT_POOL_KEY = "__default__";
 //   频繁 spawn/close Python 进程有开销；close().catch() 吞异常子进程泄漏不可见；idle 回收未做。
 //   dev 够用；生产需：上限按活跃租户量调 + close 失败可观测 + idle 回收。
 
-/** 把当前进程 env 复制给 Python 子进程（继承 SITEBASE_* / CODEBUDDY_API_KEY 等） */
+/** 最小权限 env：只透传 Python MCP 必需的变量，防敏感密钥泄露到子进程 */
+const ALLOWED_ENV_PREFIXES = ["SITEBASE_", "PYTHONPATH", "PYTHON", "PATH", "HOME", "USERPROFILE", "TEMP", "TMP"];
+
 function buildChildEnv(adminUrlOverride?: string): Record<string, string> {
   const env: Record<string, string> = {};
   for (const [key, value] of Object.entries(process.env)) {
-    if (value !== undefined) env[key] = value;
+    if (value === undefined) continue;
+    if (ALLOWED_ENV_PREFIXES.some((prefix) => key.startsWith(prefix))) {
+      env[key] = value;
+    }
   }
   // 覆盖 SITEBASE_ADMIN_URL：让 Python 端路由到正确 siteBase 实例
   if (adminUrlOverride) env.SITEBASE_ADMIN_URL = adminUrlOverride;

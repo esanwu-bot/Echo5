@@ -242,7 +242,7 @@ export default function AuditPage() {
       </Card>
 
       <Table
-        rowKey="ID"
+        rowKey="id"
         loading={loading}
         dataSource={data}
         columns={columns}

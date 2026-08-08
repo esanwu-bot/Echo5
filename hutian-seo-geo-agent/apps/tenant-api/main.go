@@ -63,17 +63,23 @@ func main() {
 	}
 	r := gin.Default()
 
-	// T7.6 dev CORS：允许 apps/web（localhost:3000）/apps/admin 直连 tenant-api
-	// 生产环境应关闭或限定具体域名，不可 * 通配带凭证请求。
+	// T7.6 CORS：仅允许白名单 Origin，不再反射任意源
+	// 生产环境通过反向代理/网关控制 CORS，此处仅服务本地开发
 	if cfg.Dev {
+		allowedOrigins := map[string]bool{
+			"http://localhost:3000": true, // apps/web
+			"http://localhost:4319": true, // apps/admin
+			"http://127.0.0.1:3000": true,
+			"http://127.0.0.1:4319": true,
+		}
 		r.Use(func(c *gin.Context) {
 			origin := c.GetHeader("Origin")
-			if origin != "" {
+			if origin != "" && allowedOrigins[origin] {
 				c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
 				c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 			}
 			c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-			c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Admin-Token, X-Tenant-ID, X-Workspace-ID")
+			c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Admin-Token, X-Tenant-ID, X-Workspace-ID, X-Internal-Secret")
 			if c.Request.Method == "OPTIONS" {
 				c.AbortWithStatus(204)
 				return
@@ -94,7 +100,20 @@ func main() {
 
 	// T6.2: 业务路由组，强制 TenantContext 中间件
 	// 无 X-Tenant-ID/X-Workspace-ID → 401；workspace 不归属 tenant → 403
+	// P0 修复：/api/v1 增加服务级密钥认证，防止未授权访问
 	api := r.Group("/api/v1")
+	api.Use(func(c *gin.Context) {
+		if cfg.InternalAPISecret == "" {
+			c.AbortWithStatusJSON(403, gin.H{"error": "internal API secret not configured — /api/v1 is disabled"})
+			return
+		}
+		secret := c.GetHeader("X-Internal-Secret")
+		if secret == "" || secret != cfg.InternalAPISecret {
+			c.AbortWithStatusJSON(401, gin.H{"error": "invalid or missing X-Internal-Secret"})
+			return
+		}
+		c.Next()
+	})
 	api.Use(middleware.TenantContext(gormDB))
 	api.Use(middleware.RequireTenantContext())
 	{

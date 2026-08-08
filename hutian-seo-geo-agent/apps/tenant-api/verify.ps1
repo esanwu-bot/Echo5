@@ -48,6 +48,8 @@ try {
     $env:TENANT_INTERNAL_TOKEN_KEY = "dev-secret-key-change-in-prod"
     $env:TENANT_JWT_KEY = "dev-jwt-key-change-in-prod"
     $env:TENANT_ADMIN_TOKEN = "dev-admin-token-change-in-prod"
+    $env:TENANT_INTERNAL_API_SECRET = "dev-internal-secret-change-in-prod"
+    $env:TENANT_API_DEV = "true"
     $proc = Start-Process -FilePath "go" -ArgumentList "run","." -WorkingDirectory $apiDir -PassThru -WindowStyle Hidden -RedirectStandardOutput "$env:TEMP\tenant-api.verify.log" -RedirectStandardError "$env:TEMP\tenant-api.verify.err"
     $needStop = $true
     # Wait for service to be healthy (up to 20s)

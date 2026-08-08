@@ -35,15 +35,11 @@ export const api = axios.create({
 });
 
 // 请求拦截器：注入 X-Admin-Token
+// TODO(P0): 迁移到 httpOnly + SameSite Cookie 方案，localStorage 对 XSS 不安全
 api.interceptors.request.use((config) => {
   const token = getAdminToken().trim();
   if (token) {
-    // 使用 headers.set 确保在 axios 1.x 的 AxiosHeaders 上稳定写入
     config.headers.set("X-Admin-Token", token);
-    // dev 调试用：确认 token 已带上（生产可注释）
-    console.log("[admin-api] outgoing", config.method?.toUpperCase(), config.url, "token-present:", true);
-  } else {
-    console.warn("[admin-api] outgoing without X-Admin-Token — will likely 401");
   }
   return config;
 });

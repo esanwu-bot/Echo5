@@ -147,11 +147,12 @@ export function useAgentSession(
     while (pendingRef.current.length > 0) {
       const text = pendingRef.current.shift()!;
       try {
-        await fetch(api(`/api/sessions/${sid}/messages`), {
+        const resp = await fetch(api(`/api/sessions/${sid}/messages`), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ prompt: text }),
         });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       } catch (e) {
         console.error("[useAgentSession] POST /messages failed:", e);
       }
@@ -223,11 +224,12 @@ export function useAgentSession(
       }
 
       try {
-        await fetch(api(`/api/sessions/${sessionId}/messages`), {
+        const resp = await fetch(api(`/api/sessions/${sessionId}/messages`), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ prompt: text }),
         });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       } catch (e) {
         console.error("[useAgentSession] POST /messages failed:", e);
         dispatch({

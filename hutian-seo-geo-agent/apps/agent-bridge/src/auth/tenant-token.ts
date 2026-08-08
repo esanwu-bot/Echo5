@@ -32,6 +32,13 @@ export type VerifyResult =
   | { ok: false; mode: "disabled" | "missing" | "invalid"; reason: string };
 
 const ENV_KEY = process.env.TENANT_INTERNAL_TOKEN_KEY ?? "";
+const REQUIRE_TOKEN = process.env.BRIDGE_REQUIRE_TOKEN === "true" || process.env.NODE_ENV === "production";
+
+// P1 修复：fail-closed — 生产/严格模式下缺 key 直接启动失败，不再静默放行
+if (REQUIRE_TOKEN && !ENV_KEY) {
+  console.error("[FATAL] TENANT_INTERNAL_TOKEN_KEY is not set but BRIDGE_REQUIRE_TOKEN=true (or NODE_ENV=production). Bridge cannot start without token verification enabled.");
+  process.exit(1);
+}
 
 /**
  * 验签 + 解析 payload。

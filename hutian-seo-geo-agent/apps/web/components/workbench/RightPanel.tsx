@@ -257,11 +257,9 @@ function TerminalView({
         <div className="opacity-40">$ 等待命令…</div>
       ) : (
         lines.map((l) => (
-          <div
-            key={l.id}
-            className="animate-fade-in-up"
-            dangerouslySetInnerHTML={{ __html: l.html }}
-          />
+          <div key={l.id} className="animate-fade-in-up">
+            {l.html}
+          </div>
         ))
       )}
       <div className="flex items-center">

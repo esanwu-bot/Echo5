@@ -182,6 +182,10 @@ func doRequest(method, path string, headers map[string]string) (int, string) {
 	if err != nil {
 		return -1, err.Error()
 	}
+	// P0-1 修复后 /api/v1 需要 X-Internal-Secret
+	if secret := os.Getenv("TENANT_INTERNAL_API_SECRET"); secret != "" {
+		req.Header.Set("X-Internal-Secret", secret)
+	}
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}

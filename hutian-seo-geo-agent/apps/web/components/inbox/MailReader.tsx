@@ -229,11 +229,10 @@ function Letter({ letter, delay }: { letter: EmailLetter; delay: number }) {
         </span>
       </div>
 
-      {/* 正文 — 原型用 HTML 字符串，这里用 dangerouslySetInnerHTML 保留富文本 */}
-      <div
-        className="text-content"
-        dangerouslySetInnerHTML={{ __html: letter.textHtml }}
-      />
+      {/* 正文 — 纯文本渲染，防止 Agent 可控 HTML 注入 XSS */}
+      <div className="whitespace-pre-wrap text-content">
+        {letter.textHtml}
+      </div>
 
       {/* 证据卡 */}
       {letter.evidence && letter.evidence.length > 0 && (

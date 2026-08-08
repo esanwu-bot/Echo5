@@ -38,6 +38,12 @@ if ($LASTEXITCODE -ne 0) { Write-Host "FAIL: go build" -ForegroundColor Red; Pop
 Write-Host "PASS: go build" -ForegroundColor Green
 
 # Probes need the service running. Check if 4318 is already listening; if not, start one.
+# Env must be set BEFORE the check: probes read them regardless of who started the service.
+$env:TENANT_INTERNAL_TOKEN_KEY = "dev-secret-key-change-in-prod"
+$env:TENANT_JWT_KEY = "dev-jwt-key-change-in-prod"
+$env:TENANT_ADMIN_TOKEN = "dev-admin-token-change-in-prod"
+$env:TENANT_INTERNAL_API_SECRET = "dev-internal-secret-change-in-prod"
+$env:TENANT_API_DEV = "true"
 $needStop = $false
 $proc = $null
 try {
@@ -45,11 +51,6 @@ try {
     Write-Host "=== [3/8] tenant-api already running (healthz=$($health.StatusCode)) ===" -ForegroundColor Cyan
 } catch {
     Write-Host "=== [3/8] start tenant-api (background) ===" -ForegroundColor Cyan
-    $env:TENANT_INTERNAL_TOKEN_KEY = "dev-secret-key-change-in-prod"
-    $env:TENANT_JWT_KEY = "dev-jwt-key-change-in-prod"
-    $env:TENANT_ADMIN_TOKEN = "dev-admin-token-change-in-prod"
-    $env:TENANT_INTERNAL_API_SECRET = "dev-internal-secret-change-in-prod"
-    $env:TENANT_API_DEV = "true"
     $proc = Start-Process -FilePath "go" -ArgumentList "run","." -WorkingDirectory $apiDir -PassThru -WindowStyle Hidden -RedirectStandardOutput "$env:TEMP\tenant-api.verify.log" -RedirectStandardError "$env:TEMP\tenant-api.verify.err"
     $needStop = $true
     # Wait for service to be healthy (up to 20s)
@@ -126,11 +127,16 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # Cleanup: kill the service if we started it
-if ($needStop -and $null -ne $proc -and -not $proc.HasExited) {
-    Write-Host "=== cleanup: stop tenant-api (pid=$($proc.Id)) ===" -ForegroundColor DarkGray
-    Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
-    # go run spawns a child process, kill that too
-    Get-Process -Name "tenant-api*" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+# Note: `go run .` spawns a child binary (hutian-tenant-api.exe); killing only the
+# go parent leaks the child and poisons the next run ("already running" + stale code).
+if ($needStop -and $null -ne $proc) {
+    Write-Host "=== cleanup: stop tenant-api (go pid=$($proc.Id)) ===" -ForegroundColor DarkGray
+    $children = Get-CimInstance Win32_Process -Filter "ParentProcessId=$($proc.Id)" -ErrorAction SilentlyContinue
+    foreach ($child in $children) {
+        Stop-Process -Id $child.ProcessId -Force -ErrorAction SilentlyContinue
+    }
+    if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
+    Get-Process -Name "hutian-tenant-api*","tenant-api*" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 }
 
 Pop-Location

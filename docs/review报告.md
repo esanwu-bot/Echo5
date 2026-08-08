@@ -5,8 +5,8 @@
 > 技术栈: Go(Gin+GORM+MySQL) + Node.js/TS(MCP Agent Bridge) + Next.js 14(web) + Vite+React+AntD(admin) + Capacitor(mobile) + Wails(desktop)
 > 项目结构: pnpm workspace + Turborepo monorepo，6 个应用 + 1 个共享包
 > 问题统计: P0: 10 | P1: 22 | P2: 24 | P3: 19
-> 回归探针: 隔离链 28/28 全绿（T6.3a 4/4 + T6.3b 6/6 + admin-isolation 7/7 + m5-auth 11/11）
-> 注: tenant-selfservice 5/13 为 M5 遗留探针债（探针未适配 cookie 认证），非本轮修复引入
+> 回归探针: Go 隔离链 42/42 全绿（T6.3a 4/4 + T6.3b 6/6 + admin-isolation 7/7 + selfservice 14/14 + m5-auth 11/11）+ MCP 路由隔离 probe:tenant-routing 16/16
+> 注: tenant-selfservice 已从 5/13 适配 M5 cookie 认证并转绿（14/14），探针债清零
 
 ---
 
@@ -14,15 +14,15 @@
 
 | # | 层 | 位置 | 问题 | 建议 | 状态 |
 |---|---|---|---|---|---|
-| 1 | 后端 | apps/tenant-api/middleware/tenant_context.go:45-95, main.go:97-165 | `/api/v1/*` 路由组无任何认证，租户身份完全由自报 `X-Tenant-ID`/`X-Workspace-ID` 请求头决定；`POST /api/v1/internal/token` 可为任意合法组合签发 HMAC 内部 token，持 token 即可经 agent-bridge 读写该租户 siteBase 数据 | 该端点必须挂在已认证主体之后（portal JWT 或服务间密钥），废除"自报 header 即身份"设计；或删除该端点改用 portal 链的 JWT 版本 | ✅ 已修复：加 X-Internal-Secret 服务密钥中间件 |
+| 1 | 后端 | apps/tenant-api/middleware/tenant_context.go:45-95, main.go:97-165 | `/api/v1/*` 路由组无任何认证，租户身份完全由自报 `X-Tenant-ID`/`X-Workspace-ID` 请求头决定；`POST /api/v1/internal/token` 可为任意合法组合签发 HMAC 内部 token，持 token 即可经 agent-bridge 读写该租户 siteBase 数据 | 该端点必须挂在已认证主体之后（portal JWT 或服务间密钥），废除"自报 header 即身份"设计；或删除该端点改用 portal 链的 JWT 版本 | ✅ 已修复（两阶段）：① X-Internal-Secret 服务密钥中间件（过渡态）；② **终态**：删除旧 `POST /api/v1/internal/token` 明文自报签发端点，签发统一走 portal JWT 链 `GET /portal/api/v1/internal/token`（workspace 只从 JWT claims 解，协议层无法伪造跨租户签发）。服务密钥仅过渡保留 |
 | 2 | 前端 | apps/web/lib/bridgeToken.ts:55 | 内部 token 缓存 key 用 `jwt.slice(0,16)`，而 HS256 JWT 前 16 字符是固定头（所有用户相同），导致**所有用户共享同一条缓存**，用户 B 会带着用户 A 的 token 请求 bridge → 跨租户数据泄露 | 改用完整 JWT 的 sha256 摘要或解码 payload 中 uid+wid 作缓存 key | ✅ 已修复：改用 JWT payload 段作缓存 key |
 | 3 | 后端 | apps/tenant-api/config/config.go:38, main.go:68-83 | `Dev` 默认为 true（fail-open）：生产忘设 `TENANT_API_DEV=false` 即进入 DebugMode + CORS 反射任意 Origin 且 `Allow-Credentials: true` → 全域 CSRF | Dev 默认改 `== "true"`；CORS 改白名单不反射任意源 | ✅ 已修复：Dev 默认 false + CORS 白名单 |
 | 4 | 前端 | apps/web/components/inbox/MailReader.tsx:235 | `dangerouslySetInnerHTML` 直接渲染邮件 HTML（Agent/SSE 可控内容），无消毒 → 存储型 XSS | DOMPurify 白名单消毒后渲染，或改用安全 Markdown 渲染路径 | ✅ 已修复：改纯文本渲染 |
 | 5 | 前端 | apps/web/components/workbench/RightPanel.tsx:263 | `TerminalView` 用 `dangerouslySetInnerHTML` 渲染终端行（Agent 事件流写入）→ 任意脚本注入 | 终端输出改纯文本渲染，确需高亮用受控 ANSI→span 映射 | ✅ 已修复：改纯文本渲染 |
 | 6 | 前端 | apps/web/components/workbench/ToolCall.tsx:119 | `dangerouslySetInnerHTML` 渲染工具调用文本（Agent 事件）→ XSS | 改纯文本渲染或 DOMPurify 消毒 | ✅ 已修复：改纯文本渲染 |
 | 7 | 前端 | apps/web/components/workbench/MarkdownRenderer.tsx:71 | `rehypePlugins={[rehypeRaw]}` 对 Agent 流式 Markdown 启用原始 HTML 解析，与 SSR 安全版 `lib/markdown.tsx` 形成双标 → Agent 可夹带 `<script>` 执行 | 移除 rehype-raw，统一使用安全渲染器；如需 HTML 表格配合 rehype-sanitize | ✅ 已修复：移除 rehype-raw |
-| 8 | 前端 | apps/web/components/portal/PortalShell.tsx:65-66 | 登录表单硬编码默认凭据 `owner-a@hutian.dev` / `dev-password-change-in-prod` 作为 state 初值，随生产 bundle 下发 | 默认值置空，dev 凭据仅在 NODE_ENV!=="production" 时填充 | ✅ 已修复：env 条件化（闭环判官：生产 bundle grep 无默认凭据） |
-| 9 | 前端 | apps/admin/src/App.tsx:214 | 登录页 UI 明文展示默认管理员 token `dev-admin-token-change-in-prod` → 任何人可以管理员身份调用 API | 删除提示或仅开发环境显示，生产强制校验真实凭据 | ✅ 已修复：仅 import.meta.env.DEV 显示 |
+| 8 | 前端 | apps/web/components/portal/PortalShell.tsx:65-66 | 登录表单硬编码默认凭据 `owner-a@hutian.dev` / `dev-password-change-in-prod` 作为 state 初值，随生产 bundle 下发 | 默认值置空，dev 凭据仅在 NODE_ENV!=="production" 时填充 | ✅ 已修复：env 条件化 + **闭环判官已执行**（next build 后 grep `.next` 生产 bundle，默认凭据 0 命中） |
+| 9 | 前端 | apps/admin/src/App.tsx:214 | 登录页 UI 明文展示默认管理员 token `dev-admin-token-change-in-prod` → 任何人可以管理员身份调用 API | 删除提示或仅开发环境显示，生产强制校验真实凭据 | ✅ 已修复：仅 import.meta.env.DEV 显示 + **闭环判官已执行**（vite build 后 grep `dist` 生产 bundle，默认 token 0 命中）。附带修复：admin 缺 vite-env.d.ts 导致生产构建 TS 报错无法出包 |
 | 10 | 前端 | apps/admin/src/api/client.ts:14-22 | 管理员 token 存 localStorage（XSS 可读），且为静态字符串无过期 → 一次 XSS 即全平台接管 | 改 httpOnly + SameSite Cookie，加 token 过期与刷新机制 | ⚠️ 部分修复：删除了 console.log 泄露，但 localStorage 存储模型未改。**债：需 M5 排期迁移到 httpOnly cookie** |
 
 ---
@@ -178,22 +178,42 @@
 ### 回归探针结果
 
 ```
-go vet:          PASS
-go build:        PASS
-T6.3a 隔离:      4/4 PASS  ← 隔离链完好
-T6.3b 跨语言:    6/6 PASS  ← token 签发/验签/路由隔离完好
-admin-isolation: 7/7 PASS  ← admin 鉴权完好
-m5-auth:         11/11 PASS ← cookie+CSRF+logout 完好
-tenant-selfservice: 5/13   ← M5 遗留探针债（探针用 Bearer token，M5 已改 cookie）
+go vet:             PASS
+go build:           PASS
+T6.3a 隔离:         4/4 PASS   ← 隔离链完好
+T6.3b 跨语言:       6/6 PASS   ← 改走 portal JWT 链签发，新增断言⑥验旧端点已删除=404
+admin-isolation:    7/7 PASS   ← admin 鉴权完好
+tenant-selfservice: 14/14 PASS ← 已适配 M5 cookie 认证（原 5/13 探针债清零）
+m5-auth:            11/11 PASS ← cookie+CSRF+logout 完好
+probe:tenant-routing: 16/16 PASS ← MCP 实例池路由隔离（含 env 白名单回归：雷二 ⑤g 证 SITEBASE_ADMIN_URL 只来自签名 payload 覆盖）
 ```
 
-**结论：安全修复未崩隔离链。** 隔离层（T6.3a/b）和安全层（m5-auth, admin-isolation）同时绿。
+**P0-8/9 闭环判官（生产 bundle grep）：**
+
+```
+apps/web  next build → grep .next:
+  dev-password-change-in-prod / owner-a@hutian.dev / admin-b@hutian.dev → 0 命中
+  dev-admin-token / dev-secret-key / dev-internal-secret / dev-jwt-key  → 0 命中
+  "change-in-prod" 全串                                                 → 0 命中
+apps/admin vite build → grep dist: 同上全 0 命中
+（bundle 中仅存 HUTIAN_TENANT_TOKEN cookie 名——公开信息非凭据）
+```
+
+**结论：安全修复未崩隔离链，且隔离探针自身完成了 M5 适配。** 隔离层（T6.3a/b）、安全层（m5-auth、admin-isolation）、自服务层（selfservice）、MCP 路由层（tenant-routing）四链同绿。
+
+### 尾巴收尾记录（四轮补尾）
+
+| 尾巴 | 内容 | 结果 |
+|---|---|---|
+| 一 | P0-1 终态：删除旧 `POST /api/v1/internal/token`，签发统一 portal JWT 链；probe_cross_lang 改走真实登录链（login→cookie→GET 签发），新增断言验旧端点 404 | 已删端点，cross-lang 6/6 绿。服务密钥（X-Internal-Secret）保留为过渡态，列债 |
+| 二 | pool.ts env 白名单回归：probe:tenant-routing 重跑 | 16/16 绿（雷二 ⑤g 证白名单不破坏 SITEBASE_ADMIN_URL 覆盖链） |
+| 三 | P0-8/9 闭环判官：生产 bundle grep | web `.next` + admin `dist` 默认凭据 0 命中 |
+| 四 | probe_tenant_selfservice 适配 M5 cookie 认证 | 14/14 绿（Bearer→cookie+CSRF nonce 双因子） |
 
 ### 遗留债（需排期）
 
 1. **P0-10 完整修复**：admin token 从 localStorage 迁移到 httpOnly cookie（与 portal 的 HUTIAN_TENANT_TOKEN 同方案）
-2. **P0-8/9 闭环验证**：需 `next build` 后 grep 生产 bundle 确认无默认凭据字符串
-3. **tenant-selfservice 探针适配 M5**：改用 cookie 认证方式
-4. **P1-1 登录锁定**：FailedLoginCount/LockedUntil 字段写入逻辑
-5. **P1-9/10 Agent 安全**：cms 写工具纳入破坏性闸门 + cms_upload_media 路径白名单
-6. **P1-13/14 Schema 基线统一**：确立 SQL 文件为唯一基线，解决软删除+唯一约束冲突
+2. **P0-1 收尾**：`/api/v1` 服务密钥（X-Internal-Secret）为过渡态——待 /api/v1 剩余业务面（workspaces 等）迁移到 portal/admin 双轨后，整组下线
+3. **P1-1 登录锁定**：FailedLoginCount/LockedUntil 字段写入逻辑
+4. **P1-9/10 Agent 安全**：cms 写工具纳入破坏性闸门 + cms_upload_media 路径白名单
+5. **P1-13/14 Schema 基线统一**：确立 SQL 文件为唯一基线，解决软删除+唯一约束冲突

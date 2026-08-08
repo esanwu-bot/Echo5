@@ -20,9 +20,7 @@ import (
 	"hutian-tenant-api/db"
 	"hutian-tenant-api/handlers"
 	"hutian-tenant-api/middleware"
-	"hutian-tenant-api/models"
 	"hutian-tenant-api/repo"
-	"hutian-tenant-api/token"
 )
 
 func main() {
@@ -137,51 +135,9 @@ func main() {
 			c.JSON(200, gin.H{"data": ws, "tenant_id": tenantID})
 		})
 
-		// T6.2 扩展（ADR-cross-lang）：跨语言内部 token 签发
-		// Go 验完租户，签发 HMAC token，下游 bridge/MCP 验签后用 payload 里的 sitebase_base_url 路由
-		// 球门：防"Go 层绿、bridge 调 siteBase 照样串"的假隔离
-		api.POST("/internal/token", func(c *gin.Context) {
-			tenantID := middleware.MustTenantID(c)
-			workspaceID := middleware.MustWorkspaceID(c)
-			seatID := middleware.MaybeSeatID(c)
-
-			// 查 workspace 拿 sitebase_instance_id（中间件已校验归属，这里直接查）
-			var ws models.Workspace
-			if err := gormDB.First(&ws, workspaceID).Error; err != nil {
-				c.JSON(500, gin.H{"error": "workspace lookup failed"})
-				return
-			}
-			// 查 sitebase_instance 拿 base_url
-			var inst models.SitebaseInstance
-			if err := gormDB.First(&inst, ws.SitebaseInstanceID).Error; err != nil {
-				c.JSON(500, gin.H{"error": "sitebase instance lookup failed"})
-				return
-			}
-
-			signer, err := token.NewSigner()
-			if err != nil {
-				c.JSON(500, gin.H{"error": "token signer not configured: " + err.Error()})
-				return
-			}
-			tok, err := signer.Issue(token.Payload{
-				TenantID:           tenantID,
-				WorkspaceID:        workspaceID,
-				SitebaseInstanceID: inst.ID,
-				SitebaseBaseURL:    inst.BaseURL,
-				SeatID:             seatID,
-			})
-			if err != nil {
-				c.JSON(500, gin.H{"error": "issue token: " + err.Error()})
-				return
-			}
-			c.JSON(200, gin.H{
-				"token":           tok,
-				"tenant_id":       tenantID,
-				"workspace_id":    workspaceID,
-				"sitebase_url":    inst.BaseURL,
-				"expires_in":      300,
-			})
-		})
+		// P0-1 终态：旧的明文 header 签发端点 POST /api/v1/internal/token 已删除。
+		// 跨语言内部 token 签发统一走 portal JWT 链：GET /portal/api/v1/internal/token
+		// （handlers.TenantIssueInternalToken，workspace 只从 JWT claims 解，请求无参可伪造）
 	}
 
 	// T6.2+ 路由组（待加）：
@@ -252,7 +208,7 @@ func main() {
 	// portal 路由组（租户自服务后台，链①：tenant-api 直查 hutian）
 	// 接缝（T7.2）：强制 TenantJWTContext 四合一单中间件；与 ops admin 中间件物理分开
 	// 链①不签 ADR 内部 token，只读/写自己元数据
-	// 链②（触发工具）仍走 /api/v1/internal/token 签 HMAC token
+	// 链②（触发工具）走 portal JWT 链：GET /portal/api/v1/internal/token 签 HMAC token
 	// ────────────────────────────────────────────────
 	// T7.5 登录端点（公开，不过 JWT 中间件）
 	r.POST("/portal/api/v1/auth/login", handlers.TenantLogin(gormDB, jwtSigner, cfg.Dev))

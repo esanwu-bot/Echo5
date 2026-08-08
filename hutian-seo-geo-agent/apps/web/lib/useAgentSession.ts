@@ -37,7 +37,8 @@ import {
  * ════════════════════════════════════════════════════
  * P0 红线：workbench → agent-bridge 绝不传明文 X-Tenant-ID / X-Workspace-ID header
  *   违反 ADR 四条信任源原则：下游签名签 / 单一信任源 / 签名防篡改 / 下游不连 hutian
- *   下一轮接 ADR 内部 token：workbench BFF → tenant-api /api/v1/internal/token 签 HMAC token
+ *   已落地：workbench BFF（lib/bridgeToken.ts）→ tenant-api GET /portal/api/v1/internal/token
+ *   （portal JWT 验签，workspace 只从 claims 解）签 HMAC token
  *   → 把带签名的 {tenant_id, workspace_id, sitebase_base_url, exp} 给 bridge 验签
  *   → bridge 只信签名 token，不信任何明文 header
  * ════════════════════════════════════════════════════

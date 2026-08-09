@@ -550,7 +550,8 @@ func TenantInviteSeat(c *gin.Context) {
 
 	var sub models.Subscription
 	// FOR UPDATE 锁 subscription 行，防 Count→Create 间隙并发
-	if err := tx.Set("gorm:query_option", "FOR UPDATE").
+	// T9.7 修复：GORM v2 的 gorm:query_option 不生效，改用 clause.Locking{Strength:"UPDATE"}
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("tenant_id = ?", tenantID).First(&sub).Error; err != nil {
 		writePortalError(c, cfgDev, http.StatusInternalServerError, "subscription not found", "")
 		return

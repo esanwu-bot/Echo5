@@ -20,6 +20,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"hutian-tenant-api/middleware"
 	"hutian-tenant-api/models"
@@ -885,7 +886,9 @@ func CreateSeat(c *gin.Context) {
 		}
 	}()
 	var sub models.Subscription
-	if err := tx.Set("gorm:query_option", "FOR UPDATE").
+	// FOR UPDATE 锁 subscription 行，防 TOCTOU
+	// T9.7 修复：GORM v2 的 gorm:query_option 不生效，改用 clause.Locking{Strength:"UPDATE"}
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("tenant_id = ?", req.TenantID).First(&sub).Error; err != nil {
 		c.JSON(400, gin.H{"error": "subscription not found for tenant"})
 		return

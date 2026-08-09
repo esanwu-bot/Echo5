@@ -13,6 +13,8 @@
 #   - probe:m5-auth               (M5 收口：httpOnly cookie / CSRF / 404 UX / logout)
 #   - probe:login-lockout         (P1-1 登录失败锁定：N 次失败→423、成功清零)
 #   - probe:api-keys              (T9.1 开放 API key 管理：创建/列表/吊销/鉴权/越权，8 asserts)
+#   - probe:fail-closed           (T9.7 工具层挂→503 handler 层：diagnose/schema 503 + 统一错误口径，3 asserts，tool-executor 未起时跑)
+#   - probe:seats-quota           (T9.7 席位 TOCTOU 并发不超额：5 并发 CreateSeat 成功==allowNew/409==rest/DB active 不超限，3 asserts)
 #   - probe:open-api              (T9.2 开放 API 工具端点：diagnose/schema/check/sitemap/submit，6 asserts)
 #   - probe:quota                 (T9.3 配额执行链路：拦截/空窗口并发首调TOCTOU/无配额放行/allow策略，4 asserts)
 #   - probe:rate-limit            (T9.4 限流：限额内放行/超限429/Retry-After头/限流不消耗配额，4 asserts)
@@ -35,18 +37,18 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Resolve-Path (Join-Path (Join-Path $PSScriptRoot "..") "..")
 $apiDir   = Join-Path $repoRoot "apps\tenant-api"
 
-Write-Host "=== [1/18] go vet ===" -ForegroundColor Cyan
+Write-Host "=== [1/20] go vet ===" -ForegroundColor Cyan
 Push-Location $apiDir
 go vet ./...
 if ($LASTEXITCODE -ne 0) { Write-Host "FAIL: go vet" -ForegroundColor Red; Pop-Location; exit 1 }
 Write-Host "PASS: go vet" -ForegroundColor Green
 
-Write-Host "=== [2/18] go build ===" -ForegroundColor Cyan
+Write-Host "=== [2/20] go build ===" -ForegroundColor Cyan
 go build ./...
 if ($LASTEXITCODE -ne 0) { Write-Host "FAIL: go build" -ForegroundColor Red; Pop-Location; exit 1 }
 Write-Host "PASS: go build" -ForegroundColor Green
 
-Write-Host "=== [3/18] probe:schema-baseline (P1-13/14 模型↔SQL 对齐) ===" -ForegroundColor Cyan
+Write-Host "=== [3/20] probe:schema-baseline (P1-13/14 模型↔SQL 对齐) ===" -ForegroundColor Cyan
 go run ./cmd/probe_schema_baseline
 if ($LASTEXITCODE -ne 0) {
     Write-Host "FAIL: probe:schema-baseline" -ForegroundColor Red
@@ -67,9 +69,9 @@ $needStop = $false
 $proc = $null
 try {
     $health = Invoke-WebRequest -Uri "http://localhost:4318/healthz" -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop
-    Write-Host "=== [4/18] tenant-api already running (healthz=$($health.StatusCode)) ===" -ForegroundColor Cyan
+    Write-Host "=== [4/20] tenant-api already running (healthz=$($health.StatusCode)) ===" -ForegroundColor Cyan
 } catch {
-    Write-Host "=== [4/18] start tenant-api (background) ===" -ForegroundColor Cyan
+    Write-Host "=== [4/20] start tenant-api (background) ===" -ForegroundColor Cyan
     $proc = Start-Process -FilePath "go" -ArgumentList "run","." -WorkingDirectory $apiDir -PassThru -WindowStyle Hidden -RedirectStandardOutput "$env:TEMP\tenant-api.verify.log" -RedirectStandardError "$env:TEMP\tenant-api.verify.err"
     $needStop = $true
     # Wait for service to be healthy (up to 20s)
@@ -96,7 +98,7 @@ try {
 
 $exitCode = 0
 
-Write-Host "=== [5/18] probe:tenant-isolation (T6.3a Go layer) ===" -ForegroundColor Cyan
+Write-Host "=== [5/20] probe:tenant-isolation (T6.3a Go layer) ===" -ForegroundColor Cyan
 go run ./cmd/probe_tenant_isolation
 if ($LASTEXITCODE -ne 0) {
     Write-Host "FAIL: probe:tenant-isolation" -ForegroundColor Red
@@ -105,7 +107,7 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "PASS: probe:tenant-isolation" -ForegroundColor Green
 }
 
-Write-Host "=== [6/18] probe:cross-lang (T6.3b cross-lang boundary) ===" -ForegroundColor Cyan
+Write-Host "=== [6/20] probe:cross-lang (T6.3b cross-lang boundary) ===" -ForegroundColor Cyan
 $env:TENANT_INTERNAL_TOKEN_KEY = "dev-secret-key-change-in-prod"
 go run ./cmd/probe_cross_lang
 if ($LASTEXITCODE -ne 0) {
@@ -115,7 +117,7 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "PASS: probe:cross-lang" -ForegroundColor Green
 }
 
-Write-Host "=== [7/18] probe:admin-isolation (P0-1 admin auth) ===" -ForegroundColor Cyan
+Write-Host "=== [7/20] probe:admin-isolation (P0-1 admin auth) ===" -ForegroundColor Cyan
 $env:TENANT_ADMIN_TOKEN = "dev-admin-token-change-in-prod"
 go run ./cmd/probe_admin_isolation
 if ($LASTEXITCODE -ne 0) {
@@ -125,7 +127,7 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "PASS: probe:admin-isolation" -ForegroundColor Green
 }
 
-Write-Host "=== [8/18] probe:tenant-selfservice (T7.4) ===" -ForegroundColor Cyan
+Write-Host "=== [8/20] probe:tenant-selfservice (T7.4) ===" -ForegroundColor Cyan
 $env:TENANT_JWT_KEY = "dev-jwt-key-change-in-prod"
 go run ./cmd/probe_tenant_selfservice
 if ($LASTEXITCODE -ne 0) {
@@ -135,7 +137,7 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "PASS: probe:tenant-selfservice" -ForegroundColor Green
 }
 
-Write-Host "=== [9/18] probe:m5-auth (M5 收口：cookie+CSRF+404+logout) ===" -ForegroundColor Cyan
+Write-Host "=== [9/20] probe:m5-auth (M5 收口：cookie+CSRF+404+logout) ===" -ForegroundColor Cyan
 $env:TENANT_JWT_KEY = "dev-jwt-key-change-in-prod"
 go run ./cmd/probe_m5_auth
 if ($LASTEXITCODE -ne 0) {
@@ -145,7 +147,7 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "PASS: probe:m5-auth" -ForegroundColor Green
 }
 
-Write-Host "=== [10/18] probe:login-lockout (P1-1：N 次失败→423、成功清零) ===" -ForegroundColor Cyan
+Write-Host "=== [10/20] probe:login-lockout (P1-1：N 次失败→423、成功清零) ===" -ForegroundColor Cyan
 go run ./cmd/probe_login_lockout
 if ($LASTEXITCODE -ne 0) {
     Write-Host "FAIL: probe:login-lockout" -ForegroundColor Red
@@ -154,13 +156,36 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "PASS: probe:login-lockout" -ForegroundColor Green
 }
 
-Write-Host "=== [11/18] probe:api-keys (T9.1 开放 API key 管理, 8 asserts) ===" -ForegroundColor Cyan
+Write-Host "=== [11/20] probe:api-keys (T9.1 开放 API key 管理, 8 asserts) ===" -ForegroundColor Cyan
 go run ./cmd/probe_api_keys
 if ($LASTEXITCODE -ne 0) {
     Write-Host "FAIL: probe:api-keys" -ForegroundColor Red
     $exitCode = 1
 } else {
     Write-Host "PASS: probe:api-keys" -ForegroundColor Green
+}
+
+# T9.7 补的 2 条 ADR 安全属性（必须在 tool-executor 启动前跑）：
+# - probe:fail-closed：ADR 验收表第 6 条"工具执行层挂→503 不 fail-open"的 handler 层断言
+#   此时 tool-executor 未起，调 /open/v1/diagnose 必然走 fail-closed 分支返回 503
+# - probe:seats-quota：ADR 验收表第 8 条"席位竞态回归 seats_limit 并发不超限"
+#   纯 admin HTTP + DB，不依赖 tool-executor
+Write-Host "=== [12/20] probe:fail-closed (T9.7 工具层挂→503 handler 层, 3 asserts) ===" -ForegroundColor Cyan
+go run ./cmd/probe_fail_closed
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "FAIL: probe:fail-closed" -ForegroundColor Red
+    $exitCode = 1
+} else {
+    Write-Host "PASS: probe:fail-closed" -ForegroundColor Green
+}
+
+Write-Host "=== [13/20] probe:seats-quota (T9.7 席位 TOCTOU 并发不超额, 3 asserts) ===" -ForegroundColor Cyan
+go run ./cmd/probe_seats_quota
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "FAIL: probe:seats-quota" -ForegroundColor Red
+    $exitCode = 1
+} else {
+    Write-Host "PASS: probe:seats-quota" -ForegroundColor Green
 }
 
 # --- T9.0 工具执行层（Python REST，系统 Python 3.13）---
@@ -171,7 +196,7 @@ $mcpDir = Join-Path $repoRoot "hutian-seo-plugin\mcp-server"
 $toolProc = $null
 $needStopTool = $false
 
-Write-Host "=== [12/18] start tool-executor (T9.0 Python REST :4320) ===" -ForegroundColor Cyan
+Write-Host "=== [14/20] start tool-executor (T9.0 Python REST :4320) ===" -ForegroundColor Cyan
 try {
     $h2 = Invoke-WebRequest -Uri "http://127.0.0.1:4320/healthz" -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop
     Write-Host "tool-executor already running (healthz=$($h2.StatusCode))" -ForegroundColor Cyan
@@ -196,7 +221,7 @@ try {
     }
 }
 
-Write-Host "=== [13/18] probe:open-api (T9.2 开放 API 工具端点, 6 asserts) ===" -ForegroundColor Cyan
+Write-Host "=== [15/20] probe:open-api (T9.2 开放 API 工具端点, 6 asserts) ===" -ForegroundColor Cyan
 go run ./cmd/probe_open_api
 if ($LASTEXITCODE -ne 0) {
     Write-Host "FAIL: probe:open-api" -ForegroundColor Red
@@ -205,7 +230,7 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "PASS: probe:open-api" -ForegroundColor Green
 }
 
-Write-Host "=== [14/18] probe:quota (T9.3 配额执行链路, 4 asserts) ===" -ForegroundColor Cyan
+Write-Host "=== [16/20] probe:quota (T9.3 配额执行链路, 4 asserts) ===" -ForegroundColor Cyan
 go run ./cmd/probe_quota
 if ($LASTEXITCODE -ne 0) {
     Write-Host "FAIL: probe:quota" -ForegroundColor Red
@@ -214,7 +239,7 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "PASS: probe:quota" -ForegroundColor Green
 }
 
-Write-Host "=== [15/18] probe:rate-limit (T9.4 限流中间件, 4 asserts) ===" -ForegroundColor Cyan
+Write-Host "=== [17/20] probe:rate-limit (T9.4 限流中间件, 4 asserts) ===" -ForegroundColor Cyan
 go run ./cmd/probe_rate_limit
 if ($LASTEXITCODE -ne 0) {
     Write-Host "FAIL: probe:rate-limit" -ForegroundColor Red
@@ -223,7 +248,7 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "PASS: probe:rate-limit" -ForegroundColor Green
 }
 
-Write-Host "=== [16/18] probe:ownership (T9.5 归属校验, 4 asserts) ===" -ForegroundColor Cyan
+Write-Host "=== [18/20] probe:ownership (T9.5 归属校验, 4 asserts) ===" -ForegroundColor Cyan
 go run ./cmd/probe_ownership
 if ($LASTEXITCODE -ne 0) {
     Write-Host "FAIL: probe:ownership" -ForegroundColor Red
@@ -232,7 +257,7 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "PASS: probe:ownership" -ForegroundColor Green
 }
 
-Write-Host "=== [17/18] probe:audit (T9.6 开放 API 审计 access_kind=api, 6 asserts) ===" -ForegroundColor Cyan
+Write-Host "=== [19/20] probe:audit (T9.6 开放 API 审计 access_kind=api, 6 asserts) ===" -ForegroundColor Cyan
 go run ./cmd/probe_audit
 if ($LASTEXITCODE -ne 0) {
     Write-Host "FAIL: probe:audit" -ForegroundColor Red
@@ -241,7 +266,7 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "PASS: probe:audit" -ForegroundColor Green
 }
 
-Write-Host "=== [18/18] probe:t9-tool-executor (T9.0 Go→Python REST 调通, 4 asserts) ===" -ForegroundColor Cyan
+Write-Host "=== [20/20] probe:t9-tool-executor (T9.0 Go→Python REST 调通, 4 asserts) ===" -ForegroundColor Cyan
 go run ./cmd/probe_t9_tool_executor
 if ($LASTEXITCODE -ne 0) {
     Write-Host "FAIL: probe:t9-tool-executor" -ForegroundColor Red

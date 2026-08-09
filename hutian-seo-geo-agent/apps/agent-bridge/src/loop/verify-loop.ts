@@ -77,7 +77,7 @@ async function main() {
     { name: "含 tool_end 事件", ok: toolEndCount > 0 },
     { name: "tool_start === tool_end", ok: toolStartCount === toolEndCount, detail: `${toolStartCount} vs ${toolEndCount}` },
     { name: "末事件是 done", ok: types[types.length - 1] === "done" },
-    { name: "meta.totalTools === 5", ok: events[0].type === "meta" && events[0].totalTools === 5 },
+    { name: "meta.totalTools === 10", ok: events[0].type === "meta" && events[0].totalTools === 10 },
   ];
 
   console.log("\n=== 结构断言 ===");

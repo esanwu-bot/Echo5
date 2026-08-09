@@ -16,6 +16,8 @@
  */
 import type { AgentEvent, StatItem } from "@hutian/agent-protocol";
 import type { Intent } from "./intent.ts";
+import fs from "node:fs";
+import path from "node:path";
 import {
   buildBrandFirstConstraint,
   deriveStatsFromDiagnosis,
@@ -52,6 +54,67 @@ export interface AfterGuardrailResult {
   statsItems?: StatItem[];
   /** 自动复验任务（C 规则：写后必复验） */
   reverifyTask?: ReverifyTask;
+}
+
+// ───────────────────────────────────────────────────────────────
+// P1-10 · cms_upload_media 路径白名单
+// ───────────────────────────────────────────────────────────────
+
+/** 读取允许上传的目录白名单（绝对路径）。
+ * 优先读 env CMS_UPLOAD_ALLOWED_DIRS（逗号分隔）；未配置则默认仅允许
+ * cwd 下的 uploads/ 与 public/uploads/。 */
+function getUploadAllowedDirs(): string[] {
+  const env = process.env.CMS_UPLOAD_ALLOWED_DIRS;
+  if (env) {
+    return env
+      .split(",")
+      .map((d) => d.trim())
+      .filter(Boolean)
+      .map((d) => path.resolve(d));
+  }
+  const cwd = process.cwd();
+  return [path.join(cwd, "uploads"), path.join(cwd, "public", "uploads")];
+}
+
+/** 校验 cms_upload_media 的 file_path 是否在白名单目录下，防止任意文件读取。 */
+export function validateCmsUploadPath(
+  filePath: unknown,
+): { ok: boolean; reason?: string } {
+  if (typeof filePath !== "string" || filePath.length === 0) {
+    return { ok: false, reason: "file_path 为空或非字符串" };
+  }
+  if (filePath.includes("\0")) {
+    return { ok: false, reason: "file_path 包含非法空字符" };
+  }
+  const allowedDirs = getUploadAllowedDirs();
+  if (allowedDirs.length === 0) {
+    return { ok: false, reason: "未配置 CMS_UPLOAD_ALLOWED_DIRS，上传被禁用" };
+  }
+  let realPath: string;
+  try {
+    realPath = fs.realpathSync(path.resolve(filePath));
+  } catch {
+    // 文件尚不存在时 realpath 会抛，退而使用绝对路径并继续检查目录前缀
+    realPath = path.resolve(filePath);
+  }
+  const normalizedAllowed = allowedDirs.map((dir) => {
+    try {
+      return fs.realpathSync(dir);
+    } catch {
+      return path.resolve(dir);
+    }
+  });
+  const inside = normalizedAllowed.some((dir) => {
+    const relative = path.relative(dir, realPath);
+    return !relative.startsWith("..") && !path.isAbsolute(relative);
+  });
+  if (!inside) {
+    return {
+      ok: false,
+      reason: `file_path 不在允许上传目录内: ${allowedDirs.join(", ")}`,
+    };
+  }
+  return { ok: true };
 }
 
 // ───────────────────────────────────────────────────────────────
@@ -122,6 +185,31 @@ export function execGuardrail(
   intent: Intent,
   toolCallId: string,
 ): ExecGuardrailResult {
+  // P1-10：cms_upload_media 必须先过路径白名单（独立于用户确认）
+  if (toolName === "cms_upload_media") {
+    const pathCheck = validateCmsUploadPath(args.file_path);
+    if (!pathCheck.ok) {
+      const events: AgentEvent[] = [
+        {
+          type: "tool_end",
+          id: toolCallId,
+          ok: false,
+          durationMs: 0,
+          output: {
+            error: "cms_upload_media_path_blocked",
+            note: pathCheck.reason,
+            pending: { name: toolName, args },
+          },
+        },
+      ];
+      return {
+        allowed: false,
+        rejectReason: `cms_upload_media_path_blocked: ${pathCheck.reason}`,
+        events,
+      };
+    }
+  }
+
   if (!isDestructiveToolCall(toolName, args)) {
     return { allowed: true };
   }

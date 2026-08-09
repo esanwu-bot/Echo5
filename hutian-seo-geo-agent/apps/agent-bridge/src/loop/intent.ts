@@ -503,6 +503,15 @@ export function isDestructiveAuthorized(intent: Intent): boolean {
   return intent.source === "rule" && intent.kind === "confirm";
 }
 
+/** CMS 写类工具名集合（P1-9：全部纳入破坏性闸门） */
+const CMS_WRITE_TOOLS = new Set([
+  "cms_create_page",
+  "cms_update_content",
+  "cms_configure_product",
+  "cms_upload_media",
+  "cms_publish",
+]);
+
 /** 判断工具调用是否破坏性（需要闸门） */
 export function isDestructiveToolCall(
   toolName: string,
@@ -510,5 +519,7 @@ export function isDestructiveToolCall(
 ): boolean {
   if (toolName === "entity_rename" && args.dry_run === false) return true;
   if (toolName === "submit_sitemap") return true;
+  // P1-9：CMS 写类工具（建/改/删/发/传）统一走破坏性确认
+  if (CMS_WRITE_TOOLS.has(toolName)) return true;
   return false;
 }

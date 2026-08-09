@@ -17,9 +17,13 @@
  * 10. windowDays slot 抽取：30 天 / 7d 抽到
  * 11. 红线：isDestructiveAuthorized 只信 rule + confirm，不信 llm
  * 12. 红线：isDestructiveToolCall 识别 entity_rename dry_run=false + submit_sitemap
- * 13. ambiguous 反问：无 LLM 时降级 ambiguous + needsClarify
- * 14. applyFlowControl(rename) 注入硬约束
- * 15. applyFlowControl(submit) 注入闸门提示
+ *    并覆盖全部 CMS 写工具（cms_create_page / update_content / configure_product /
+ *    upload_media / publish）
+ * 13. P1-10：cms_upload_media 路径白名单（允许 uploads/ / public/uploads/，拦截
+ *    越级路径、空路径、空字符）
+ * 14. ambiguous 反问：无 LLM 时降级 ambiguous + needsClarify
+ * 15. applyFlowControl(rename) 注入硬约束
+ * 16. applyFlowControl(submit) 注入闸门提示
  */
 import {
   classifyIntentByRule,
@@ -30,6 +34,7 @@ import {
   type Intent,
 } from "./intent.ts";
 import { applyFlowControl } from "./flow-control.ts";
+import { validateCmsUploadPath } from "./guardrail-pipeline.ts";
 
 interface Case {
   name: string;
@@ -252,10 +257,75 @@ async function run() {
       isDestructiveToolCall("run_diagnosis", { url: "x.com" }) === false,
       "诊断只读，非破坏性",
     );
+    assert(
+      "cms_create_page 破坏性",
+      isDestructiveToolCall("cms_create_page", { title: "t", summary: "s", content: "c" }) === true,
+      "cms_create_page 必须纳入破坏性闸门",
+    );
+    assert(
+      "cms_update_content 破坏性",
+      isDestructiveToolCall("cms_update_content", { id: 1 }) === true,
+      "cms_update_content 必须纳入破坏性闸门",
+    );
+    assert(
+      "cms_configure_product 破坏性",
+      isDestructiveToolCall("cms_configure_product", { name: "n", product_code: "p" }) === true,
+      "cms_configure_product 必须纳入破坏性闸门",
+    );
+    assert(
+      "cms_upload_media 破坏性",
+      isDestructiveToolCall("cms_upload_media", { file_path: "/tmp/x.png" }) === true,
+      "cms_upload_media 必须纳入破坏性闸门",
+    );
+    assert(
+      "cms_publish 破坏性",
+      isDestructiveToolCall("cms_publish", { id: 1, type: "article" }) === true,
+      "cms_publish 必须纳入破坏性闸门",
+    );
   }
 
-  // ── 13. ambiguous 反问（无 LLM 时降级）
-  console.log("\n■ 13. ambiguous 反问（无 LLM 降级）");
+  // ── 13. P1-10 · cms_upload_media 路径白名单
+  console.log("\n■ 13. P1-10 · cms_upload_media 路径白名单");
+  {
+    assert(
+      "空路径被拦截",
+      validateCmsUploadPath("").ok === false,
+      "空 file_path 必须拦截",
+    );
+    assert(
+      "非字符串路径被拦截",
+      validateCmsUploadPath(123).ok === false,
+      "非字符串 file_path 必须拦截",
+    );
+    assert(
+      "空字符路径被拦截",
+      validateCmsUploadPath("uploads/\0x.png").ok === false,
+      "含空字符 file_path 必须拦截",
+    );
+    assert(
+      "越级 ../.env 被拦截",
+      validateCmsUploadPath("../.env").ok === false,
+      "../.env 必须被白名单拦截",
+    );
+    assert(
+      "绝对系统路径被拦截",
+      validateCmsUploadPath("/etc/passwd").ok === false,
+      "/etc/passwd 必须被白名单拦截",
+    );
+    assert(
+      "uploads 子目录允许",
+      validateCmsUploadPath("uploads/hero.png").ok === true,
+      "uploads/hero.png 应在默认白名单内",
+    );
+    assert(
+      "public/uploads 子目录允许",
+      validateCmsUploadPath("public/uploads/logo.png").ok === true,
+      "public/uploads/logo.png 应在默认白名单内",
+    );
+  }
+
+  // ── 14. ambiguous 反问（无 LLM 时降级）
+  console.log("\n■ 14. ambiguous 反问（无 LLM 降级）");
   {
     const r = classifyIntentByRule("那个啥来着");
     assert(
@@ -276,8 +346,8 @@ async function run() {
     );
   }
 
-  // ── 14. applyFlowControl(rename) 注入硬约束
-  console.log("\n■ 14. applyFlowControl(rename) 注入硬约束");
+  // ── 15. applyFlowControl(rename) 注入硬约束
+  console.log("\n■ 15. applyFlowControl(rename) 注入硬约束");
   {
     const intent: Intent = {
       kind: "rename",
@@ -294,8 +364,8 @@ async function run() {
     );
   }
 
-  // ── 15. applyFlowControl(submit) 注入闸门提示
-  console.log("\n■ 15. applyFlowControl(submit) 注入闸门提示");
+  // ── 16. applyFlowControl(submit) 注入闸门提示
+  console.log("\n■ 16. applyFlowControl(submit) 注入闸门提示");
   {
     const intent: Intent = {
       kind: "submit",

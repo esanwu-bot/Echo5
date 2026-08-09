@@ -27,6 +27,10 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"hutian-tenant-api/config"
+	"hutian-tenant-api/db"
+	"hutian-tenant-api/models"
 )
 
 const apiBase = "http://localhost:4318"
@@ -130,6 +134,56 @@ func main() {
 		detail: fmt.Sprintf("429_with_retry_after=%d/%d first_value=%q (want >0)", retryAfterSeen, count429, firstRetryAfter),
 	})
 
+	// ── ④ 被限流的工具请求不消耗配额（两层计量互不污染）──
+	// 验证 RateLimit 在 QuotaEnforce 之前，被 429 的 diagnose 不进 usage_meters：
+	//   a. sleep 到下个分钟窗口（让限流桶重置）
+	//   b. 重置 usage_meters（seo_audits count=0）
+	//   c. 打满限流桶（80 并发 whoami → 限流桶耗尽）
+	//   d. 再打 1 个 diagnose → 应被限流 429（不走 QuotaEnforce，不消耗配额）
+	//   e. 查 usage_meters count=0（不是 1，证明被限流的 diagnose 没进配额）
+	log.Println("[④] 验证被限流的工具请求不消耗配额（两层计量互不污染）...")
+	sleepToNextMinute()
+
+	gormDB, err := db.Connect(config.Load())
+	if err != nil {
+		log.Fatalf("[fatal] connect db: %v", err)
+	}
+	var tenant models.Tenant
+	if err := gormDB.Where("slug = ?", "tenant-a").First(&tenant).Error; err != nil {
+		log.Fatalf("[fatal] tenant-a not found: %v", err)
+	}
+	// 重置 usage_meters（硬删，与 probe_quota 一致）
+	gormDB.Unscoped().Where("tenant_id = ? AND meter_kind = ?", tenant.ID, models.MeterSEOAudits).Delete(&models.UsageMeter{})
+
+	// 打满限流桶
+	log.Println("[④] 打满限流桶（80 并发 whoami）...")
+	for i := 0; i < 80; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			doGetBearer(apiKey, "/open/v1/whoami")
+		}()
+	}
+	wg.Wait()
+	time.Sleep(200 * time.Millisecond) // 等并发请求排空
+
+	// 再打 1 个 diagnose → 应被限流 429
+	codeDiag, _ := doPostBearer(apiKey, "/open/v1/diagnose", map[string]string{"url": "https://example.com"})
+	log.Printf("[④] diagnose after rate-limit exhausted: code=%d (want 429)", codeDiag)
+
+	// 查 usage_meters count
+	var meterCount int64
+	gormDB.Model(&models.UsageMeter{}).
+		Where("tenant_id = ? AND meter_kind = ?", tenant.ID, models.MeterSEOAudits).
+		Count(&meterCount)
+
+	pass4 := codeDiag == 429 && meterCount == 0
+	asserts = append(asserts, assertion{
+		name:   "④ 被限流的工具请求不消耗配额（usage_meters count=0）",
+		pass:   pass4,
+		detail: fmt.Sprintf("diagnose_code=%d usage_count=%d (want 429, 0)", codeDiag, meterCount),
+	})
+
 	printSummary(asserts)
 }
 
@@ -185,7 +239,7 @@ func doWrite(client *http.Client, method, path string, body map[string]string, w
 	return resp.StatusCode, string(b)
 }
 
-// doGetBearer 发 GET 请求，返回 (statusCode, retryAfterHeader, err)
+// doGetBearer 发 GET 请求，返回 (statusCode, retryAfterHeader)
 // 内部关闭 body，调用方无需处理 response
 func doGetBearer(token, path string) (int, string) {
 	req, _ := http.NewRequest("GET", apiBase+path, nil)
@@ -197,6 +251,21 @@ func doGetBearer(token, path string) (int, string) {
 	defer resp.Body.Close()
 	io.Copy(io.Discard, resp.Body) // 排空 body 以便连接复用
 	return resp.StatusCode, resp.Header.Get("Retry-After")
+}
+
+// doPostBearer 发 POST 请求（Bearer 鉴权），返回 (statusCode, body)
+func doPostBearer(token, path string, body map[string]string) (int, string) {
+	b, _ := json.Marshal(body)
+	req, _ := http.NewRequest("POST", apiBase+path, bytes.NewReader(b))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return -1, err.Error()
+	}
+	defer resp.Body.Close()
+	rb, _ := io.ReadAll(resp.Body)
+	return resp.StatusCode, string(rb)
 }
 
 func extractNonceCookie(jar http.CookieJar) string {

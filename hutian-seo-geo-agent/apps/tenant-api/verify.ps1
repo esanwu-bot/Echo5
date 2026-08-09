@@ -15,7 +15,7 @@
 #   - probe:api-keys              (T9.1 开放 API key 管理：创建/列表/吊销/鉴权/越权，8 asserts)
 #   - probe:open-api              (T9.2 开放 API 工具端点：diagnose/schema/check/sitemap/submit，6 asserts)
 #   - probe:quota                 (T9.3 配额执行链路：拦截/空窗口并发首调TOCTOU/无配额放行/allow策略，4 asserts)
-#   - probe:rate-limit            (T9.4 限流：限额内放行/超限429/Retry-After头，3 asserts)
+#   - probe:rate-limit            (T9.4 限流：限额内放行/超限429/Retry-After头/限流不消耗配额，4 asserts)
 #   - probe:t9-tool-executor      (T9.0 工具执行层 Go→Python REST 调通，4 asserts)
 #
 # Run from repo root:
@@ -212,7 +212,7 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "PASS: probe:quota" -ForegroundColor Green
 }
 
-Write-Host "=== [15/16] probe:rate-limit (T9.4 限流中间件, 3 asserts) ===" -ForegroundColor Cyan
+Write-Host "=== [15/16] probe:rate-limit (T9.4 限流中间件, 4 asserts) ===" -ForegroundColor Cyan
 go run ./cmd/probe_rate_limit
 if ($LASTEXITCODE -ne 0) {
     Write-Host "FAIL: probe:rate-limit" -ForegroundColor Red

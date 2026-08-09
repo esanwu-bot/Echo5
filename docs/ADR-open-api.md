@@ -167,6 +167,8 @@ per-tenant per-minute 固定窗口限流（T9.4 落地）：
 
 MVP 单实例内存 map；多实例部署换 Redis + 滑动窗口（标开放问题）。呼应 review P1-1 的 rate limiter 诉求。
 
+**Known limitation（固定窗口边界突发）**：fixed window 在分钟边界允许 2×RPM 突发（上分钟末 60 + 本分钟初 60 = 几秒内 120）。MVP 可接受——配额（月度）才是成本闸门，限流只防瞬时刷，且下面有 QuotaEnforce 兜着。多实例换 Redis 时一并换滑动窗口修复。
+
 ### 5.7 审计
 
 `writeAudit` 时记 `access_kind=api` + `api_key_id`（用 meta_json 记，不动 actor_kind 枚举，轻量）。开放 API 每次调用都要记审计：哪个 key、调了什么、何时、结果。

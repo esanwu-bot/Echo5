@@ -25,19 +25,20 @@ export default function Nav() {
   return (
     <nav className={`nav${scrolled ? " scrolled" : ""}${menuOpen ? " menu-open" : ""}`} id="nav">
       <div className="wrap">
-        <a href="#top" className="brand" onClick={closeMenu}>
+        <Link href="/" className="brand" onClick={closeMenu}>
           <span className="mk">壶</span>
           <span>
             壶天AI 建站
             <small>HUTIAN AI BUILDER</small>
           </span>
-        </a>
+        </Link>
         <div className="nav-links">
           <a href="#features">产品能力</a>
           <a href="#flow">建站流程</a>
           <a href="#templates">模板中心</a>
+          <Link href="/cases">案例</Link>
           <a href="#pricing">定价</a>
-          <a href="#docs">文档</a>
+          <Link href="/docs">文档</Link>
           <Link href="/download" className="nav-dl">下载</Link>
         </div>
         <div className="nav-right">
@@ -73,12 +74,15 @@ export default function Nav() {
         <a href="#templates" onClick={closeMenu}>
           模板中心
         </a>
+        <Link href="/cases" onClick={closeMenu}>
+          案例
+        </Link>
         <a href="#pricing" onClick={closeMenu}>
           定价
         </a>
-        <a href="#docs" onClick={closeMenu}>
+        <Link href="/docs" onClick={closeMenu}>
           文档
-        </a>
+        </Link>
         <Link href="/download" onClick={closeMenu}>
           下载
         </Link>

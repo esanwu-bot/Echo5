@@ -8,7 +8,7 @@ export default function Footer() {
       <div className="wrap">
         <div className="foot-grid">
           <div>
-            <a href="#top" className="brand">
+            <a href="/" className="brand">
               <span className="mk">壶</span>
               <span>
                 壶天AI 建站
@@ -41,14 +41,15 @@ export default function Footer() {
             <a href="#features">产品能力</a>
             <a href="#flow">建站流程</a>
             <a href="#templates">模板中心</a>
+            <a href="/cases">客户案例</a>
             <a href="#pricing">定价方案</a>
             <a href="/download">下载桌面版</a>
           </div>
           <div className="foot-col">
             <h4>资源</h4>
-            <a href="#">开发文档</a>
-            <a href="#">SEO 指南</a>
-            <a href="#">GEO 白皮书</a>
+            <a href="/docs">开发文档</a>
+            <a href="/docs">SEO 指南</a>
+            <a href="/docs">GEO 白皮书</a>
             <a href="#">更新日志</a>
           </div>
           <div className="foot-col">

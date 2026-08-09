@@ -195,7 +195,7 @@ MVP 单实例内存 map；多实例部署换 Redis + 滑动窗口（标开放问
 | API key 鉴权 | 有效 key→200；无效/吊销 key→401 |
 | 配额拦截 | 超配额→429（reject 策略）；OveragePolicy 分支真被执行 |
 | TOCTOU 原子性 | 并发调用不超额（检查+递增原子）|
-| 归属校验 | A 的 key 提交 B 的 host→403 |
+| 归属校验（probe:ownership）| 自有 host 放行；A 的 key 提交 B 的 host→403；子域名匹配放行；无关 host→403（4 asserts）|
 | 限流 | 超频率→429 |
 | fail-closed | 工具执行层挂→503，不 fail-open |
 | 工具正确性 | diagnose 返回 scores 结构对（traditional_seo/generative_geo）|

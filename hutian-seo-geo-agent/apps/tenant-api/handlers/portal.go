@@ -222,7 +222,9 @@ type AuditLogResponse struct {
 
 // TenantLogin devOnly 参数：dev 模式下 secure=false 允许 http 本地 Cookie 写入
 // 保留 Authorization JSON 返回（兼容期），M5 统一用 httpOnly cookie
-func TenantLogin(db *gorm.DB, signer *auth.Signer, devOnly bool) gin.HandlerFunc {
+// maxAttempts/lockoutMinutes：P1-1 登录失败锁定（0 次失败不锁定仅清零，实际由配置保证 ≥1）
+func TenantLogin(db *gorm.DB, signer *auth.Signer, devOnly bool, maxAttempts, lockoutMinutes int) gin.HandlerFunc {
+	lockoutDuration := time.Duration(lockoutMinutes) * time.Minute
 	return func(c *gin.Context) {
 		var req LoginRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -235,13 +237,36 @@ func TenantLogin(db *gorm.DB, signer *auth.Signer, devOnly bool) gin.HandlerFunc
 			writePortalError(c, devOnly, http.StatusUnauthorized, "invalid credentials", "")
 			return
 		}
+
+		// P1-1：账户锁定时先拒绝（423 Locked），不泄露密码正确性
+		if user.LockedUntil != nil && time.Now().Before(*user.LockedUntil) {
+			writePortalError(c, devOnly, http.StatusLocked, "account locked",
+				fmt.Sprintf("too many failed login attempts; try again after %s", user.LockedUntil.Format(time.RFC3339)))
+			return
+		}
+
 		if user.Status != models.UserStatusActive {
 			writePortalError(c, devOnly, http.StatusUnauthorized, "user disabled or inactive", "")
 			return
 		}
+
 		if !auth.CheckPassword(req.Password, user.PasswordHash) {
+			// P1-1：原子递增失败计数，达阈值则设锁定时间
+			until := time.Now().Add(lockoutDuration)
+			db.Model(&user).UpdateColumns(map[string]interface{}{
+				"failed_login_count": gorm.Expr("failed_login_count + 1"),
+				"locked_until":       gorm.Expr("CASE WHEN failed_login_count + 1 >= ? THEN ? ELSE locked_until END", maxAttempts, until),
+			})
 			writePortalError(c, devOnly, http.StatusUnauthorized, "invalid credentials", "")
 			return
+		}
+
+		// P1-1：成功登录清零失败计数与锁定
+		if user.FailedLoginCount > 0 || user.LockedUntil != nil {
+			db.Model(&user).Updates(map[string]interface{}{
+				"failed_login_count": 0,
+				"locked_until":       nil,
+			})
 		}
 
 		var tenant models.Tenant
@@ -507,13 +532,31 @@ func TenantInviteSeat(c *gin.Context) {
 		return
 	}
 
+	// T9.3 修复席位 TOCTOU（review P2-9）：
+	// 旧逻辑 Count→Create 无锁，并发邀请会超额。
+	// 修复：事务 + FOR UPDATE 锁 subscription 行，Count+Create 都在事务内，
+	// 并发请求串行化在 subscription 行锁上，不可能并发超额。
+	tx := db.Begin()
+	if tx.Error != nil {
+		writePortalError(c, cfgDev, http.StatusInternalServerError, "begin tx failed", "")
+		return
+	}
+	txOK := false
+	defer func() {
+		if !txOK {
+			tx.Rollback()
+		}
+	}()
+
 	var sub models.Subscription
-	if err := db.Where("tenant_id = ?", tenantID).First(&sub).Error; err != nil {
+	// FOR UPDATE 锁 subscription 行，防 Count→Create 间隙并发
+	if err := tx.Set("gorm:query_option", "FOR UPDATE").
+		Where("tenant_id = ?", tenantID).First(&sub).Error; err != nil {
 		writePortalError(c, cfgDev, http.StatusInternalServerError, "subscription not found", "")
 		return
 	}
 	var activeCount int64
-	if err := db.Model(&models.Seat{}).Where("tenant_id = ? AND status = ?", tenantID, models.SeatStatusActive).Count(&activeCount).Error; err != nil {
+	if err := tx.Model(&models.Seat{}).Where("tenant_id = ? AND status = ?", tenantID, models.SeatStatusActive).Count(&activeCount).Error; err != nil {
 		writePortalError(c, cfgDev, http.StatusInternalServerError, "count seats failed", "")
 		return
 	}
@@ -534,7 +577,7 @@ func TenantInviteSeat(c *gin.Context) {
 		PasswordHash: randomHash,
 		Status:       models.UserStatusPendingInvite,
 	}
-	if err := db.Create(&user).Error; err != nil {
+	if err := tx.Create(&user).Error; err != nil {
 		writePortalError(c, cfgDev, http.StatusConflict, "email already exists", "")
 		return
 	}
@@ -545,10 +588,16 @@ func TenantInviteSeat(c *gin.Context) {
 		Role:     models.SeatRole(req.Role),
 		Status:   models.SeatStatusActive,
 	}
-	if err := db.Create(&seat).Error; err != nil {
+	if err := tx.Create(&seat).Error; err != nil {
 		writePortalError(c, cfgDev, http.StatusInternalServerError, "create seat failed", "")
 		return
 	}
+
+	if err := tx.Commit().Error; err != nil {
+		writePortalError(c, cfgDev, http.StatusInternalServerError, "commit failed", "")
+		return
+	}
+	txOK = true
 
 	writePortalOK(c, cfgDev, SeatResponse{
 		ID:          seat.ID,
@@ -983,4 +1032,124 @@ func TenantIssueInternalToken(c *gin.Context) {
 		"sitebase_url": inst.BaseURL,
 		"expires_in":   300,
 	})
+}
+
+// ────────────────────────────────────────────────
+// 开放 API key 管理（T9.1 ADR-open-api D5）
+// 端点挂 portal 路由组（TenantJWTContext 已鉴权 + CSRF 已强制），
+// tenant_id/workspace_id 从 portalCtx 取，绝不信任请求体。
+// 明文 key 仅创建时返回一次；DB 只存 SHA256 hash（NFR-T02 同红线）。
+// ────────────────────────────────────────────────
+
+// TenantCreateApiKey 创建开放 API key
+// POST /portal/api/v1/api-keys  body: {name?, scopes?}
+// scopes 默认 "diagnose,schema,sitemap"
+func TenantCreateApiKey(c *gin.Context) {
+	_, db, _, _, tenantID, workspaceID := portalCtx(c)
+	devOnly, _ := c.Get("cfg.dev")
+	cfgDev, _ := devOnly.(bool)
+
+	var req struct {
+		Name   string `json:"name"`
+		Scopes string `json:"scopes"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil && err.Error() != "EOF" {
+		writePortalError(c, cfgDev, http.StatusBadRequest, "invalid request body", err.Error())
+		return
+	}
+	if req.Scopes == "" {
+		req.Scopes = "diagnose,schema,sitemap"
+	}
+
+	plaintext, prefix, hash, err := middleware.GenerateApiKey()
+	if err != nil {
+		writePortalError(c, cfgDev, http.StatusInternalServerError, "generate key failed", err.Error())
+		return
+	}
+
+	key := models.ApiKey{
+		TenantID:    tenantID,
+		WorkspaceID: workspaceID,
+		Name:        req.Name,
+		KeyPrefix:   prefix,
+		KeyHash:     hash,
+		Scopes:      req.Scopes,
+		Status:      models.ApiKeyStatusActive,
+	}
+	if err := db.Create(&key).Error; err != nil {
+		writePortalError(c, cfgDev, http.StatusInternalServerError, "create key failed", err.Error())
+		return
+	}
+
+	// 明文 key 仅此一次返回；后续 list 只返 prefix
+	writePortalOK(c, cfgDev, gin.H{
+		"id":           key.ID,
+		"key":          plaintext, // 明文，仅创建时返回
+		"key_prefix":   prefix,
+		"name":         key.Name,
+		"scopes":       key.Scopes,
+		"status":       key.Status,
+		"tenant_id":    tenantID,
+		"workspace_id": workspaceID,
+		"created_at":   key.CreatedAt,
+	})
+}
+
+// TenantListApiKeys 列出当前 workspace 的 API keys（不含明文/hash）
+// GET /portal/api/v1/api-keys
+func TenantListApiKeys(c *gin.Context) {
+	_, db, _, _, tenantID, workspaceID := portalCtx(c)
+	devOnly, _ := c.Get("cfg.dev")
+	cfgDev, _ := devOnly.(bool)
+
+	var keys []models.ApiKey
+	if err := db.Where("tenant_id = ? AND workspace_id = ?", tenantID, workspaceID).
+		Order("created_at DESC").
+		Find(&keys).Error; err != nil {
+		writePortalError(c, cfgDev, http.StatusInternalServerError, "list keys failed", err.Error())
+		return
+	}
+	// 不暴露 key_hash（JSON 标 - 已挡），这里显式构造不含 hash 的视图
+	out := make([]gin.H, 0, len(keys))
+	for _, k := range keys {
+		out = append(out, gin.H{
+			"id":          k.ID,
+			"key_prefix":  k.KeyPrefix,
+			"name":        k.Name,
+			"scopes":      k.Scopes,
+			"status":      k.Status,
+			"last_used_at": k.LastUsedAt,
+			"created_at":  k.CreatedAt,
+		})
+	}
+	writePortalOK(c, cfgDev, gin.H{"data": out, "tenant_id": tenantID, "workspace_id": workspaceID})
+}
+
+// TenantRevokeApiKey 吊销 API key
+// POST /portal/api/v1/api-keys/:id/revoke
+// 校验 key 属当前 workspace（防越权吊销他租户 key）
+func TenantRevokeApiKey(c *gin.Context) {
+	_, db, _, _, tenantID, workspaceID := portalCtx(c)
+	devOnly, _ := c.Get("cfg.dev")
+	cfgDev, _ := devOnly.(bool)
+
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		writePortalError(c, cfgDev, http.StatusBadRequest, "invalid key id", "")
+		return
+	}
+
+	// 越权防护：WHERE tenant_id + workspace_id（不属本 workspace 的 key 返回 404，不泄存在性）
+	res := db.Model(&models.ApiKey{}).
+		Where("id = ? AND tenant_id = ? AND workspace_id = ?", id, tenantID, workspaceID).
+		UpdateColumn("status", models.ApiKeyStatusRevoked)
+	if res.Error != nil {
+		writePortalError(c, cfgDev, http.StatusInternalServerError, "revoke key failed", res.Error.Error())
+		return
+	}
+	if res.RowsAffected == 0 {
+		writePortalError(c, cfgDev, http.StatusNotFound, "key not found", "")
+		return
+	}
+	writePortalOK(c, cfgDev, gin.H{"id": id, "status": models.ApiKeyStatusRevoked})
 }

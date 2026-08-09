@@ -214,9 +214,41 @@ apps/admin vite build → grep dist: 同上全 0 命中
 
 1. **P0-10 完整修复**：admin token 从 localStorage 迁移到 httpOnly cookie（与 portal 的 HUTIAN_TENANT_TOKEN 同方案）
 2. **P0-1 收尾**：`/api/v1` 服务密钥（X-Internal-Secret）为过渡态——待 /api/v1 剩余业务面（workspaces 等）迁移到 portal/admin 双轨后，整组下线
-3. **P1-1 登录锁定**：FailedLoginCount/LockedUntil 字段写入逻辑
-4. **P1-9/10 Agent 安全**：cms 写工具纳入破坏性闸门 + cms_upload_media 路径白名单
-5. **P1-13/14 Schema 基线统一**：确立 SQL 文件为唯一基线，解决软删除+唯一约束冲突
+3. **P1-13/14 Schema 完整统一**（约定已立，存量治理后排）：软删除+唯一约束冲突的完整治理
+
+---
+
+## 修复记录（2026-08-09）
+
+### 本轮已修复项
+
+**P1（4/22 新增闭环，累计 14/22）：**
+
+| # | 修复内容 | 改动文件 | 防复活断言 |
+|---|---|---|---|
+| P1-13/14 | Schema 基线约定 + CI 对齐检查：新增表必须附 SQL migration 文件；SQL 文件为唯一基线；`db.go` 表名校验从 `AllTableNames()` 动态派生，干掉硬编码 11 表列表；静态探针验证 `AllModels()` ↔ `migrations/*.sql` 双向对齐 | `apps/tenant-api/models/models.go`<br>`apps/tenant-api/db/db.go`<br>`apps/tenant-api/cmd/probe_schema_baseline/main.go` | `probe:schema-baseline` 断言：每个模型表有 CREATE TABLE、无幽灵表、模型数==表名数、migration 目录非空 |
+| P1-1 | 登录失败锁定：`FailedLoginCount`/`LockedUntil` 写入逻辑；连续 N 次错误密码返回 423 Locked，成功登录清零；阈值与锁定时长可配置 | `apps/tenant-api/config/config.go`<br>`apps/tenant-api/main.go`<br>`apps/tenant-api/handlers/portal.go` | `probe:login-lockout` 断言：N-1 次失败 401、第 N 次 423、锁定期间正确密码仍 423、成功登录清零 |
+| P1-9 | CMS 写类工具全部纳入破坏性闸门：`cms_create_page` / `cms_update_content` / `cms_configure_product` / `cms_upload_media` / `cms_publish` | `apps/agent-bridge/src/loop/intent.ts` | `verify:intent` 断言 5 个 CMS 工具均触发 `destructive_gate_blocked` |
+| P1-10 | `cms_upload_media` 路径白名单：仅允许 `CMS_UPLOAD_ALLOWED_DIRS` 或默认 `uploads/` / `public/uploads/` 子树；拦截空路径、空字符、路径遍历、系统绝对路径 | `apps/agent-bridge/src/loop/guardrail-pipeline.ts` | `verify:intent` 断言越级路径 / 空路径 / 非字符串 / 空字符均被拦截，白名单内路径放行 |
+| 附 | `verify:loop` 硬编码 `meta.totalTools === 5` 随 CMS 工具上线更新为 10 | `apps/agent-bridge/src/loop/verify-loop.ts` | `verify:loop` 10/10 结构断言通过 |
+| 附 | `verify.ps1` 增加 `probe:schema-baseline` + `probe:login-lockout` 步骤，共 10/10 | `apps/tenant-api/verify.ps1` | `pnpm probe:tenant` 全绿 |
+
+### 回归探针结果
+
+```
+typecheck:            PASS
+verify:intent:        76/76 PASS  ← P1-9/10 新增断言全绿
+verify:loop:          10/10 PASS  ← 破坏性闸门 + 路径白名单未崩事件流骨架
+verify:tools:         PASS        ← 10 工具名闭环
+verify:sanitize:      9/9 PASS
+probe:tenant-routing: 16/16 PASS  ← MCP 路由隔离未受影响
+probe:e2e-routing:    7/7 PASS    ← CMS 写链路端到端未受影响
+pnpm probe:tenant:    10/10 PASS  ← go vet + go build + 7 条 Go 探针（含新增 schema-baseline 4/4 + login-lockout 6/6）
+```
+
+### 排程结论
+
+走**安全耦合带 → 业务腿**路线：安全耦合带已全部清完（P1-9/10 + P1-1 + Schema 新表约定），下一步全力推进业务腿（建站 → CMS 适配器抽象 → WordPress 接入），对外发布前再清 P0-10 / P0-1 收尾 / Schema 完整统一。
 
 ---
 
@@ -224,7 +256,7 @@ apps/admin vite build → grep dist: 同上全 0 命中
 
 **本轮盖的章 = 安全阻断项清零 + 四探针链守卫，不是"生产就绪"章。**
 
-含义界定：上线前**必须零**的阻断项，零了（P0 从 10 → 9 闭环 + 1 项部分修复列债，四链探针 58/58 守卫，生产 bundle 凭据 grep 0 命中）。这**不代表**可以对外提供多租户服务——"生产就绪"那个章仍被上面 5 项遗留债阻塞，需另行排期挣取。
+含义界定：上线前**必须零**的阻断项，零了（P0 从 10 → 9 闭环 + 1 项部分修复列债，四链探针 58/58 守卫，生产 bundle 凭据 grep 0 命中）。P1-9/10 已补闸，P1-1 登录锁定已落地，P1-13/14 Schema 基线约定已立。这**不代表**可以对外提供多租户服务——"生产就绪"那个章仍被 2 项遗留债阻塞（P0-10 / P0-1 收尾），完整的 Schema 软删+唯一约束治理后排，需按排期挣取。
 
 **本轮沉淀的三件工程元纪律**（比任何单条修复值钱，保证"将来的绿可信"），已落盘 `docs/工程纪律.md`：
 
@@ -232,4 +264,4 @@ apps/admin vite build → grep dist: 同上全 0 命中
 2. **探针/门禁脚本自身也是被测对象**——活例：verify.ps1 清理 glob 杀不掉 `hutian-tenant-api.exe` 残留进程，回归被污染；门禁自己有 bug，所有全绿都不可信。
 3. **安全删除必须带防复活断言**——活例：删旧签发端点后，probe_cross_lang 断言⑥验旧端点=404，把"它真的不在了"钉成回归。
 
-**下一程**：安全是地基，已夯到"阻断项清零"。待决：先排 P1 债挣"生产就绪"章，还是回业务腿（建站/CMS 适配器/WordPress 接入）往上盖。
+**下一程**：安全耦合带已全部清完（P1-9/10 + P1-1 + P1-13/14），进入业务腿：建站 → CMS 适配器抽象 → WordPress 接入。进业务腿第一步前，建议先做一次 CMS 适配器接口设计对齐（适配器契约放在 packages/ 还是 agent-bridge 内、siteBase ThinkPHP 与 WordPress 的能力差异怎么抽象）。对外发布前再清 P0-10 / P0-1 收尾 / Schema 完整统一。

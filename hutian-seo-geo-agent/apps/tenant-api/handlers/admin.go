@@ -853,6 +853,8 @@ type CreateSeatReq struct {
 
 // CreateSeat POST /admin/api/v1/seats
 // 校验 active 席位数 ≤ subscriptions.seats_limit（FR-S02）
+// T9.3 修复席位 TOCTOU（review P2-9）：事务 + FOR UPDATE 锁 subscription 行，
+// Count+Create 在同一事务内，防并发超额
 func CreateSeat(c *gin.Context) {
 	db := DB(c)
 	var req CreateSeatReq
@@ -870,14 +872,26 @@ func CreateSeat(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "tenant not found"})
 		return
 	}
-	// 校验 active 席位不超限
+	// 事务 + FOR UPDATE 锁 subscription 行，防 TOCTOU
+	tx := db.Begin()
+	if tx.Error != nil {
+		c.JSON(500, gin.H{"error": "begin tx failed"})
+		return
+	}
+	txOK := false
+	defer func() {
+		if !txOK {
+			tx.Rollback()
+		}
+	}()
 	var sub models.Subscription
-	if err := db.Where("tenant_id = ?", req.TenantID).First(&sub).Error; err != nil {
+	if err := tx.Set("gorm:query_option", "FOR UPDATE").
+		Where("tenant_id = ?", req.TenantID).First(&sub).Error; err != nil {
 		c.JSON(400, gin.H{"error": "subscription not found for tenant"})
 		return
 	}
 	var activeSeats int64
-	db.Model(&models.Seat{}).Where("tenant_id = ? AND status = ?", req.TenantID, models.SeatStatusActive).Count(&activeSeats)
+	tx.Model(&models.Seat{}).Where("tenant_id = ? AND status = ?", req.TenantID, models.SeatStatusActive).Count(&activeSeats)
 	if int(activeSeats) >= sub.SeatsLimit {
 		c.JSON(409, gin.H{"error": "seats_limit exceeded", "reason": "active seats will exceed plan limit, ask tenant to upgrade"})
 		return
@@ -888,10 +902,15 @@ func CreateSeat(c *gin.Context) {
 		Role:     role,
 		Status:   models.SeatStatusActive,
 	}
-	if err := db.Create(&seat).Error; err != nil {
+	if err := tx.Create(&seat).Error; err != nil {
 		c.JSON(500, gin.H{"error": "create seat failed", "reason": err.Error()})
 		return
 	}
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(500, gin.H{"error": "commit failed"})
+		return
+	}
+	txOK = true
 	tid := seat.TenantID
 	sid := seat.ID
 	writeAudit(c, db, &tid, nil, &sid, "seat.created", "seat", &sid,

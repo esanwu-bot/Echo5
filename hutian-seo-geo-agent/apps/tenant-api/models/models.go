@@ -13,6 +13,7 @@ package models
 
 import (
 	"database/sql"
+	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -327,6 +328,12 @@ func (AuditLog) TableName() string { return "audit_logs" }
 
 // AllModels 返回所有需 AutoMigrate 的模型（T6.1 migration 用）
 // 顺序：无外键依赖的先建（users/tenants/sitebase_instances/plan_quotas），有依赖的后建
+//
+// P1-13/14 约定（Schema 基线）：
+//   - 新增表必须同时在 migrations/ 目录下追加 SQL migration 文件（NNNN_table_name.sql）
+//   - SQL migration 文件是生产 schema 的唯一可追溯基线
+//   - GORM AutoMigrate 仅用于本地 dev 快速起表，不作为生产建表手段
+//   - 本函数是表名校验的运行时来源，db.go 表数校验由此派生，禁止在 db.go 硬编码表名列表
 func AllModels() []interface{} {
 	return []interface{}{
 		&User{},
@@ -340,7 +347,28 @@ func AllModels() []interface{} {
 		&UsageMeter{},
 		&AuditLog{},
 		&UserSession{},
+		&ApiKey{},
 	}
+}
+
+// tabler 接口：所有模型都实现 TableName() string
+type tabler interface {
+	TableName() string
+}
+
+// AllTableNames 返回 AllModels() 中所有模型的 TableName()。
+// P1-13/14：db.go 表数校验和 probe:schema-baseline 均由此派生，避免硬编码漂移。
+func AllTableNames() []string {
+	models := AllModels()
+	names := make([]string, 0, len(models))
+	for _, m := range models {
+		t, ok := m.(tabler)
+		if !ok {
+			panic(fmt.Sprintf("model %T does not implement TableName()", m))
+		}
+		names = append(names, t.TableName())
+	}
+	return names
 }
 
 // ────────────────────────────────────────────────
@@ -362,3 +390,32 @@ type UserSession struct {
 }
 
 func (UserSession) TableName() string { return "user_sessions" }
+
+// ────────────────────────────────────────────────
+// 11. api_keys — 开放 API 密钥（T9.1 ADR-open-api D5）
+//    开放 API /open/v1/* 用 Bearer hsk_xxx 鉴权，与 portal JWT cookie 物理隔离
+//    key 只存 SHA256 hash；明文仅创建时返回一次（NFR-T02 同红线：永不序列化）
+//    绑定 workspace：submit_sitemap 归属校验（D4）需查该 workspace 的 cms_instances 域名
+// ────────────────────────────────────────────────
+
+type ApiKeyStatus string
+
+const (
+	ApiKeyStatusActive  ApiKeyStatus = "active"
+	ApiKeyStatusRevoked ApiKeyStatus = "revoked"
+)
+
+// ApiKey 开放 API 密钥
+type ApiKey struct {
+	BaseModel
+	TenantID    int64        `gorm:"index;not null" json:"tenant_id"`
+	WorkspaceID int64        `gorm:"index;not null" json:"workspace_id"`
+	Name        string       `gorm:"type:varchar(128)" json:"name"`
+	KeyPrefix   string       `gorm:"type:varchar(32);index;not null" json:"key_prefix"`            // hsk_test_xxxxxxxx，列表展示用
+	KeyHash     string       `gorm:"type:varchar(128);uniqueIndex;not null" json:"-"`             // SHA256 hex，查询+防时序，永不序列化
+	Scopes      string       `gorm:"type:varchar(256);not null;default:diagnose,schema,sitemap" json:"scopes"`
+	Status      ApiKeyStatus `gorm:"type:varchar(32);index;not null;default:active" json:"status"`
+	LastUsedAt  *time.Time   `gorm:"index" json:"last_used_at,omitempty"`
+}
+
+func (ApiKey) TableName() string { return "api_keys" }

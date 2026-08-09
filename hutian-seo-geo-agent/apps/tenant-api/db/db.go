@@ -10,6 +10,7 @@ package db
 import (
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"hutian-tenant-api/config"
@@ -54,32 +55,46 @@ func Connect(cfg config.Config) (*gorm.DB, error) {
 	return db, nil
 }
 
-// Migrate T6.1：AutoMigrate 9 张表
+// Migrate T6.1：AutoMigrate 全部模型表
 // GORM AutoMigrate 会建表 + 加列 + 加索引，不会删列/删表（安全）
 //
 // 表选项强制 InnoDB + utf8mb4（P1 修复）：
 //   - GORM mysql 驱动不指定 table_options 会继承 MySQL 服务器默认，
 //     XAMPP 等环境常默认 MyISAM（不支持事务/行锁），多租户元数据并发写必出问题
 //   - charset 用 utf8mb4 支持 emoji/完整 Unicode（utf8 是 3 字节截断版）
-//   - 生产 schema 演进用显式 migration SQL（见 migrations/0001_init.sql），AutoMigrate 仅本地起表用
+//
+// P1-13/14 约定：
+//   - 生产 schema 演进用显式 migration SQL（见 migrations/*.sql），AutoMigrate 仅本地 dev 起表
+//   - 表名校验从 models.AllTableNames() 动态派生，不再硬编码表名列表或表数
 func Migrate(db *gorm.DB) error {
 	if err := db.Set("gorm:table_options", "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci").
 		AutoMigrate(models.AllModels()...); err != nil {
 		return fmt.Errorf("auto migrate: %w", err)
 	}
-	// 验证 11 张表都建好（M7 T7.1 起 +users；跨设备持久化 +user_sessions）
-	// T8.0：sitebase_instances → cms_instances（加 cms_type，多底座路由）
-	var tableCount int64
-	if err := db.Raw(`
+	// 验证所有表都建好——表名列表从 AllTableNames() 动态派生（P1-13/14）
+	expectedTables := models.AllTableNames()
+	expectedCount := len(expectedTables)
+
+	// 动态构造 IN (?, ?, ...) 占位符
+	placeholders := make([]string, len(expectedTables))
+	args := make([]interface{}, len(expectedTables)+1)
+	args[0] = "hutian"
+	for i, name := range expectedTables {
+		placeholders[i] = "?"
+		args[i+1] = name
+	}
+	query := fmt.Sprintf(`
 		SELECT COUNT(*) FROM information_schema.tables
-		WHERE table_schema = 'hutian'
-		AND table_name IN ('users','tenants','workspaces','cms_instances','tenant_credentials','subscriptions','seats','usage_meters','plan_quotas','audit_logs','user_sessions')
-	`).Scan(&tableCount).Error; err != nil {
+		WHERE table_schema = ? AND table_name IN (%s)
+	`, strings.Join(placeholders, ","))
+
+	var tableCount int64
+	if err := db.Raw(query, args...).Scan(&tableCount).Error; err != nil {
 		return fmt.Errorf("verify tables: %w", err)
 	}
-	if tableCount != 11 {
-		return fmt.Errorf("FATAL: expected 11 tables, got %d — migration incomplete", tableCount)
+	if int(tableCount) != expectedCount {
+		return fmt.Errorf("FATAL: expected %d tables, got %d — migration incomplete", expectedCount, tableCount)
 	}
-	log.Printf("[db] migrated 11 tables to hutian (verified count=%d)", tableCount)
+	log.Printf("[db] migrated %d tables to hutian (verified count=%d)", expectedCount, tableCount)
 	return nil
 }

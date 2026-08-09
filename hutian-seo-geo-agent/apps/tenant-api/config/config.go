@@ -8,6 +8,7 @@ package config
 
 import (
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -32,17 +33,33 @@ type Config struct {
 	// 仅授权内部服务（如 agent-bridge）可携带此密钥调用
 	// env TENANT_INTERNAL_API_SECRET 配置，空则 /api/v1/* 全拒绝（fail-closed）
 	InternalAPISecret string
+	// 登录失败最大次数，超过则锁定（P1-1）
+	LoginMaxAttempts int
+	// 登录锁定持续时间（分钟）（P1-1）
+	LoginLockoutMinutes int
+	// 工具执行层地址（T9.0 ADR-open-api D1 方案 C）
+	// Python 侧 REST 端点，tenant-api 通过普通 HTTP 调用，不走 MCP 协议
+	// env HUTIAN_TOOL_EXECUTOR_URL 配置，默认 http://localhost:4320
+	ToolExecutorURL string
+	// 开放 API 限流：每租户每分钟最大请求数（T9.4 ADR-open-api 5.6）
+	// env TENANT_API_RATE_LIMIT_RPM 配置，默认 60（与配额分层：限流防瞬时刷，配额防月度超额）
+	// MVP 单实例内存 map；多实例部署换 Redis（ADR 开放问题）
+	RateLimitRPM int
 }
 
 // Load 从环境变量加载配置，带默认值
 func Load() Config {
 	c := Config{
-		Port:              envOrDefault("TENANT_API_PORT", "4318"),
-		MetaDBDSN:         envOrDefault("TENANT_META_DSN", "root:root@tcp(localhost:3306)/hutian?charset=utf8mb4&parseTime=True&loc=Local"),
-		Dev:               os.Getenv("TENANT_API_DEV") == "true",
-		AdminToken:        strings.TrimSpace(os.Getenv("TENANT_ADMIN_TOKEN")),
-		JWTKey:            strings.TrimSpace(os.Getenv("TENANT_JWT_KEY")),
-		InternalAPISecret: strings.TrimSpace(os.Getenv("TENANT_INTERNAL_API_SECRET")),
+		Port:                envOrDefault("TENANT_API_PORT", "4318"),
+		MetaDBDSN:           envOrDefault("TENANT_META_DSN", "root:root@tcp(localhost:3306)/hutian?charset=utf8mb4&parseTime=True&loc=Local"),
+		Dev:                 os.Getenv("TENANT_API_DEV") == "true",
+		AdminToken:          strings.TrimSpace(os.Getenv("TENANT_ADMIN_TOKEN")),
+		JWTKey:              strings.TrimSpace(os.Getenv("TENANT_JWT_KEY")),
+		InternalAPISecret:   strings.TrimSpace(os.Getenv("TENANT_INTERNAL_API_SECRET")),
+		LoginMaxAttempts:    envOrDefaultInt("TENANT_LOGIN_MAX_ATTEMPTS", 5),
+		LoginLockoutMinutes: envOrDefaultInt("TENANT_LOGIN_LOCKOUT_MINUTES", 15),
+		ToolExecutorURL:     envOrDefault("HUTIAN_TOOL_EXECUTOR_URL", "http://localhost:4320"),
+		RateLimitRPM:        envOrDefaultInt("TENANT_API_RATE_LIMIT_RPM", 60),
 	}
 	return c
 }
@@ -52,4 +69,16 @@ func envOrDefault(key, def string) string {
 		return v
 	}
 	return def
+}
+
+func envOrDefaultInt(key string, def int) int {
+	v := strings.TrimSpace(os.Getenv(key))
+	if v == "" {
+		return def
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n <= 0 {
+		return def
+	}
+	return n
 }

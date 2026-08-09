@@ -20,7 +20,9 @@ import (
 	"hutian-tenant-api/db"
 	"hutian-tenant-api/handlers"
 	"hutian-tenant-api/middleware"
+	"hutian-tenant-api/models"
 	"hutian-tenant-api/repo"
+	"hutian-tenant-api/toolexec"
 )
 
 func main() {
@@ -38,7 +40,7 @@ func main() {
 		if err := db.Migrate(gormDB); err != nil {
 			log.Fatalf("[fatal] migrate: %v", err)
 		}
-		log.Println("[ok] migration done, 10 tables ready in hutian db")
+		log.Println("[ok] migration done, all tables ready in hutian db")
 		return
 	}
 
@@ -211,7 +213,7 @@ func main() {
 	// 链②（触发工具）走 portal JWT 链：GET /portal/api/v1/internal/token 签 HMAC token
 	// ────────────────────────────────────────────────
 	// T7.5 登录端点（公开，不过 JWT 中间件）
-	r.POST("/portal/api/v1/auth/login", handlers.TenantLogin(gormDB, jwtSigner, cfg.Dev))
+	r.POST("/portal/api/v1/auth/login", handlers.TenantLogin(gormDB, jwtSigner, cfg.Dev, cfg.LoginMaxAttempts, cfg.LoginLockoutMinutes))
 	r.POST("/portal/api/v1/auth/logout", handlers.TenantLogout(cfg.Dev))
 
 	portal := r.Group("/portal/api/v1")
@@ -253,6 +255,47 @@ func main() {
 	// 9. 跨语言内部 token 签发（链②：BFF 调 → 透传 bridge 验签）
 	//    走 portal JWT 验签；GET 豁免 CSRF 头，BFF 只需转发 cookie
 	portal.GET("/internal/token", handlers.TenantIssueInternalToken)
+
+	// 10. 开放 API key 管理（T9.1 ADR-open-api D5）
+	//     明文 key 仅创建时返回一次；DB 只存 SHA256 hash
+	portal.GET("/api-keys", handlers.TenantListApiKeys)
+	portal.POST("/api-keys", handlers.TenantCreateApiKey)
+	portal.POST("/api-keys/:id/revoke", handlers.TenantRevokeApiKey)
+	}
+
+	// ────────────────────────────────────────────────
+	// 开放 API 路由组（T9 ADR-open-api）
+	// 接缝：Bearer hsk_xxx 鉴权（ApiKeyContext），与 portal JWT cookie 物理隔离
+	// 工具执行层无租户状态，tenant 上下文只用于鉴权配额（T9.3 配额、T9.4 限流）
+	// ────────────────────────────────────────────────
+	toolExec := toolexec.New(cfg.ToolExecutorURL)
+	// T9.4 限流器：per-tenant per-minute 固定窗口（进程内单例）
+	// MVP 单实例内存 map；多实例换 Redis（ADR 开放问题）
+	rateLimiter := middleware.NewRateLimiter(cfg.RateLimitRPM)
+	openAPI := r.Group("/open/v1")
+	openAPI.Use(func(c *gin.Context) {
+		c.Set("db", gormDB)
+		c.Set(handlers.CtxToolExecutor, toolExec)
+		c.Next()
+	})
+	openAPI.Use(middleware.ApiKeyContext(gormDB))
+	// 挂载顺序：ApiKeyContext → RateLimit → QuotaEnforce → handler
+	// RateLimit 在 QuotaEnforce 之前：挡掉刷量请求不消耗配额计数
+	openAPI.Use(rateLimiter.RateLimit())
+	{
+		// T9.1：whoami 验证 ApiKeyContext 注入（走组级 RateLimit，但不走 QuotaEnforce——元信息端点不消耗工具配额）
+		openAPI.GET("/whoami", handlers.OpenWhoami)
+		// T9.2 + T9.3 + T9.4：三个工具端点，RateLimit(组级) → QuotaEnforce(seo_audits) → handler
+		// diagnose / schema/check / sitemap/submit 均计 seo_audits 用量（ADR-open-api 5.3）
+		openAPI.POST("/diagnose",
+			middleware.QuotaEnforce(gormDB, models.MeterSEOAudits),
+			handlers.OpenDiagnose)
+		openAPI.POST("/schema/check",
+			middleware.QuotaEnforce(gormDB, models.MeterSEOAudits),
+			handlers.OpenSchemaCheck)
+		openAPI.POST("/sitemap/submit",
+			middleware.QuotaEnforce(gormDB, models.MeterSEOAudits),
+			handlers.OpenSitemapSubmit)
 	}
 
 	log.Printf("[tenant-api] listening on :%s (dev=%v, db=hutian, admin=%v, jwt=%v)", cfg.Port, cfg.Dev, cfg.AdminToken != "", cfg.JWTKey != "")

@@ -103,28 +103,42 @@ func main() {
 	}
 	log.Printf("[setup] created 5 temp users: %v", userIDs)
 
+	// defer 兜底清理：保证任何退出路径都恢复 seats_limit + 删临时 user/seat
+	// 注意 log.Fatalf/os.Exit 不执行 defer，所以后续 fatal 改用 log.Printf+return
+	defer func() {
+		cleanup(gormDB, userIDs)
+		if err := gormDB.Model(&sub).Update("seats_limit", origSeatsLimit).Error; err != nil {
+			log.Printf("[cleanup] WARN: restore seats_limit failed: %v", err)
+		} else {
+			log.Printf("[cleanup] seats_limit restored to %d", origSeatsLimit)
+		}
+	}()
+
 	// 设 seats_limit = 当前 active 数 + 2（允许新增 2 个）
 	allowNew := 2
 	newLimit := int(origActiveCount) + allowNew
 	if err := gormDB.Model(&sub).Update("seats_limit", newLimit).Error; err != nil {
-		cleanup(gormDB, userIDs)
-		log.Fatalf("[fatal] set seats_limit=%d: %v", newLimit, err)
+		log.Printf("[fatal] set seats_limit=%d: %v", newLimit, err)
+		return
 	}
 	log.Printf("[setup] seats_limit set to %d (orig active=%d, allow new=%d)", newLimit, origActiveCount, allowNew)
 
-	// ── 并发 5 个 CreateSeat（不同 user_id）──
+	// ── 并发 5 个 CreateSeat（不同 user_id），barrier 让 5 个同一瞬间放行 ──
 	var wg sync.WaitGroup
 	var successCount, conflictCount, otherCount int64
 	results := make([]int, 5) // 每个请求的 status code
+	barrier := make(chan struct{})
 	for i := 0; i < 5; i++ {
 		wg.Add(1)
 		go func(idx, uid int64) {
 			defer wg.Done()
+			<-barrier // 等所有 goroutine 就绪，close(barrier) 后同一瞬间放行，最大化并发重叠
 			code := doCreateSeat(tenantID, uid)
 			incrementCounter(code, &successCount, &conflictCount, &otherCount)
 			results[idx] = code
 		}(int64(i), userIDs[i])
 	}
+	close(barrier) // 5 个 goroutine 同一瞬间放行
 	wg.Wait()
 	log.Printf("[run] concurrent results: %v", results)
 
@@ -158,7 +172,9 @@ func main() {
 		detail: fmt.Sprintf("final=%d expect=%d", finalActiveCount, expectFinal),
 	})
 
-	// ── 清理 ──
+	// ── 显式清理（printSummary 的 os.Exit 不执行 defer，所以显式清理 + defer 双保险）──
+	// defer 保留作 panic 兜底；显式清理保证断言失败 os.Exit 前也清理。
+	// 重复执行无害：cleanup 第二次删空集，seats_limit 恢复幂等。
 	cleanup(gormDB, userIDs)
 	if err := gormDB.Model(&sub).Update("seats_limit", origSeatsLimit).Error; err != nil {
 		log.Printf("[cleanup] WARN: restore seats_limit failed: %v", err)
@@ -167,6 +183,7 @@ func main() {
 	}
 
 	printSummary(asserts)
+	// 清理由 defer 兜底（保证 os.Exit/return 都清理）
 }
 
 // incrementCounter 根据 code 递增对应计数器

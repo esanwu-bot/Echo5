@@ -3,31 +3,34 @@
 // 把声明式的 plan_quotas + usage_meters 第一次运行化。
 //
 // 核心算法：先递增后读回（防空窗口首调竞态）
-//   BEGIN
-//   ① INSERT INTO usage_meters (...) VALUES (...,count=1)
-//        ON DUPLICATE KEY UPDATE count = count + 1     ← 原子递增+行锁串行化
-//        （行不存在时 INSERT 创建并锁；行存在时 ON DUPLICATE KEY 获取排他锁，并发串行化）
-//   ② SELECT count FROM usage_meters ... FOR UPDATE    ← 读回递增后的值，锁行到事务结束
-//   ③ SELECT limit_per_window, overage_policy FROM plan_quotas
-//   ④ IF limit >= 0 AND count > limit:                  ← 注意是 >（已递增）
-//        overage_policy=reject  → UPDATE count=count-1（递减，不消耗配额）→ 429
-//        overage_policy=degrade → 同 reject（MVP，T9.7 再细化降级响应）→ 429
-//        overage_policy=allow   → 放行（已递增，保留用量）
-//   ⑤ ELSE: COMMIT 放行
-//   COMMIT
+//
+//	BEGIN
+//	① INSERT INTO usage_meters (...) VALUES (...,count=1)
+//	     ON DUPLICATE KEY UPDATE count = count + 1     ← 原子递增+行锁串行化
+//	     （行不存在时 INSERT 创建并锁；行存在时 ON DUPLICATE KEY 获取排他锁，并发串行化）
+//	② SELECT count FROM usage_meters ... FOR UPDATE    ← 读回递增后的值，锁行到事务结束
+//	③ SELECT limit_per_window, overage_policy FROM plan_quotas
+//	④ IF limit >= 0 AND count > limit:                  ← 注意是 >（已递增）
+//	     overage_policy=reject  → UPDATE count=count-1（递减，不消耗配额）→ 429
+//	     overage_policy=degrade → 同 reject（MVP，T9.7 再细化降级响应）→ 429
+//	     overage_policy=allow   → 放行（已递增，保留用量）
+//	⑤ ELSE: COMMIT 放行
+//	COMMIT
 //
 // 为什么不用"先查 FOR UPDATE 再递增"：
-//   FOR UPDATE 锁不住"不存在的行"。两个并发首调同一 tenant+meter+window（行还不存在）时，
-//   SELECT FOR UPDATE 都读到"无行"、都通过检查、都递增——READ COMMITTED 下静默超额，
-//   REPEATABLE READ 下可能 gap-lock 死锁。"先递增后读回"与隔离级别无关，始终正确。
+//
+//	FOR UPDATE 锁不住"不存在的行"。两个并发首调同一 tenant+meter+window（行还不存在）时，
+//	SELECT FOR UPDATE 都读到"无行"、都通过检查、都递增——READ COMMITTED 下静默超额，
+//	REPEATABLE READ 下可能 gap-lock 死锁。"先递增后读回"与隔离级别无关，始终正确。
 //
 // fail-closed：DB 不可用 / 事务失败 → 503（绝不 fail-open 放行）
 // 超额 → 429（客户端不重试）；配额服务故障 → 503（客户端可重试）
 //
 // 退配额策略（ADR 5.5 开放问题，显式决策）：
-//   ① 配额超额被 reject → 递减回去（不消耗配额，请求未到工具层）
-//   ② 配额通过但工具调用失败 → 不退（ADR 倾向，记为 failed 调用；预扣已 commit，不回滚）
-//   理由：reject 是"拒绝服务"不应消耗配额；工具失败是"已服务但失败"消耗了资源
+//
+//	① 配额超额被 reject → 递减回去（不消耗配额，请求未到工具层）
+//	② 配额通过但工具调用失败 → 不退（ADR 倾向，记为 failed 调用；预扣已 commit，不回滚）
+//	理由：reject 是"拒绝服务"不应消耗配额；工具失败是"已服务但失败"消耗了资源
 package middleware
 
 import (
@@ -36,15 +39,18 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"hutian-tenant-api/models"
 )
 
 // QuotaEnforce 配额执行中间件
 // meterKind 按端点注入（route→meter_kind 显式映射在 main.go 路由注册处）：
-//   diagnose       → seo_audits
-//   schema/check   → seo_audits
-//   sitemap/submit → seo_audits
+//
+//	diagnose       → seo_audits
+//	schema/check   → seo_audits
+//	sitemap/submit → seo_audits
+//
 // 必须挂在 ApiKeyContext 之后（依赖 MustTenantID）
 func QuotaEnforce(db *gorm.DB, meterKind models.MeterKind) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -80,8 +86,12 @@ func QuotaEnforce(db *gorm.DB, meterKind models.MeterKind) gin.HandlerFunc {
 		}
 
 		// ② FOR UPDATE 读回递增后的值（锁行到 COMMIT，防后续并发在 check 间隙插入）
+		// T9.7 修复：GORM v2 的 gorm:query_option 不生效（DryRun 实测 SQL 不含 FOR UPDATE），
+		// 改用 clause.Locking{Strength:"UPDATE"}。配额是"先递增后读回"型，正确性靠 ① 的
+		// INSERT ON DUPLICATE KEY UPDATE 原子递增兜底，FOR UPDATE 是冗余保险，但失效写法
+		// 一并改掉消除认知负担（与 admin.go/portal.go 席位两处一致）。
 		var meter models.UsageMeter
-		if err := tx.Set("gorm:query_option", "FOR UPDATE").
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("tenant_id = ? AND meter_kind = ? AND window_start = ?",
 				tenantID, meterKind, windowStart).
 			First(&meter).Error; err != nil {

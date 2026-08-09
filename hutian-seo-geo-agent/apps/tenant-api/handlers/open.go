@@ -5,12 +5,14 @@
 //
 // T9.1：whoami（验证 ApiKeyContext 注入）
 // T9.2：diagnose / schema/check / sitemap/submit（调工具执行层 Python REST）
+// T9.6：3 业务端点成功/失败后落审计（writeOpenApiAudit，access_kind=api）
 package handlers
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -37,8 +39,50 @@ func getToolExecutor(c *gin.Context) *toolexec.Client {
 	return nil
 }
 
+// writeOpenApiAudit 开放 API 审计（ADR-open-api 5.7）
+//
+// 与 admin writeAudit 的区别：开放 API 走 ApiKeyContext（非 AdminContext），
+// 不依赖 MustAdminActor。actor_kind=agent（API 调用是非人类系统，ADR"不动
+// actor_kind 枚举"用现有 agent 值）。access_kind=api + api_key_id 记入
+// meta_json（不动 audit_logs 表结构，轻量）。
+//
+// 纪律（ADR 5.7）：审计不阻塞业务流程，写失败只记日志不返回 500。
+// 范围：3 业务能力端点（diagnose/schema_check/sitemap_submit）成功+失败都审；
+// whoami 元端点不审（不调工具、不消耗配额，性质等同鉴权后心跳）。
+func writeOpenApiAudit(c *gin.Context, action string, meta map[string]interface{}) {
+	db := DB(c)
+	apiKeyID := middleware.MustApiKeyID(c)
+	tenantID := middleware.MustTenantID(c)
+	workspaceID := middleware.MustWorkspaceID(c)
+
+	if meta == nil {
+		meta = make(map[string]interface{})
+	}
+	meta["access_kind"] = "api"
+	meta["api_key_id"] = apiKeyID
+
+	metaBytes, err := json.Marshal(meta)
+	if err != nil {
+		log.Printf("[audit] WARN: open-api meta marshal failed (action=%s): %v", action, err)
+		metaBytes = []byte(`{"access_kind":"api"}`)
+	}
+
+	logEntry := models.AuditLog{
+		ActorKind:   models.ActorKindAgent,
+		Action:      action,
+		TargetKind:  "open_api",
+		TenantID:    sqlNullInt64(tenantID),
+		WorkspaceID: sqlNullInt64(workspaceID),
+		MetaJSON:    string(metaBytes),
+	}
+	if err := db.Create(&logEntry).Error; err != nil {
+		log.Printf("[audit] WARN: open-api audit write failed (action=%s): %v", action, err)
+	}
+}
+
 // OpenWhoami 返回当前 API key 的身份信息
 // 用途：T9.1 验证 ApiKeyContext 中间件正确注入 tenant/workspace/scopes
+// 不落审计：元端点，不调工具、不消耗配额（见 writeOpenApiAudit 注释）
 func OpenWhoami(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"api_key_id":   middleware.MustApiKeyID(c),
@@ -54,6 +98,10 @@ func OpenDiagnose(c *gin.Context) {
 	client := getToolExecutor(c)
 	if client == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "tool executor not configured"})
+		writeOpenApiAudit(c, "open_api.diagnose", map[string]interface{}{
+			"status": http.StatusServiceUnavailable,
+			"error":  "tool executor not configured",
+		})
 		return
 	}
 	var req struct {
@@ -61,17 +109,34 @@ func OpenDiagnose(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request", "reason": err.Error()})
+		writeOpenApiAudit(c, "open_api.diagnose", map[string]interface{}{
+			"status": http.StatusBadRequest,
+			"error":  err.Error(),
+		})
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 35*time.Second)
 	defer cancel()
+	start := time.Now()
 	result, err := client.Diagnose(ctx, req.URL)
+	durationMs := time.Since(start).Milliseconds()
 	if err != nil {
 		// fail-closed：工具执行层不可用 → 503，不返回部分结果
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "tool execution failed", "reason": err.Error()})
+		writeOpenApiAudit(c, "open_api.diagnose", map[string]interface{}{
+			"status":      http.StatusServiceUnavailable,
+			"url":         req.URL,
+			"error":       err.Error(),
+			"duration_ms": durationMs,
+		})
 		return
 	}
+	writeOpenApiAudit(c, "open_api.diagnose", map[string]interface{}{
+		"status":      http.StatusOK,
+		"url":         req.URL,
+		"duration_ms": durationMs,
+	})
 	c.Data(http.StatusOK, "application/json", result)
 }
 
@@ -81,6 +146,10 @@ func OpenSchemaCheck(c *gin.Context) {
 	client := getToolExecutor(c)
 	if client == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "tool executor not configured"})
+		writeOpenApiAudit(c, "open_api.schema_check", map[string]interface{}{
+			"status": http.StatusServiceUnavailable,
+			"error":  "tool executor not configured",
+		})
 		return
 	}
 	var req struct {
@@ -89,16 +158,35 @@ func OpenSchemaCheck(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request", "reason": err.Error()})
+		writeOpenApiAudit(c, "open_api.schema_check", map[string]interface{}{
+			"status": http.StatusBadRequest,
+			"error":  err.Error(),
+		})
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 35*time.Second)
 	defer cancel()
+	start := time.Now()
 	result, err := client.SchemaCheck(ctx, req.URL, req.ExpectedType)
+	durationMs := time.Since(start).Milliseconds()
 	if err != nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "tool execution failed", "reason": err.Error()})
+		writeOpenApiAudit(c, "open_api.schema_check", map[string]interface{}{
+			"status":       http.StatusServiceUnavailable,
+			"url":          req.URL,
+			"expected_type": req.ExpectedType,
+			"error":        err.Error(),
+			"duration_ms":  durationMs,
+		})
 		return
 	}
+	writeOpenApiAudit(c, "open_api.schema_check", map[string]interface{}{
+		"status":        http.StatusOK,
+		"url":           req.URL,
+		"expected_type": req.ExpectedType,
+		"duration_ms":   durationMs,
+	})
 	c.Data(http.StatusOK, "application/json", result)
 }
 
@@ -110,19 +198,32 @@ func OpenSitemapSubmit(c *gin.Context) {
 	client := getToolExecutor(c)
 	if client == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "tool executor not configured"})
+		writeOpenApiAudit(c, "open_api.sitemap_submit", map[string]interface{}{
+			"status": http.StatusServiceUnavailable,
+			"error":  "tool executor not configured",
+		})
 		return
 	}
 	var req struct {
-		Host         string   `json:"host" binding:"required"`
-		URLs         []string `json:"urls" binding:"required"`
-		IndexNowKey  string   `json:"indexnow_key" binding:"required"`
+		Host        string   `json:"host" binding:"required"`
+		URLs        []string `json:"urls" binding:"required"`
+		IndexNowKey string   `json:"indexnow_key" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request", "reason": err.Error()})
+		writeOpenApiAudit(c, "open_api.sitemap_submit", map[string]interface{}{
+			"status": http.StatusBadRequest,
+			"error":  err.Error(),
+		})
 		return
 	}
 	if len(req.URLs) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "urls must not be empty"})
+		writeOpenApiAudit(c, "open_api.sitemap_submit", map[string]interface{}{
+			"status": http.StatusBadRequest,
+			"host":   req.Host,
+			"error":  "urls must not be empty",
+		})
 		return
 	}
 
@@ -130,20 +231,41 @@ func OpenSitemapSubmit(c *gin.Context) {
 	db := DB(c)
 	workspaceID := middleware.MustWorkspaceID(c)
 	if err := validateHostOwnership(db, workspaceID, req.Host); err != nil {
+		// 安全事件必审：跨租户提交尝试
 		c.JSON(http.StatusForbidden, gin.H{
 			"error":  "host ownership validation failed",
 			"reason": err.Error(),
+		})
+		writeOpenApiAudit(c, "open_api.sitemap_submit", map[string]interface{}{
+			"status": http.StatusForbidden,
+			"host":   req.Host,
+			"error":  err.Error(),
 		})
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 35*time.Second)
 	defer cancel()
+	start := time.Now()
 	result, err := client.SitemapSubmit(ctx, req.Host, req.URLs, req.IndexNowKey)
+	durationMs := time.Since(start).Milliseconds()
 	if err != nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "tool execution failed", "reason": err.Error()})
+		writeOpenApiAudit(c, "open_api.sitemap_submit", map[string]interface{}{
+			"status":      http.StatusServiceUnavailable,
+			"host":        req.Host,
+			"url_count":   len(req.URLs),
+			"error":       err.Error(),
+			"duration_ms": durationMs,
+		})
 		return
 	}
+	writeOpenApiAudit(c, "open_api.sitemap_submit", map[string]interface{}{
+		"status":      http.StatusOK,
+		"host":        req.Host,
+		"url_count":   len(req.URLs),
+		"duration_ms": durationMs,
+	})
 	c.Data(http.StatusOK, "application/json", result)
 }
 
@@ -206,7 +328,3 @@ func extractHostname(s string) string {
 	}
 	return s
 }
-
-// 保留 json/strings 引用（未来配额/审计可能用到）
-var _ = json.RawMessage{}
-var _ = strings.TrimSpace

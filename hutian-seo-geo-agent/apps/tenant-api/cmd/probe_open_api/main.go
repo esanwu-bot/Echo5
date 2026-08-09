@@ -86,15 +86,17 @@ func main() {
 	// IndexNow 提交到 Google/Bing 受外部网络影响（中国网络可能超时），
 	// 探针断言：端点正确转发请求到工具执行层，返回 200（工具成功）或 503（工具超时/fail-closed）
 	// 核心验证：handler → toolexec → Python 链路打通（非 IndexNow 外部成功）
+	// T9.5 归属校验：host 必须属该 API key 绑定的 workspace（tenant-a ws=10 site_domain=brand-a.com），
+	// 用 example.com 会被 403 拒绝（回归：原用 example.com 在 T9.5 上线后变 FAIL），改用 brand-a.com
 	code, resp = doPostBearerObj(apiKey, "/open/v1/sitemap/submit",
 		map[string]interface{}{
-			"host":         "example.com",
-			"urls":         []string{"https://example.com/"},
+			"host":         "brand-a.com",
+			"urls":         []string{"https://brand-a.com/"},
 			"indexnow_key": "test-key-probe-000000000000000000000000",
 		})
 	sitemapOK := code == 200 || code == 503
 	asserts = append(asserts, assertion{
-		name:   "③ POST /open/v1/sitemap/submit → 200 或 503（IndexNow 外部网络可能超时）",
+		name:   "③ POST /open/v1/sitemap/submit → 200 或 503（host=brand-a.com 过 T9.5 归属校验，IndexNow 外部可能超时）",
 		pass:   sitemapOK,
 		detail: fmt.Sprintf("status=%d body=%s", code, truncate(resp, 160)),
 	})

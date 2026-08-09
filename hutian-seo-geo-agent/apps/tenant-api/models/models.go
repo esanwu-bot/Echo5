@@ -140,6 +140,7 @@ type CmsInstance struct {
 	BaseModel
 	CmsType       CmsType        `gorm:"type:varchar(32);index;not null;default:sitebase" json:"cms_type"`
 	BaseURL       string         `gorm:"type:varchar(255);not null" json:"base_url"` // siteBase=admin_url, WordPress=wp_url
+	SiteDomain    string         `gorm:"type:varchar(255);index" json:"site_domain"` // 站点公开域名（T9.5 归属校验：submit_sitemap 的 host 必须匹配此域名）
 	ProvisionKind ProvisionKind  `gorm:"type:varchar(32);not null;default:preset" json:"provision_kind"`
 	Capacity      int            `gorm:"not null;default:1" json:"capacity"` // M6=1，预留共享模式
 	Health        InstanceHealth `gorm:"type:varchar(32);index;not null;default:healthy" json:"health"`

@@ -12,9 +12,10 @@ DELETE FROM tenants WHERE id IN (1, 2);
 
 -- 两个 CMS 实例（T8.0 起 sitebase_instances → cms_instances，标 cms_type=sitebase）
 -- 模拟每 workspace 一套实例隔离
-INSERT INTO cms_instances (id, cms_type, base_url, provision_kind, capacity, health) VALUES
-  (100, 'sitebase', 'http://localhost:8001/api/v1', 'preset', 1, 'healthy'),
-  (200, 'sitebase', 'http://localhost:8002/api/v1', 'preset', 1, 'healthy');
+-- T9.5：site_domain 存站点公开域名，用于 submit_sitemap 归属校验
+INSERT INTO cms_instances (id, cms_type, base_url, site_domain, provision_kind, capacity, health) VALUES
+  (100, 'sitebase', 'http://localhost:8001/api/v1', 'brand-a.com', 'preset', 1, 'healthy'),
+  (200, 'sitebase', 'http://localhost:8002/api/v1', 'brand-b.com', 'preset', 1, 'healthy');
 
 -- 租户 A（id=1）
 INSERT INTO tenants (id, slug, display_name, status, owner_seat_id) VALUES

@@ -7,6 +7,7 @@
     "dev": "node --env-file=../../.env --import tsx --watch src/server.ts",
     "start": "node --env-file=../../.env --import tsx src/server.ts",
     "probe:llm": "node --env-file=../../.env --import tsx src/llm/probe-codebuddy.ts",
+    "probe:sensenova": "node --env-file=../../.env --import tsx src/llm/probe-sensenova.ts",
     "probe:derived": "node --env-file=../../.env --import tsx src/llm/probe-derived-schema.ts",
     "verify:tools": "node --import tsx src/mcp/verify-schema.ts",
     "verify:sanitize": "node --import tsx src/mcp/verify-sanitize.ts",

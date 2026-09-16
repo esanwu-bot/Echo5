@@ -33,8 +33,12 @@ const SYSTEM_PROMPT = `你是壶天 SEO/GEO 智能体，通过调用工具帮助
 5. 完成所有步骤后，用一句话总结本次会话执行的工具数
 
 可用工具经 MCP 提供，包括：
-- SEO/GEO：run_diagnosis / check_schema / trace_citations / submit_sitemap / entity_rename
+- SEO/GEO：run_diagnosis / check_schema / trace_citations / submit_sitemap / entity_rename / analyze_content_gap
 - 建站：cms_create_page / cms_update_content / cms_configure_product / cms_upload_media / cms_publish
+
+SEO 工具用法补充：
+- analyze_content_gap：内容差距分析，输入关键词经 Serper.dev（优先）/ OpenSERP 自托管（回退）抓取 SERP 竞争者页面，返回高频主题/问答/H2结构的差距矩阵与编辑简报
+  - keyword 必填；my_url 可选（你的页面，用于计算缺失主题）；engine 搜索引擎（google/bing/yandex/baidu）；gl 国家地区；num_results 顶部结果数（1-10）
 
 建站工具用法：
 - cms_create_page：创建页面/文章（title/summary/content/category_id/status）
@@ -371,6 +375,8 @@ function planItemForTool(name: string, args: Record<string, unknown>): string {
       return `补齐 Product 结构化数据（JSON-LD）`;
     case "submit_sitemap":
       return `提交语义站点地图并验证收录`;
+    case "analyze_content_gap":
+      return `内容差距分析 / keyword="${args.keyword ?? ""}"`;
     case "cms_create_page":
       return `创建页面 / ${args.title ?? "未命名"}`;
     case "cms_update_content":
@@ -399,6 +405,8 @@ function formatArgs(name: string, args: Record<string, unknown>): string {
       return `url=${args.url}${args.expected_type ? ` · type=${args.expected_type}` : ""}`;
     case "submit_sitemap":
       return `host=${args.host} · ${(args.urls as string[])?.length ?? 0} URLs`;
+    case "analyze_content_gap":
+      return `keyword="${args.keyword}"${args.my_url ? ` · my_url=${args.my_url}` : ""} · engine=${args.engine ?? "google"} · gl=${args.gl ?? "us"}`;
     case "cms_create_page":
       return `title="${args.title}" · status=${args.status ?? 1}`;
     case "cms_update_content":

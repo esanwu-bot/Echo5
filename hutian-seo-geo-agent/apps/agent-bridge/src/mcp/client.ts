@@ -42,12 +42,13 @@ export interface McpClientConfig {
   cwd?: string;
 }
 
-const TEN_TOOL_NAMES = [
+const TOOL_NAMES = [
   "run_diagnosis",
   "check_schema",
   "trace_citations",
   "submit_sitemap",
   "entity_rename",
+  "analyze_content_gap",
   "cms_create_page",
   "cms_update_content",
   "cms_configure_product",
@@ -205,6 +206,24 @@ export const STATIC_TOOLS: ToolSchema[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "analyze_content_gap",
+      description: "SERP content gap analysis via Serper.dev (primary) / OpenSERP self-hosted (fallback). Fetches top competitor pages for a keyword, extracts their markdown content, and returns a content gap matrix (common topics, top questions, heading themes) plus an editorial brief with missing topics for your page.",
+      parameters: {
+        type: "object",
+        properties: {
+          keyword: { type: "string", description: "Target search keyword" },
+          my_url: { type: "string", description: "Your page URL (optional). Excluded from competitor set and fetched for missing-topic calculation.", default: "" },
+          engine: { type: "string", description: "Search engine: google, bing, yandex, baidu, duckduckgo, ecosia", default: "google" },
+          gl: { type: "string", description: "Country/region code, e.g. us, uk, cn", default: "us" },
+          num_results: { type: "integer", description: "Number of top results to analyze (1-10)", default: 5 },
+        },
+        required: ["keyword"],
+      },
+    },
+  },
   // ── 建站腿 5 工具 ──
   {
     type: "function",
@@ -299,10 +318,10 @@ export const STATIC_TOOLS: ToolSchema[] = [
   },
 ];
 
-/** 验证工具名闭环：派生的 10 个名字必须等于 TEN_TOOL_NAMES */
+/** 验证工具名闭环：派生的名字必须等于 TOOL_NAMES */
 export function validateToolNames(schemas: ToolSchema[]): { ok: boolean; missing: string[]; extra: string[] } {
   const names = new Set(schemas.map((s) => s.function.name));
-  const expected = new Set<string>(TEN_TOOL_NAMES);
+  const expected = new Set<string>(TOOL_NAMES);
   const missing = [...expected].filter((n) => !names.has(n));
   const extra = [...names].filter((n) => !expected.has(n));
   return { ok: missing.length === 0 && extra.length === 0, missing, extra };

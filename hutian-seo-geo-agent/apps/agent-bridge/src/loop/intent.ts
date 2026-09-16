@@ -105,7 +105,7 @@ const URL_PATTERN =
 const RENAME_KEYWORDS = /品牌.*(更名|改名|重命名|换名|改为|改成|统一为|更新为)|rename\s+(brand|entity)/i;
 
 /** 诊断关键词 */
-const DIAGNOSE_KEYWORDS = /(诊断|分析|检测|评估|seo\s*(score|评分|分数)|geo\s*(score|评分|分数)|audit)/i;
+const DIAGNOSE_KEYWORDS = /(诊断|分析|检测|评估|seo\s*(score|评分|分数)|geo\s*(score|评分|分数)|audit|内容差距|content\s*gap|差距分析|serp|competitor)/i;
 
 /** 引用追踪关键词 */
 const REPORT_KEYWORDS = /(引用|提及|提到|可见度|出现频次|citation|mention|trace)/i;

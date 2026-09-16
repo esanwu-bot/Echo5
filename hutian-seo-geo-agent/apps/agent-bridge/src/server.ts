@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { CodeBuddyClient } from "./llm/codebuddy-client.ts";
 import { GrokClient } from "./llm/grok-client.ts";
+import { SenseNovaClient } from "./llm/sensenova-client.ts";
 import { MockLLMClient, seoDemoScript } from "./llm/mock-client.ts";
 import { StdioMcpClient } from "./mcp/client.ts";
 import { getMcpForTenant } from "./mcp/pool.ts";
@@ -36,6 +37,7 @@ function sseHead(res: ServerResponse) {
 // 优先级（LLM_PROVIDER 环境变量控制）：
 //   - "grok"     : Grok → CodeBuddy → Mock（Grok 优先，需 CLIProxyAPI 活着）
 //   - "codebuddy": CodeBuddy → Mock（默认，不等待 Grok）
+//   - "sensenova": SenseNova → CodeBuddy → Mock（商汤 SenseNova 优先，失败降级 CodeBuddy）
 //   - "auto"     : Grok → CodeBuddy → Mock（自动选，Grok 活着就用）
 //
 // 注意：Grok 只是 LLM 后端之一，loop 零改动；CLIProxyAPI 未启动时自动降级。
@@ -62,6 +64,15 @@ async function buildLLM(): Promise<LLMClient> {
   if (provider === "grok" || provider === "auto") {
     const grok = await tryGrok(provider === "grok" ? 3000 : 1000);
     if (grok) return grok;
+  }
+
+  // SenseNova 优先路径
+  if (provider === "sensenova") {
+    try {
+      return SenseNovaClient.fromEnv();
+    } catch (e) {
+      errors.push(`SenseNovaClient: ${(e as Error).message}`);
+    }
   }
 
   // CodeBuddy 路径

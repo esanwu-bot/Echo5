@@ -25,7 +25,7 @@ const DEFAULT_POOL_KEY = "__default__";
 //   dev 够用；生产需：上限按活跃租户量调 + close 失败可观测 + idle 回收。
 
 /** 最小权限 env：只透传 Python MCP 必需的变量，防敏感密钥泄露到子进程 */
-const ALLOWED_ENV_PREFIXES = ["SITEBASE_", "PYTHONPATH", "PYTHON", "PATH", "HOME", "USERPROFILE", "TEMP", "TMP"];
+const ALLOWED_ENV_PREFIXES = ["SITEBASE_", "SERPER_", "OPENSERP_", "PAGESPEED_", "HUTIAN_", "PYTHONPATH", "PYTHON", "PATH", "HOME", "USERPROFILE", "TEMP", "TMP"];
 
 function buildChildEnv(adminUrlOverride?: string): Record<string, string> {
   const env: Record<string, string> = {};

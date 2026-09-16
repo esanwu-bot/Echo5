@@ -19,6 +19,7 @@ import type { LLMClient, Message, ToolSchema } from "../llm/types.ts";
 import type { McpToolClient } from "../mcp/client.ts";
 import { classifyIntent, type Intent } from "./intent.ts";
 import { GuardrailPipeline } from "./guardrail-pipeline.ts";
+import { tryBuildArtifact } from "./artifact.ts";
 import type { RunCtx } from "./flow-control.ts";
 
 const MAX_TURNS = 15;
@@ -264,6 +265,13 @@ export async function* runAgentLoop(
         durationMs: result.ms,
         output: result.output,
       };
+
+      // artifact_created：工具产出可渲染产物（独立于 tool_end 语义）
+      // 仅白名单工具 + JSON 解析成功才产 artifact，失败静默跳过（tool_end 已显示原文）
+      const artifact = tryBuildArtifact(call.name, result.output);
+      if (artifact) {
+        yield artifact;
+      }
 
       // plan_update（第 i 个工具完成）
       yield { type: "plan_update", done: toolCallCount, current: toolCallCount };

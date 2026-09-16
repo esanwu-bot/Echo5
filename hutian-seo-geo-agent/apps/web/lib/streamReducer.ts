@@ -4,6 +4,7 @@ import type {
   StatItem,
   DiffData,
   ArtifactData,
+  ArtifactEvent,
 } from "@hutian/agent-protocol";
 
 /**
@@ -54,6 +55,14 @@ export interface StreamState {
   diffs: DiffData[];
   terminalLines: TerminalLine[];
   artifacts: ArtifactData[];
+  /**
+   * v0.3: 富 artifact（artifact_created 事件），含完整 data 供右栏报告视图渲染。
+   *
+   * ⚠️ MVP 债：artifactEvents 随 session 内存态存在，页面刷新即丢失。
+   * 持久化需落 DB（接 project_events 或独立 artifacts 表），另排期实现。
+   * 与 sessionHistories 同级别内存态，不影响会话列表（Sidebar）的本地持久化。
+   */
+  artifactEvents: ArtifactEvent[];
   stats: StatItem[];
   activePanel: PanelTab;
   agentRunning: boolean;
@@ -71,6 +80,7 @@ export const initialStreamState: StreamState = {
   diffs: [],
   terminalLines: [],
   artifacts: [],
+  artifactEvents: [],
   stats: [],
   activePanel: "diff",
   agentRunning: false,
@@ -207,6 +217,19 @@ export function streamReducer(
         artifacts: [...state.artifacts, event.data],
         activePanel: "arts",
       };
+
+    case "artifact_created": {
+      // 按 artifact_id 去重（SSE 重连可能重复推送同一 artifact）
+      const exists = state.artifactEvents.some(
+        (a) => a.artifact_id === event.artifact_id,
+      );
+      if (exists) return state;
+      return {
+        ...state,
+        artifactEvents: [...state.artifactEvents, event],
+        activePanel: "arts",
+      };
+    }
 
     case "stats":
       return {

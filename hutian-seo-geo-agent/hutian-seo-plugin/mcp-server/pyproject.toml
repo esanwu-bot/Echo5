@@ -19,6 +19,11 @@ dependencies = [
     "openserp==0.2.6",
     "httpx>=0.27.0",
     "markdownify>=0.11.0",
+    # Google API 集成（T15.1 GSC + T15.2 GA4）
+    "google-auth>=2.23.0",
+    "google-auth-oauthlib>=1.1.0",
+    "google-api-python-client>=2.100.0",
+    "google-analytics-data>=0.18.0",
 ]
 # playwright 为可选依赖：仅 render_mode=auto 时尝试 import，失败降级为仅标记空壳
 # 安装：pip install "hutian-seo-mcp[render]" 或 pip install playwright && playwright install chromium

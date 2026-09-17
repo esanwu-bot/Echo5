@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import type { StreamState, PanelTab } from "@/lib/streamReducer";
-import type { DiffData, ArtifactData } from "@hutian/agent-protocol";
+import type { DiffData, ArtifactData, ArtifactEvent } from "@hutian/agent-protocol";
+import CrawlReport, { type CrawlReportData } from "./CrawlReport";
 
 /**
  * 右栏面板.  ← FR-W06 Diff 联动 / FR-W07 终端与产物
@@ -25,8 +27,10 @@ const TABS: { id: PanelTab; label: string; icon: string }[] = [
 
 export default function RightPanel({ state, onTabChange }: RightPanelProps) {
   const latestDiff = state.diffs[state.diffs.length - 1];
+  const [crawlReport, setCrawlReport] = useState<CrawlReportData | null>(null);
 
   return (
+    <>
     <aside className="hidden w-[400px] shrink-0 flex-col border-l border-line bg-bg1/60 xl:flex">
       {/* 标签栏 */}
       <div className="flex items-center border-b border-line bg-bg1/80">
@@ -51,9 +55,9 @@ export default function RightPanel({ state, onTabChange }: RightPanelProps) {
                 {state.diffs.length}
               </span>
             )}
-            {t.id === "arts" && state.artifacts.length > 0 && (
+            {t.id === "arts" && state.artifactEvents.length > 0 && (
               <span className="ml-0.5 rounded bg-bg3 px-1 text-[9px] font-mono text-dim">
-                {state.artifacts.length}
+                {state.artifactEvents.length}
               </span>
             )}
           </button>
@@ -70,10 +74,22 @@ export default function RightPanel({ state, onTabChange }: RightPanelProps) {
           <TerminalView lines={state.terminalLines} />
         )}
         {state.activePanel === "arts" && (
-          <ArtifactsView artifacts={state.artifacts} />
+          <ArtifactsView
+            artifacts={state.artifacts}
+            artifactEvents={state.artifactEvents}
+            onOpenCrawl={(data) => setCrawlReport(data)}
+          />
         )}
       </div>
     </aside>
+
+    {/* 全屏爬取审计报告 */}
+    {crawlReport && (
+      <div className="fixed inset-0 z-[100]">
+        <CrawlReport data={crawlReport} onClose={() => setCrawlReport(null)} />
+      </div>
+    )}
+    </>
   );
 }
 
@@ -274,8 +290,16 @@ function TerminalView({
 }
 
 /* ════════ Artifacts ════════ */
-function ArtifactsView({ artifacts }: { artifacts: ArtifactData[] }) {
-  if (artifacts.length === 0) {
+function ArtifactsView({
+  artifacts,
+  artifactEvents,
+  onOpenCrawl,
+}: {
+  artifacts: ArtifactData[];
+  artifactEvents: ArtifactEvent[];
+  onOpenCrawl: (data: CrawlReportData) => void;
+}) {
+  if (artifacts.length === 0 && artifactEvents.length === 0) {
     return (
       <EmptyState
         icon="w-pkg"
@@ -288,9 +312,52 @@ function ArtifactsView({ artifacts }: { artifacts: ArtifactData[] }) {
   return (
     <div className="h-full overflow-y-auto p-3">
       <div className="mb-2 font-mono text-[10px] tracking-wider text-faint">
-        产物列表（{artifacts.length}）
+        产物列表（{artifacts.length + artifactEvents.length}）
       </div>
       <div className="space-y-2">
+        {/* 富 artifact（crawl_report 等） */}
+        {artifactEvents.map((a) => {
+          const isCrawl = a.kind === "crawl_report";
+          return (
+            <div
+              key={a.artifact_id}
+              className="animate-fade-in-up rounded-lg border border-line bg-bg2 p-2.5"
+              style={isCrawl ? { borderColor: "var(--amber)" } : undefined}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className={`grid h-8 w-8 shrink-0 place-items-center rounded-md ${
+                    isCrawl ? "bg-amber/15 text-amber" : "bg-violet/15 text-violet"
+                  }`}
+                >
+                  <svg className="h-4 w-4">
+                    <use href={isCrawl ? "#w-pkg" : "#w-edit"} />
+                  </svg>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-mono text-[12px] text-text">
+                    {a.title}
+                  </div>
+                  <div className="flex items-center gap-2 text-[10.5px] text-faint">
+                    <span>{a.kind}</span>
+                    <span>·</span>
+                    <span>{a.source_tool}</span>
+                  </div>
+                </div>
+                {isCrawl && (
+                  <button
+                    onClick={() => onOpenCrawl(a.data as CrawlReportData)}
+                    className="rounded-md bg-amber px-2 py-1 text-[10px] font-semibold text-bg1 transition hover:opacity-90"
+                  >
+                    查看报告
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* 文件类 artifact（向后兼容） */}
         {artifacts.map((a, i) => (
           <div
             key={i}

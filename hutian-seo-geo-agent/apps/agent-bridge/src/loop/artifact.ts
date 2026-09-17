@@ -19,6 +19,7 @@ const ARTIFACT_WHITELIST: Record<string, ArtifactKind> = {
   analyze_content_gap: "content_gap_report",
   check_schema: "schema_patch",
   run_diagnosis: "diagnosis_report",
+  crawl_site_audit: "crawl_report",
 };
 
 /** 单事件体积上限：256KB（SSE 单帧不宜过大） */
@@ -162,6 +163,16 @@ function deriveTitle(kind: ArtifactKind, data: Record<string, unknown>): string 
       return "结构化数据补丁";
     case "diagnosis_report":
       return "SEO/GEO 诊断报告";
+    case "crawl_report": {
+      const summary =
+        typeof data.summary === "object" && data.summary
+          ? (data.summary as Record<string, unknown>)
+          : {};
+      const domain = typeof summary.domain === "string" ? summary.domain : "unknown";
+      const crawled = summary.urls_crawled ?? "?";
+      const csr = summary.csr_empty_pages ?? 0;
+      return `全站爬取审计 · ${domain} · ${crawled} 页 · ${csr} CSR 空壳`;
+    }
     default:
       return "Artifact";
   }

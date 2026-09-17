@@ -76,7 +76,11 @@ export interface GapReportData {
  * 独立于 tool_end（调用完成语义），一工具调用可产 0..n 个 artifact。
  * ════════════════════════════════════════════════════════════════ */
 
-export type ArtifactKind = "content_gap_report" | "schema_patch" | "diagnosis_report";
+export type ArtifactKind =
+  | "content_gap_report"
+  | "schema_patch"
+  | "diagnosis_report"
+  | "crawl_report";
 
 export interface ArtifactEvent {
   type: "artifact_created";

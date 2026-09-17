@@ -349,6 +349,7 @@ func AllModels() []interface{} {
 		&AuditLog{},
 		&UserSession{},
 		&ApiKey{},
+		&ProjectEvent{},
 	}
 }
 
@@ -420,3 +421,31 @@ type ApiKey struct {
 }
 
 func (ApiKey) TableName() string { return "api_keys" }
+
+// ────────────────────────────────────────────────
+// 11. project_events — 项目事件存储（T15.3 排名趋势存储）
+//     用于存储 analyze_content_gap 等工具的快照结果，支持长期趋势对比
+//     kind 字段标识事件类型（如 serp_rank_snapshot / crawl_audit / content_gap）
+//     payload 字段存储 JSON 格式的详细数据
+// ────────────────────────────────────────────────
+
+type ProjectEventKind string
+
+const (
+	ProjectEventKindSerpRankSnapshot ProjectEventKind = "serp_rank_snapshot"
+	ProjectEventKindCrawlAudit       ProjectEventKind = "crawl_audit"
+	ProjectEventKindContentGap       ProjectEventKind = "content_gap"
+)
+
+// ProjectEvent 项目事件（按 tenant_id+workspace_id+kind+event_time 索引）
+type ProjectEvent struct {
+	BaseModel
+	TenantID    int64            `gorm:"index;not null" json:"tenant_id"`
+	WorkspaceID int64            `gorm:"index;not null" json:"workspace_id"`
+	Kind        ProjectEventKind `gorm:"type:varchar(64);index;not null" json:"kind"`
+	EventTime   time.Time        `gorm:"index;not null" json:"event_time"`
+	Payload     string           `gorm:"type:json;not null" json:"payload"` // JSON 格式详细数据
+	SourceTool  string           `gorm:"type:varchar(128)" json:"source_tool"`
+}
+
+func (ProjectEvent) TableName() string { return "project_events" }

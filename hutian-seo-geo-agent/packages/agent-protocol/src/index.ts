@@ -80,7 +80,8 @@ export type ArtifactKind =
   | "content_gap_report"
   | "schema_patch"
   | "diagnosis_report"
-  | "crawl_report";
+  | "crawl_report"
+  | "content_calendar";
 
 export interface ArtifactEvent {
   type: "artifact_created";

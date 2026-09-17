@@ -20,6 +20,7 @@ const ARTIFACT_WHITELIST: Record<string, ArtifactKind> = {
   check_schema: "schema_patch",
   run_diagnosis: "diagnosis_report",
   crawl_site_audit: "crawl_report",
+  content_calendar_plan: "content_calendar",
 };
 
 /** 单事件体积上限：256KB（SSE 单帧不宜过大） */
@@ -172,6 +173,11 @@ function deriveTitle(kind: ArtifactKind, data: Record<string, unknown>): string 
       const crawled = summary.urls_crawled ?? "?";
       const csr = summary.csr_empty_pages ?? 0;
       return `全站爬取审计 · ${domain} · ${crawled} 页 · ${csr} CSR 空壳`;
+    }
+    case "content_calendar": {
+      const count = typeof data.total_articles === "number" ? data.total_articles : "?";
+      const strategy = typeof data.strategy === "string" ? data.strategy.slice(0, 40) : "";
+      return `内容日历 · ${count} 篇文章${strategy ? ` · ${strategy}` : ""}`;
     }
     default:
       return "Artifact";
